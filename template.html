@@ -249,7 +249,7 @@ table.t tr.tot td{background:#f2f7f4;font-weight:700;border-top:1px solid var(--
 /* heatmap */
 table.hm{border-collapse:separate;border-spacing:3px;width:100%;font-size:12.5px}
 table.hm th{font-weight:600;color:#56635d;font-size:11.5px;padding:6px 8px;text-align:center;white-space:nowrap}
-table.hm th.rl{text-align:left}
+table.hm th.rl{text-align:left}table.hm th.lost{color:var(--verm)}
 table.hm td{text-align:center;padding:9px 6px;border-radius:7px;font-weight:600;min-width:58px;transition:transform .12s}
 table.hm td.cell{cursor:pointer}table.hm td.cell:hover{transform:scale(1.06);box-shadow:0 2px 8px rgba(0,40,30,.18)}
 table.hm td.rl{text-align:left;font-weight:500;background:none;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
@@ -1141,20 +1141,27 @@ function viewFunil() {
     `<tr class="tot"><td>Total</td><td class="num muted" colspan="7">${fN(k.leads)} leads no período · ${fN(EF.reduce((a, e) => a + e.atuais, 0))} abertos no funil · ${fN(k.ganhos)} ganhos · ${fN(k.perdidos)} perdidos</td></tr></tbody></table></div></div>`;
   // heatmap consultor × etapa (atuais)
   const cons = C.res.consultores.map(c => c.consultor), M = new Map();
-  for (const {l} of C.rows) if (l.s === 'open') { const key = l.c + '\u0001' + l.sg; M.set(key, (M.get(key) || 0) + 1); }
-  const mx = Math.max(1, ...M.values());
+  const LP = new Map();  // perdidos por consultor (leads do período já perdidos)
+  for (const {l} of C.rows) {
+    if (l.s === 'open') { const key = l.c + '\u0001' + l.sg; M.set(key, (M.get(key) || 0) + 1); }
+    else if (l.s === 'lost') LP.set(l.c, (LP.get(l.c) || 0) + 1);
+  }
+  const mx = Math.max(1, ...M.values()), mxl = Math.max(1, ...LP.values());
   const SF = STAGES.filter(st => FLOW.includes(Number(st.id)));
-  let hm = `<table class="hm"><thead><tr><th class="rl">Consultor</th>${SF.map(s => `<th>${ESC(s.nome)}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  let hm = `<table class="hm"><thead><tr><th class="rl">Consultor</th>${SF.map(s => `<th>${ESC(s.nome)}</th>`).join('')}<th>Total abertos</th><th class="lost">Perdidos</th></tr></thead><tbody>`;
   for (const c of cons) {
     let tot = 0;
     hm += `<tr><td class="rl" data-xf="consultores" data-v="${ESC(c)}" title="${ESC(c)}">${ESC(c)}</td>` + SF.map(s => {
       const v = M.get(c + '\u0001' + s.id) || 0; tot += v;
       const t = v / mx, bg = v ? `rgba(0,80,60,${0.08 + 0.86 * t})` : '#f6f8f7', fg = t > 0.45 ? '#fff' : v ? '#003326' : '#b5c0bb';
       return `<td class="cell" style="background:${bg};color:${fg}" data-xf="consultores" data-v="${ESC(c)}" data-xf2="etapas" data-v2="${s.id}" data-tip="${ESC(`${c} · ${s.nome}\n${fN(v)} leads abertos na etapa\nClique para filtrar`)}">${v || '·'}</td>`;
-    }).join('') + `<td class="tt">${tot}</td></tr>`;
+    }).join('') + `<td class="tt">${tot}</td>` + (() => {
+      const v = LP.get(c) || 0, t = v / mxl, bg = v ? `rgba(178,59,46,${0.1 + 0.8 * t})` : '#f6f8f7', fg = t > 0.45 ? '#fff' : v ? '#7a2a20' : '#b5c0bb';
+      return `<td class="cell" style="background:${bg};color:${fg}" data-xf="consultores" data-v="${ESC(c)}" data-xf2="status" data-v2="lost" data-tip="${ESC(`${c} · Perdidos\n${fN(v)} leads do período já perdidos\nClique para filtrar`)}">${v || '·'}</td>`;
+    })() + `</tr>`;
   }
   hm += '</tbody></table>';
-  h += `<div class="card"><div class="ch"><div><h3>Consultor × Etapa</h3><p>Leads abertos (atuais) em cada etapa · clique numa célula para filtrar</p></div></div><div class="tw">${hm}</div></div></div>`;
+  h += `<div class="card"><div class="ch"><div><h3>Consultor × Etapa</h3><p>Leads abertos (atuais) em cada etapa e leads do período já perdidos · clique numa célula para filtrar</p></div></div><div class="tw">${hm}</div></div></div>`;
   return h;
 }
 
@@ -1433,7 +1440,7 @@ function bindEvents() {
     const xf = t.closest('[data-xf]');
     if (xf) {
       if (xf.dataset.xf2) {
-        const a = xf.dataset.xf, b = xf.dataset.xf2, va = xf.dataset.v, vb = Number(xf.dataset.v2);
+        const a = xf.dataset.xf, b = xf.dataset.xf2, va = xf.dataset.v, vb = b === 'etapas' ? Number(xf.dataset.v2) : xf.dataset.v2;
         const same = S[a].length === 1 && S[a][0] === va && S[b].length === 1 && S[b][0] === vb;
         S[a] = same ? [] : [va]; S[b] = same ? [] : [vb];
       } else toggleVal(xf.dataset.xf, xf.dataset.v);
