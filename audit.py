@@ -165,6 +165,30 @@ def bloco(P, M):
     }
 
 
+FLOW = [345, 346, 348, 349, 350]  # ordem do funil; Cultivo fora
+
+
+def avanco(P, sid):
+    """Entrou na etapa e depois chegou a uma etapa posterior do funil (ou ganho, se não houver) -> avançou."""
+    if sid not in FLOW:
+        return {"avancaram": 0, "sem_avancar": 0, "media_dias_ate_avancar": None}
+    o = FLOW.index(sid); av, sem, ate = 0, 0, []
+    for l in P:
+        mine = [s for s in (l["h"] or []) if s[0] == sid]
+        if not mine:
+            continue
+        t0 = min(dt(s[1]) for s in mine)
+        nxt = [dt(s[1]) for s in l["h"] if s[0] in FLOW and FLOW.index(s[0]) > o and dt(s[1]) >= t0]
+        t1 = min(nxt) if nxt else (dt(l["w"]) if l["s"] == "won" and l.get("w") and dt(l["w"]) >= t0 else None)
+        if l["s"] == "open" and l["sg"] == sid:
+            continue  # está na etapa agora: conta em "ainda estão"
+        if t1 is not None:
+            av += 1; ate.append(dias(t1, t0))
+        else:
+            sem += 1
+    return {"avancaram": av, "sem_avancar": sem, "media_dias_ate_avancar": media(ate)}
+
+
 def compute(leads, filtros, agora_str, stages, equipe=()):
     agora = dt(agora_str)
     P = filtra(leads, filtros)
@@ -209,6 +233,7 @@ def compute(leads, filtros, agora_str, stages, equipe=()):
             "passaram": len(passaram),
             "media_dias_na_etapa": media(dur_saiu),
             "media_dias_atual": media(dur_atual),
+            **avanco(P, sid),
         })
 
     grupos = {}

@@ -39,6 +39,7 @@ header.top{background:linear-gradient(115deg,var(--prof) 0%,var(--verde) 55%,#0b
 .live i{width:7px;height:7px;border-radius:50%;background:var(--lima);box-shadow:0 0 0 3px rgba(97,206,112,.25);animation:pulse 2.4s infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(97,206,112,0)}}
 .rf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.rfb[hidden]{display:none}
 .rfb{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:600;color:var(--prof);background:var(--lima);border:0;border-radius:99px;padding:5px 13px;cursor:pointer;transition:filter .15s,transform .15s}
 .rfb:hover{filter:brightness(1.07)}.rfb:active{transform:scale(.97)}.rfb:disabled{cursor:progress;opacity:.85}
 .rfb svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
@@ -252,12 +253,13 @@ table.hm td.rl{text-align:left;font-weight:500;background:none;white-space:nowra
 table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 /* stage funnel */
 .sf{display:flex;flex-direction:column;gap:10px}
-.sfr{display:grid;grid-template-columns:150px minmax(0,1fr) 170px;gap:12px;align-items:center;cursor:pointer;padding:4px 6px;margin:0 -6px;border-radius:8px;transition:background .15s,opacity .2s}
+.sfr{display:grid;grid-template-columns:150px minmax(0,1fr) 430px;gap:12px;align-items:center;cursor:pointer;padding:4px 6px;margin:0 -6px;border-radius:8px;transition:background .15s,opacity .2s}
 .sfr:hover{background:var(--suave)}.sfr.dim{opacity:.4}.sfr.sel .sfn{color:var(--verde)}
 .sfn{font-weight:600;font-size:13px}
 .sft{position:relative;height:26px;background:#f1f5f3;border-radius:6px;overflow:hidden}
 .sft .p{position:absolute;left:0;top:0;bottom:0;background:var(--v200);border-radius:6px;animation:growx .6s ease both;transform-origin:left}
 .sft .a{position:absolute;left:0;top:0;bottom:0;background:var(--verde);border-radius:6px;animation:growx .7s ease both;transform-origin:left}
+.sft .v{position:absolute;left:0;top:0;bottom:0;background:#5f9c83;border-radius:6px 0 0 6px;animation:growx .65s ease both;transform-origin:left}
 .sfv{font-size:12.5px;color:var(--cinza);text-align:right}.sfv b{color:var(--txt)}
 /* consultant cards */
 .cc{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
@@ -435,6 +437,7 @@ const RAW = /*__RAW__*/null;
    ========================================================================= */
 const DAY = 86400000;
 const AGENDA_STAGES = new Set([348, 349, 350]);
+const FLOW = [345, 346, 348, 349, 350];  // ordem do funil; Cultivo (438) fica fora do fluxo
 const MEETING_TYPES = new Set(['meeting', 'qualificacao']);
 const DEFAULT_STAGES = [{id: 345, nome: 'MQL - 1º Contato'}, {id: 346, nome: 'Agendar'}, {id: 348, nome: 'Reunião'},
   {id: 349, nome: 'Negociação'}, {id: 350, nome: 'Fechamento'}, {id: 438, nome: 'Cultivo'}];
@@ -573,7 +576,22 @@ function computeFull(leads, f, agoraStr) {
         }
       }
     }
-    return {id, atuais, passaram, media_dias_na_etapa: mean(fech), media_dias_atual: mean(atual)};
+    // avanço: chegou a uma etapa POSTERIOR do funil (ou foi ganho, no caso de Fechamento) depois de entrar nesta
+    const ord = FLOW.indexOf(id);
+    let avancaram = 0, semAvancar = 0;
+    const ate = [];
+    if (ord >= 0) for (const {l} of rows) {
+      const h = l.h || [], mine = h.filter(s => Number(s[0]) === id);
+      if (!mine.length) continue;
+      const t0 = Math.min(...mine.map(s => tms(s[1])));
+      let t1 = Infinity;
+      for (const s of h) { const o = FLOW.indexOf(Number(s[0])); if (o > ord && tms(s[1]) >= t0) t1 = Math.min(t1, tms(s[1])); }
+      if (t1 === Infinity && l.s === 'won' && l.w && tms(l.w) >= t0) t1 = tms(l.w);
+      if (l.s === 'open' && Number(l.sg) === id) continue;  // está na etapa agora: conta em "ainda estão"
+      if (t1 !== Infinity) { avancaram++; ate.push((t1 - t0) / DAY); } else semAvancar++;
+    }
+    return {id, atuais, passaram, media_dias_na_etapa: mean(fech), media_dias_atual: mean(atual),
+      avancaram, sem_avancar: semAvancar, media_dias_ate_avancar: mean(ate)};
   });
   const byC = new Map();
   for (const r of rows) { if (!byC.has(r.l.c)) byC.set(r.l.c, []); byC.get(r.l.c).push(r); }
@@ -1096,29 +1114,33 @@ function viewFunil() {
   const C = cur(), k = C.res.kpis, E = C.res.etapas;
   let h = viewHead('Funil / Mapa do CRM', periodCaption() + ' · etapa por etapa no B2C Funil Alpha');
   if (!k.leads) return h + `<div class="card">${emptyBox()}</div>`;
-  const act = S.etapas.map(Number);
-  const sf = '<div class="sf">' + E.map(e => {
+  const act = S.etapas.map(Number), EF = E.filter(e => FLOW.includes(Number(e.id)));  // Cultivo fora do funil
+  const sf = '<div class="sf">' + EF.map(e => {
     const st = act.length ? (act.includes(e.id) ? ' sel' : ' dim') : '';
-    const tip = `${stageName(e.id)}\nPassaram: ${fN(e.passaram)} (${fP(pctOf(e.passaram, k.leads))} dos leads)\nAtuais (abertos na etapa): ${fN(e.atuais)}\nTempo médio na etapa: ${fD(e.media_dias_na_etapa)}\nTempo médio atual: ${fD(e.media_dias_atual)}\nClique para filtrar a etapa atual`;
+    const tip = `${stageName(e.id)}\nEntraram: ${fN(e.passaram)} (${fP(pctOf(e.passaram, k.leads))} dos leads)\nAvançaram para a próxima: ${fN(e.avancaram)} (${fP(pctOf(e.avancaram, e.passaram))})\nAinda estão na etapa: ${fN(e.atuais)}\nSaíram sem avançar (perdidos, Cultivo ou voltaram): ${fN(e.sem_avancar)}\nMédia até avançar: ${fD(e.media_dias_ate_avancar)}\nClique para filtrar a etapa atual`;
     return `<div class="sfr${st}" data-xf="etapas" data-v="${e.id}" data-tip="${ESC(tip)}"><span class="sfn">${ESC(stageName(e.id))}</span>
-      <span class="sft"><span class="p" style="width:${100 * e.passaram / k.leads}%"></span><span class="a" style="width:${100 * e.atuais / k.leads}%"></span></span>
-      <span class="sfv"><b>${fN(e.passaram)}</b> passaram · <b>${fN(e.atuais)}</b> atuais</span></div>`;
+      <span class="sft"><span class="p" style="width:${100 * e.passaram / k.leads}%"></span><span class="v" style="width:${100 * e.avancaram / k.leads}%"></span><span class="a" style="left:${100 * e.avancaram / k.leads}%;width:${100 * e.atuais / k.leads}%"></span></span>
+      <span class="sfv" style="white-space:nowrap"><b>${fN(e.passaram)}</b> entraram · <b>${fN(e.avancaram)}</b> avançaram · <b>${fN(e.atuais)}</b> ainda estão · <b>${fD(e.media_dias_ate_avancar)}</b> até avançar</span></div>`;
   }).join('') + '</div>';
-  h += `<div class="card"><div class="ch"><div><h3>Funil por etapa</h3><p>Barra clara = passaram pela etapa · barra escura = estão nela agora (abertos) · base = ${fN(k.leads)} leads</p></div>
-    <div class="lg"><span><i style="background:var(--v200)"></i>Passaram</span><span><i style="background:var(--verde)"></i>Atuais</span></div></div>${sf}</div>`;
-  const cols = [{k: 'et', t: 'Etapa'}, {k: 'at', t: 'Atuais', num: 1}, {k: 'pa', t: 'Passaram', num: 1}, {k: 'pp', t: '% que passou', num: 1, tip: 'Passaram ÷ leads do período'},
-    {k: 'me', t: 'Tempo médio na etapa', num: 1, tip: 'Média de dias, entre quem já saiu da etapa (soma das passagens)'}, {k: 'ma', t: 'Tempo médio atual', num: 1, tip: 'Há quantos dias, em média, os atuais estão na etapa'}];
-  h += `<div class="g mt"><div class="card np"><div class="ch"><div><h3>Mapa de etapas</h3><p>Atuais, passagens e tempo de permanência</p></div></div><div class="tw"><table class="t">${thead(cols.map(c => ({...c, nosort: 1})), null, 'x')}<tbody>` +
-    E.map(e => `<tr><td>${stagePill(e.id)}</td><td class="num b">${fN(e.atuais)}</td><td class="num">${fN(e.passaram)}</td><td class="num"><span class="dbar"><i style="width:${pctOf(e.passaram, k.leads) || 0}%"></i></span>${fP(pctOf(e.passaram, k.leads))}</td><td class="num">${fD(e.media_dias_na_etapa)}</td><td class="num">${fD(e.media_dias_atual)}</td></tr>`).join('') +
-    `<tr class="tot"><td>Total</td><td class="num">${fN(E.reduce((a, e) => a + e.atuais, 0))}</td><td class="num muted" colspan="4">${fN(k.leads)} leads no período · ${fN(k.ganhos)} ganhos · ${fN(k.perdidos)} perdidos</td></tr></tbody></table></div></div>`;
+  h += `<div class="card"><div class="ch"><div><h3>Funil por etapa</h3><p>Barra clara = entraram na etapa · média = avançaram para a próxima · escura = ainda estão nela (abertos) · base = ${fN(k.leads)} leads</p></div>
+    <div class="lg"><span><i style="background:var(--v200)"></i>Entraram</span><span><i style="background:#5f9c83"></i>Avançaram</span><span><i style="background:var(--verde)"></i>Ainda estão</span></div></div>${sf}</div>`;
+  const cols = [{k: 'et', t: 'Etapa'}, {k: 'en', t: 'Entraram', num: 1, tip: 'Leads do período que estiveram na etapa em algum momento'},
+    {k: 'av', t: 'Avançaram', num: 1, tip: 'Foram para uma etapa seguinte do funil (em Fechamento: ganhos)'}, {k: 'pa', t: '% avanço', num: 1, tip: 'Avançaram ÷ entraram'},
+    {k: 'at', t: 'Ainda estão', num: 1, tip: 'Abertos que estão na etapa agora'}, {k: 'sa', t: 'Saíram sem avançar', num: 1, tip: 'Perdidos na etapa, enviados ao Cultivo ou que voltaram de etapa'},
+    {k: 'ma', t: 'Média até avançar', num: 1, tip: 'Dias, em média, da entrada na etapa até chegar à próxima (só quem avançou)'},
+    {k: 'mt', t: 'Tempo médio atual', num: 1, tip: 'Há quantos dias, em média, quem ainda está na etapa entrou nela'}];
+  h += `<div class="g mt"><div class="card np"><div class="ch"><div><h3>Mapa de etapas</h3><p>Quantos entraram, avançaram e ainda estão em cada etapa, e quanto tempo levam para ir à próxima</p></div></div><div class="tw"><table class="t">${thead(cols.map(c => ({...c, nosort: 1})), null, 'x')}<tbody>` +
+    EF.map(e => `<tr><td>${stagePill(e.id)}</td><td class="num b">${fN(e.passaram)}</td><td class="num">${fN(e.avancaram)}</td><td class="num"><span class="dbar"><i style="width:${pctOf(e.avancaram, e.passaram) || 0}%"></i></span>${fP(pctOf(e.avancaram, e.passaram))}</td><td class="num b">${fN(e.atuais)}</td><td class="num muted">${fN(e.sem_avancar)}</td><td class="num b">${fD(e.media_dias_ate_avancar)}</td><td class="num">${fD(e.media_dias_atual)}</td></tr>`).join('') +
+    `<tr class="tot"><td>Total</td><td class="num muted" colspan="7">${fN(k.leads)} leads no período · ${fN(EF.reduce((a, e) => a + e.atuais, 0))} abertos no funil · ${fN(k.ganhos)} ganhos · ${fN(k.perdidos)} perdidos</td></tr></tbody></table></div></div>`;
   // heatmap consultor × etapa (atuais)
   const cons = C.res.consultores.map(c => c.consultor), M = new Map();
   for (const {l} of C.rows) if (l.s === 'open') { const key = l.c + '\u0001' + l.sg; M.set(key, (M.get(key) || 0) + 1); }
   const mx = Math.max(1, ...M.values());
-  let hm = `<table class="hm"><thead><tr><th class="rl">Consultor</th>${STAGES.map(s => `<th>${ESC(s.nome)}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  const SF = STAGES.filter(st => FLOW.includes(Number(st.id)));
+  let hm = `<table class="hm"><thead><tr><th class="rl">Consultor</th>${SF.map(s => `<th>${ESC(s.nome)}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
   for (const c of cons) {
     let tot = 0;
-    hm += `<tr><td class="rl" data-xf="consultores" data-v="${ESC(c)}" title="${ESC(c)}">${ESC(c)}</td>` + STAGES.map(s => {
+    hm += `<tr><td class="rl" data-xf="consultores" data-v="${ESC(c)}" title="${ESC(c)}">${ESC(c)}</td>` + SF.map(s => {
       const v = M.get(c + '\u0001' + s.id) || 0; tot += v;
       const t = v / mx, bg = v ? `rgba(0,80,60,${0.08 + 0.86 * t})` : '#f6f8f7', fg = t > 0.45 ? '#fff' : v ? '#003326' : '#b5c0bb';
       return `<td class="cell" style="background:${bg};color:${fg}" data-xf="consultores" data-v="${ESC(c)}" data-xf2="etapas" data-v2="${s.id}" data-tip="${ESC(`${c} · ${s.nome}\n${fN(v)} leads abertos na etapa\nClique para filtrar`)}">${v || '·'}</td>`;

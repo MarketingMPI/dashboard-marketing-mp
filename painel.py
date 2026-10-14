@@ -382,6 +382,7 @@ def model(cache):
             # e os contatos do ciclo anterior não contam para este ciclo.
             entry, fonte = moved[0], f"Entrou no Funil Alpha vindo de {moved[1]} (criado no CRM em {crm[8:10]}/{crm[5:7]}/{crm[:4]})"
             contacts = [x for x in contacts if x[0] >= entry]
+            hist = [x for x in hist if x[1] >= entry[:19]]  # jornada do ciclo atual (etapas de antes da volta ficam fora)
             reat = "base de relacionamento" in moved[1].lower()
         else:
             entry, fonte = (ent[0], ent[1]) if ent else (crm, "Criação no CRM")
