@@ -1,0 +1,11 @@
+# segredos e dados locais (contêm nomes de leads) — nunca versionar
+.env
+data/
+cache/
+_site/
+legacy/
+ops/
+site/
+site-repair/
+__pycache__/
+*.pyc
