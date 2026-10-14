@@ -35,7 +35,7 @@ Publicado em https://marketingmpi.github.io/dashboard-marketing-mp/ (repo renome
     ec: "2026-10-14T09:00:00", // criação do negócio no CRM (add_time)
     ef: "Criação no CRM",      // fonte da entrada: Criação no CRM | Lead recuperado do Meta (nota) | Formulário Meta (nota 'Enviado em') |
                                // Importação CSV do Meta (nota) | Entrada no Meta/AC (nota) | 1º contato registrado (anterior à criação no CRM)
-    b: 0|1,                    // 1 = importação de BASE em lote (ex.: ex-clientes) — fora por padrão (filtros.incluir_base)
+    b: 0|1,                    // 1 = base reativada (ex-clientes importados / vindos da Base de Relacionamento) — só informativo; entra por padrão
     dd: [54637],               // (opcional) outros negócios da MESMA pessoa absorvidos neste lead
     w: null|"...",             // ganho em (BRT)
     l: null|"...",             // perdido em (BRT)
@@ -146,12 +146,13 @@ Header mostra "Dados do Pipedrive em dd/mm/aaaa hh:mm" + selo "atualização aut
   digitação, ignora.
 - **Veio de outro funil:** se o negócio chegou ao Alpha (troca de etapa de um funil de fora para uma etapa do Alpha) mais de
   1 dia depois da criação, entrada = chegada ao Alpha e os contatos anteriores (ciclo passado) saem de `k`.
-- **Base reativada (`b=1`, fora por padrão):** (a) importação em lote — origem `Import`, ≥ 10 negócios do mesmo criador na mesma
+- **Base reativada (`b=1`, informativo; entra por padrão desde 14/10/2026 a pedido do usuário):** (a) importação em lote — origem `Import`, ≥ 10 negócios do mesmo criador na mesma
   hora, sem data real em nota; (b) negócio trazido de volta da *B2C Base de Relacionamento*.
 - **Uma pessoa = um lead POR CICLO:** negócios com mesmo e-mail/telefone (hash; 8 últimos dígitos) criados com até 14 dias de
   diferença viram um lead (canônico = aberto/ganho antes de perdido, depois o mais recente; entrada = a mais antiga; contatos =
   união; `dd` = absorvidos). Conversão nova depois disso = lead novo no próprio período, com `re` = data da entrada anterior.
 - **Varredura de cadência:** conclusões do mesmo tipo em < 10 min no mesmo lead = um contato (o consultor marcando A01..A15 de uma vez).
-- Filtro extra no contrato: `filtros.incluir_base` (bool, padrão false) — leads com `b=1` só entram quando true.
+- Filtros extras no contrato: `filtros.incluir_base` (padrão **true** = funil inteiro; false tira `b=1`) e `filtros.so_trd`
+  (bool, padrão false; true = só títulos `^\s*TRD\s*\|`, sem TRD-INT). A UI mostra o funil inteiro e oferece o seletor "Somente leads TRD".
 - Conferência contra a fonte: `python data/verif/crosscheck.py` refaz pela API v2 uma amostra (semana + 20 aleatórios + duplicados)
   e compara entrada, contatos, 1º contato, status, etapa, perda/ganho e motivo.

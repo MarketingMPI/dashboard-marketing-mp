@@ -13,6 +13,7 @@ resultado = MP_DASH.compute(D.leads, filtros, D.gerado_em).
 """
 import json
 import os
+import re
 import sys
 import unicodedata
 from collections import Counter
@@ -115,9 +116,12 @@ def filtra(leads, f):
     etqs = set(f.get("etiquetas") or [])
     busca = norm(f.get("busca") or "")
     out = []
-    base = bool(f.get("incluir_base"))
+    base = f.get("incluir_base") is not False   # padrão: funil inteiro
+    so_trd = bool(f.get("so_trd"))
     for l in leads:
         if l.get("b") and not base:
+            continue
+        if so_trd and not re.match(r"^\s*TRD\s*\|", l.get("n") or "", re.I):
             continue
         d = l["e"][:10]
         if not (de <= d <= ate):
@@ -241,7 +245,7 @@ def compute(leads, filtros, agora_str, stages):
 # ----------------------------------------------------------------------------- cenários
 def filtros_base(de, ate, **kw):
     f = {"de": de, "ate": ate, "consultores": [], "origens": [], "status": [],
-         "etapas": [], "etiquetas": [], "busca": "", "incluir_base": False}
+         "etapas": [], "etiquetas": [], "busca": "", "incluir_base": True, "so_trd": False}
     f.update(kw)
     return f
 
@@ -264,8 +268,9 @@ def cenarios(D):
         ("ultimos_30_etapa_mql", filtros_base(d30, h, etapas=[345])),
         ("tudo_etiqueta_digital", filtros_base("2000-01-01", h, etiquetas=["Digital"])),
         ("tudo_busca_trd", filtros_base("2000-01-01", h, busca="trd")),
-        ("ultimos_30_com_base", filtros_base(d30, h, incluir_base=True)),
-        ("tudo_com_base", filtros_base("2000-01-01", h, incluir_base=True)),
+        ("ultimos_7_so_trd", filtros_base(d7, h, so_trd=True)),
+        ("tudo_so_trd", filtros_base("2000-01-01", h, so_trd=True)),
+        ("ultimos_30_sem_base", filtros_base(d30, h, incluir_base=False)),
     ]
 
 

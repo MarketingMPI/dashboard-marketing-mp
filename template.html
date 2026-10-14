@@ -405,7 +405,7 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
         <div><dt>Lead</dt><dd>Cada pessoa com negócio no funil B2C Funil Alpha do Pipedrive, de qualquer origem. Registros de teste são excluídos<span id="nteste"></span>. Só o nome do negócio é exibido (sem e-mail ou telefone).</dd></div>
         <div><dt>Data de entrada</dt><dd>É quando o lead chegou de verdade, não quando o negócio foi criado no CRM. Para leads recuperados do Meta, importados de CSV ou lançados em lote, vale a data registrada na nota do negócio. Se houver contato registrado antes da criação, o lead já existia e a entrada passa a ser esse contato. Negócio que veio de outro funil entra na data em que chegou ao Funil Alpha. O detalhe do lead mostra a fonte da data.</dd></div>
         <div><dt>Uma pessoa = um lead</dt><dd>Negócios da mesma pessoa (mesmo e-mail ou telefone) criados com até 14 dias de diferença são duplicidade e contam como um lead só: vale o negócio aberto mais recente, a entrada mais antiga e a soma dos contatos. Se a pessoa converter de novo depois disso, é um novo lead no período da nova entrada (marcado como reincidente).</dd></div>
-        <div><dt>Base reativada</dt><dd>Contatos antigos colocados de volta no funil (listas importadas em lote, como ex-clientes, e negócios trazidos da Base de Relacionamento) não são leads gerados no período e ficam fora por padrão. O seletor "Incluir base reativada" traz esses registros de volta. A entrada deles é a data em que voltaram ao Funil Alpha.</dd></div>
+        <div><dt>Funil inteiro e "Somente leads TRD"</dt><dd>Por padrão o dashboard mostra todos os negócios do Funil Alpha, inclusive ex-clientes importados e contatos antigos trazidos de volta da Base de Relacionamento (a entrada deles é a data em que voltaram ao funil). O seletor <b>Somente leads TRD</b> restringe tudo aos negócios cujo título começa com "TRD |" (campanha Tríade; TRD-INT fica de fora).</dd></div>
         <div><dt>Data do contato</dt><dd>Hora em que a atividade foi concluída. Contato lançado depois do fato (atividade criada já concluída, com data anterior) vale pela data informada na atividade. Conclusões do mesmo tipo em menos de 10 minutos no mesmo lead (cadência marcada como feita de uma vez) contam como um contato só.</dd></div>
         <div><dt>Período</dt><dd>Filtra pela data de entrada do lead (horário de Brasília), incluindo o primeiro e o último dia. A comparação (▲▼) usa o mesmo número de dias imediatamente anterior, com os mesmos filtros.</dd></div>
         <div><dt>Contato</dt><dd>Atividade de contato <b>concluída</b> no Pipedrive: ligação, WhatsApp, mensagem, e-mail ou reunião. Atividades pendentes da cadência não contam como contato.</dd></div>
@@ -439,6 +439,7 @@ const MEETING_TYPES = new Set(['meeting', 'qualificacao']);
 const DEFAULT_STAGES = [{id: 345, nome: 'MQL - 1º Contato'}, {id: 346, nome: 'Agendar'}, {id: 348, nome: 'Reunião'},
   {id: 349, nome: 'Negociação'}, {id: 350, nome: 'Fechamento'}, {id: 438, nome: 'Cultivo'}];
 const SEM_MOTIVO = 'Sem motivo informado';
+const TRD_RX = /^\s*TRD\s*\|/i;  // prefixo exato da Tríade (exclui TRD-INT)
 let D = null;
 let STAGES = DEFAULT_STAGES;
 
@@ -499,9 +500,10 @@ function makePred(f, skip) {
     LB = skip === 'etiquetas' ? null : set(f.etiquetas), MT = skip === 'motivos' ? null : set(f.motivos);
   const q = skip === 'busca' ? '' : norm(f.busca || '');
   const ref = f.data_ref === 'l' ? 'l' : 'e', de = f.de || '', ate = f.ate || '';
-  const base = !!f.incluir_base;
+  const base = f.incluir_base !== false, trd = !!f.so_trd;  // padrão: funil inteiro; so_trd = só título 'TRD |'
   return l => {
     if (!base && l.b) return false;
+    if (trd && !TRD_RX.test(l.n || '')) return false;
     if (skip !== 'periodo' && (de || ate)) {
       const v = l[ref];
       if (!v) return false;
@@ -694,7 +696,7 @@ const DIMS = [
   {k: 'etapas', nome: 'Etapa', h: 'et'}, {k: 'etiquetas', nome: 'Etiqueta', h: 'lb'}, {k: 'motivos', nome: 'Motivo da perda', h: 'mt', hidden: true}];
 let LEADS = [], BYID = new Map(), AGORA_STR = '', AGORA = 0, TODAY = '', MIN_DAY = '';
 const S = {
-  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: false, base: false,
+  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: false, trd: false,
   consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [],
   ll: {sort: 'e', dir: -1, page: 0, quick: 'todos'}, lost: {sort: 'l', dir: -1, page: 0},
   cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false
@@ -731,7 +733,7 @@ function prevRange() { const n = diffDays(S.de, S.ate) + 1; return [addDays(S.de
 
 function filtros(over) {
   return Object.assign({de: S.de, ate: S.ate, consultores: S.consultores.slice(), origens: S.origens.slice(), status: S.status.slice(),
-    etapas: S.etapas.slice(), etiquetas: S.etiquetas.slice(), busca: S.busca.trim(), motivos: S.motivos.slice(), incluir_base: S.base}, over || {});
+    etapas: S.etapas.slice(), etiquetas: S.etiquetas.slice(), busca: S.busca.trim(), motivos: S.motivos.slice(), incluir_base: true, so_trd: S.trd}, over || {});
 }
 const MEMO = new Map();
 function run(f) {
@@ -750,7 +752,7 @@ function writeHash() {
   for (const dm of DIMS) if (S[dm.k].length) p.set(dm.h, S[dm.k].join('|'));
   if (S.busca.trim()) p.set('q', S.busca.trim());
   if (S.perdaData) p.set('pd', '1');
-  if (S.base) p.set('base', '1');
+  if (S.trd) p.set('trd', '1');
   const h = p.toString(), want = h ? '#' + h : '';
   if (want === location.hash || (!want && !location.hash)) return;
   try { history.replaceState(null, '', location.pathname + location.search + (want || '#')); } catch (e) { location.hash = h; }
@@ -774,7 +776,7 @@ function readHash() {
   }
   S.busca = p.get('q') || '';
   S.perdaData = p.get('pd') === '1';
-  S.base = p.get('base') === '1';
+  S.trd = p.get('trd') === '1';
 }
 
 function toggleVal(k, v) {
@@ -977,11 +979,11 @@ const viewHead = (t, sub, right = '') => `<div class="vh"><div><h2>${t}</h2><p>$
 function viewMacro() {
   const C = cur(), P = prev(), k = C.res.kpis, pk = P.res.kpis;
   const pctK = (v, n) => n ? fP(v / n * 100) + ' dos leads' : '';
-  const nBase = S.base ? 0 : run(filtros({incluir_base: true})).res.kpis.leads - k.leads;
+  const nBase = C.rows.reduce((a, r) => a + (r.l.b ? 1 : 0), 0);
   let h = viewHead('Visão Macro', periodCaption());
   h += '<div class="kpis">' + [
     kpiCard({label: 'Entraram no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k.abertos)} abertos · ${fN(k.ganhos)} ganhos · ${fN(k.perdidos)} perdidos`,
-      extra: nBase > 0 ? `<div class="kx">+ ${fN(nBase)} da base reativada fora do filtro · ${fN(k.leads + nBase)} no total</div>` : (S.base ? '<div class="kx">inclui a base reativada</div>' : ''),
+      extra: nBase > 0 ? `<div class="kx">inclui ${fN(nBase)} ex-clientes e contatos antigos reativados</div>` : '',
       d: delta(k.leads, pk.leads, 0), tip: 'Todos os leads que entraram no período (abertos, ganhos e perdidos), com os filtros aplicados'}),
     kpiCard({label: 'Com contato', cls: 'w2', v: `${fN(k.contatados)}<small>${fP(k.pct_contatados)}</small>`, sub: `${f1(k.contatos_por_lead)} contatos por lead contatado`,
       extra: `<div class="prog"><i style="width:${k.pct_contatados || 0}%"></i></div>`, d: delta(k.pct_contatados, pk.pct_contatados, 1, fP), tip: 'Leads com ao menos uma atividade de contato concluída.\nVariação do % de contatados.'}),
@@ -1326,8 +1328,8 @@ function renderChips() {
   }
   if (S.busca.trim()) { any = true; h += `<span class="chip"><small>Busca:</small>“${ESC(S.busca.trim())}”<button data-rm="busca" aria-label="Remover busca">✕</button></span>`; }
   if (any) h += '<button class="clr" data-act="clear">Limpar filtros</button>';
-  const fb = filtros({incluir_base: true}), pb = makePred(fb), nb = LEADS.reduce((a, l) => a + (l.b && pb(l) ? 1 : 0), 0);
-  if (nb || S.base) h += `<span class="tg${S.base ? ' on' : ''}" data-act="base" role="switch" aria-checked="${S.base}" tabindex="0" title="Contatos antigos colocados de volta no funil: listas importadas em lote (ex.: ex-clientes) e negócios trazidos da Base de Relacionamento. Não são leads gerados no período, por isso ficam fora por padrão."><span class="sw"></span>Incluir base reativada (${fN(nb)})</span>`;
+  const ptrd = makePred(filtros({so_trd: true})), ntrd = LEADS.reduce((a, l) => a + (ptrd(l) ? 1 : 0), 0);
+  h += `<span class="tg${S.trd ? ' on' : ''}" data-act="trd" role="switch" aria-checked="${S.trd}" tabindex="0" title="Mostra só os negócios cujo título começa com 'TRD |' (campanha Tríade). TRD-INT fica de fora."><span class="sw"></span>Somente leads TRD (${fN(ntrd)})</span>`;
   document.getElementById('chips').innerHTML = h;
 }
 function renderNav() {
@@ -1382,7 +1384,7 @@ function bindEvents() {
       if (a === 'clear') { DIMS.forEach(d => S[d.k] = []); S.busca = ''; document.getElementById('q').value = ''; resetPages(); update(); }
       else if (a === 'csv-lista') exportCsv(listaRows(), 'leads');
       else if (a === 'csv-lost') exportCsv(lostList(), 'perdidos');
-      else if (a === 'base') { S.base = !S.base; resetPages(); update(); }
+      else if (a === 'trd') { S.trd = !S.trd; resetPages(); update(); }
       else if (a === 'perda-data') { S.perdaData = !S.perdaData; S.lost.page = 0; update(); }
       else if (a === 'close') closeDrawer();
       else if (a === 'tl-all') { S.tlAll = true; openDrawer(act.dataset.id); }
