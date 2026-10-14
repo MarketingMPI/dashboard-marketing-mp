@@ -321,7 +321,13 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 #tip.on{opacity:1}#tip b{color:#fff;display:block;font-size:12.5px;margin-bottom:2px}
 /* footer */
 footer.howto{margin-top:28px;background:#fff;border:1px solid var(--linha);border-radius:var(--r);padding:20px 24px;color:#46534e;font-size:13px}
-footer.howto h3{margin:0 0 10px;font-size:15px;color:var(--prof)}
+footer.howto h3{margin:0;font-size:15px;color:var(--prof)}
+footer.howto{padding:0}footer.howto details>*:not(summary){margin-left:24px;margin-right:24px}footer.howto details[open]{padding-bottom:20px}
+footer.howto summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 24px;border-radius:var(--r);user-select:none}
+footer.howto summary::-webkit-details-marker{display:none}footer.howto summary:hover{background:var(--suave)}
+footer.howto summary:before{content:'';width:8px;height:8px;border-right:2px solid var(--verde);border-bottom:2px solid var(--verde);transform:rotate(-45deg);transition:transform .2s;margin-right:2px}
+footer.howto details[open] summary:before{transform:rotate(45deg)}footer.howto details[open] summary{margin-bottom:6px}
+footer.howto .hint{font-size:12px;color:var(--cinza)}footer.howto details[open] .hint{display:none}
 footer.howto dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 28px;margin:0}
 footer.howto dt{font-weight:600;color:var(--txt)}footer.howto dd{margin:1px 0 0}
 footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
@@ -404,8 +410,8 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
       <div class="crow"><div class="chips" id="chips"></div><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Buscar lead pelo nome" autocomplete="off"></label></div>
     </div>
     <section id="view" class="view"></section>
-    <footer class="howto">
-      <h3>Como ler este dashboard</h3>
+    <footer class="howto"><details id="howto">
+      <summary><h3>Como ler este dashboard</h3><span class="hint">clique para abrir</span></summary>
       <dl>
         <div><dt>Lead</dt><dd>Cada pessoa com negócio no funil B2C Funil Alpha do Pipedrive, de qualquer origem. Registros de teste são excluídos<span id="nteste"></span>. Só o nome do negócio é exibido (sem e-mail ou telefone).</dd></div>
         <div><dt>Data de entrada</dt><dd>É quando o lead chegou de verdade, não quando o negócio foi criado no CRM. Para leads recuperados do Meta, importados de CSV ou lançados em lote, vale a data registrada na nota do negócio. Se houver contato registrado antes da criação, o lead já existia e a entrada passa a ser esse contato. Negócio que veio de outro funil entra na data em que chegou ao Funil Alpha. O detalhe do lead mostra a fonte da data.</dd></div>
@@ -417,11 +423,11 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
         <div><dt>Tempo até o 1º contato</dt><dd>Dias entre a entrada do lead e o primeiro contato concluído (0,5 d = 12 horas). Média e mediana calculadas só entre os leads contatados.</dd></div>
         <div><dt>Agendado e Reunião</dt><dd><b>Agendado</b>: o lead chegou à etapa Reunião, Negociação ou Fechamento (ou foi ganho). <b>Reunião</b>: existe uma reunião (ou reunião de qualificação) concluída.</dd></div>
         <div><dt>Dias sem contato e parados</dt><dd>Só para leads abertos: dias desde o último contato (ou desde a entrada, se nunca houve contato). <b>Parado</b> = mais de 7 dias sem contato.</dd></div>
-        <div><dt>Mapa do CRM</dt><dd><b>Atuais</b>: abertos que estão na etapa hoje. <b>Passaram</b>: leads que estiveram na etapa em algum momento. <b>Tempo na etapa</b>: média de dias de quem já saiu; <b>tempo atual</b>: há quantos dias os atuais estão lá.</dd></div>
+        <div><dt>Funil / Mapa do CRM</dt><dd>Etapas do funil sem o Cultivo. <b>Entraram</b>: leads que estiveram na etapa. <b>Avançaram</b>: chegaram a uma etapa seguinte (em Fechamento: ganhos). <b>Ainda estão</b>: abertos na etapa hoje. <b>Saíram sem avançar</b>: perdidos na etapa, enviados ao Cultivo ou que voltaram de etapa. Entraram = avançaram + ainda estão + saíram sem avançar. <b>Média até avançar</b>: dias da entrada na etapa até chegar à próxima (só quem avançou).</dd></div>
         <div><dt>Perdidos</dt><dd>Lead-time até a perda = dias da entrada até a perda. Contatos até a perda = contatos concluídos até o momento da perda. Opcionalmente, a aba Perdidos pode recortar o período pela data da perda.</dd></div>
       </dl>
       <div class="fm">Datas e horários de Brasília · fonte: Pipedrive · Meu Patrimônio, uso interno. Material de acompanhamento comercial, sem recomendação de investimento.</div>
-    </footer>
+    </details></footer>
   </main>
 </div>
 <div id="ovl"></div>
