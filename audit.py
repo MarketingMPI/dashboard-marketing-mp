@@ -165,7 +165,7 @@ def bloco(P, M):
     }
 
 
-def compute(leads, filtros, agora_str, stages):
+def compute(leads, filtros, agora_str, stages, equipe=()):
     agora = dt(agora_str)
     P = filtra(leads, filtros)
     M = {l["id"]: lead_metrics(l, agora) for l in P}
@@ -218,6 +218,10 @@ def compute(leads, filtros, agora_str, stages):
     for c, ls in grupos.items():
         bc = bloco(ls, M)
         consultores.append({"consultor": c, **bc})
+    fc = set(filtros.get("consultores") or [])
+    for c in equipe:  # equipe atual sempre aparece, zerada
+        if c not in grupos and (not fc or c in fc):
+            consultores.append({"consultor": c, **bloco([], {})})
     consultores.sort(key=lambda x: (-x["leads"], x["consultor"]))
 
     lost = [l for l in P if l["s"] == "lost"]
@@ -281,7 +285,7 @@ def load():
 
 def expected_all(D):
     return [{"cenario": nome, "filtros": f,
-             "resultado": compute(D["leads"], f, D["gerado_em"], D["stages"])}
+             "resultado": compute(D["leads"], f, D["gerado_em"], D["stages"], D.get("equipe") or ())}
             for nome, f in cenarios(D)]
 
 
@@ -425,7 +429,7 @@ def compare(arquivo, D):
             if ff.get(k, [] if isinstance(v, list) else "") != v:
                 out.append((f"filtros.{k}", v, ff.get(k, "<ausente>")))
         # recalcula o esperado com os filtros que o front usou, para não mascarar diferença de cálculo
-        res_esp = compute(D["leads"], {**ce["filtros"], **ff}, D["gerado_em"], D["stages"]) if ff else ce["resultado"]
+        res_esp = compute(D["leads"], {**ce["filtros"], **ff}, D["gerado_em"], D["stages"], D.get("equipe") or ()) if ff else ce["resultado"]
         diff(res_esp, cf.get("resultado"), "resultado", out)
         status[nome] = "OK" if not out else f"FALHOU ({len(out)})"
         total += len(out)

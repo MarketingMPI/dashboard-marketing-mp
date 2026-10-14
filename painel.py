@@ -38,6 +38,8 @@ STAGE_IDS = {s for s, _ in STAGES}
 CONTACT_TYPES = {"call", "whatsapp_chat1", "whatsapp_chat", "msg", "email", "meeting", "qualificacao"}  # no-show/tarefa não são contato
 TYPE_NAMES = {"call": "Ligação", "whatsapp_chat1": "WhatsApp", "whatsapp_chat": "WhatsApp", "msg": "Mensagem",
               "email": "E-mail", "meeting": "Reunião", "qualificacao": "Reunião de qualificação"}
+# Consultores da equipe atual: aparecem sempre no dashboard, mesmo sem leads no recorte.
+EQUIPE = ["Danilo Ribeiro", "Pedro Francisco", "Victor Carvalho"]
 TEST_RX = re.compile(r"\b(teste|test lead|zzteste|dummy)\b|registro de teste", re.I)
 
 
@@ -446,7 +448,7 @@ def collect(full=False):
     leads, excl = model(cache)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "leads": leads,
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads,
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)"}}
     tmp = SNAP.with_suffix(".tmp"); tmp.write_text(json.dumps(snap, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"); tmp.replace(SNAP)

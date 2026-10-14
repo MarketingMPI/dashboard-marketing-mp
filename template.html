@@ -582,7 +582,13 @@ function computeFull(leads, f, agoraStr) {
     return {consultor: c, leads: s.n, contatados: s.cont, pct_contatados: s.pct, media_dias_1o_contato: s.m1,
       mediana_dias_1o_contato: s.md1, contatos_por_lead: s.cpl, agendados: s.ag, reunioes: s.reu, ganhos: s.won,
       perdidos: s.lost, abertos: s.open, abertos_sem_contato: s.openSem, parados_7d: s.par};
-  }).sort((a, b) => b.leads - a.leads || (a.consultor < b.consultor ? -1 : a.consultor > b.consultor ? 1 : 0));
+  });
+  // equipe atual aparece sempre (zerada), salvo se o filtro de consultor a excluir
+  const fc = Array.isArray(f.consultores) && f.consultores.length ? new Set(f.consultores) : null;
+  for (const c of ((D && D.equipe) || [])) if (!byC.has(c) && (!fc || fc.has(c))) consultores.push({consultor: c, leads: 0, contatados: 0,
+    pct_contatados: null, media_dias_1o_contato: null, mediana_dias_1o_contato: null, contatos_por_lead: null, agendados: 0, reunioes: 0,
+    ganhos: 0, perdidos: 0, abertos: 0, abertos_sem_contato: 0, parados_7d: 0});
+  consultores.sort((a, b) => b.leads - a.leads || (a.consultor < b.consultor ? -1 : a.consultor > b.consultor ? 1 : 0));
   const lostRows = rows.filter(r => r.d.lost), motivos = {};
   for (const {l} of lostRows) { const m = l.lr || SEM_MOTIVO; motivos[m] = (motivos[m] || 0) + 1; }
   const mPerda = mean(lostRows.filter(r => r.d.dPerda != null).map(r => r.d.dPerda));
@@ -1266,6 +1272,7 @@ function dimOptions(k) {
   else if (k === 'etapas') all = STAGES.map(s => ({v: Number(s.id), label: s.nome}));
   else {
     const vals = new Set();
+    if (k === 'consultores') ((D && D.equipe) || []).forEach(c => vals.add(c));
     for (const l of LEADS) {
       if (k === 'consultores') vals.add(l.c); else if (k === 'origens') vals.add(l.o); else if (k === 'etiquetas') (l.lb || []).forEach(x => vals.add(x));
       else if (k === 'motivos' && l.s === 'lost') vals.add(l.lr || SEM_MOTIVO);
