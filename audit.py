@@ -107,6 +107,9 @@ def lead_metrics(l, agora):
 
 
 # ----------------------------------------------------------------------------- filtro
+CAMPANHAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|"}  # prefixo do título
+
+
 def filtra(leads, f):
     de, ate = f.get("de") or "0000-00-00", f.get("ate") or "9999-99-99"
     cons = set(f.get("consultores") or [])
@@ -117,11 +120,11 @@ def filtra(leads, f):
     busca = norm(f.get("busca") or "")
     out = []
     base = f.get("incluir_base") is not False   # padrão: funil inteiro
-    so_trd = bool(f.get("so_trd"))
+    camp = CAMPANHAS.get(f.get("campanha") or ("trd" if f.get("so_trd") else ""))
     for l in leads:
         if l.get("b") and not base:
             continue
-        if so_trd and not re.match(r"^\s*TRD\s*\|", l.get("n") or "", re.I):
+        if camp and not re.match(camp, l.get("n") or "", re.I):
             continue
         d = l["e"][:10]
         if not (de <= d <= ate):
@@ -274,7 +277,7 @@ def compute(leads, filtros, agora_str, stages, equipe=()):
 # ----------------------------------------------------------------------------- cenários
 def filtros_base(de, ate, **kw):
     f = {"de": de, "ate": ate, "consultores": [], "origens": [], "status": [],
-         "etapas": [], "etiquetas": [], "busca": "", "incluir_base": True, "so_trd": False}
+         "etapas": [], "etiquetas": [], "busca": "", "incluir_base": True, "campanha": None}
     f.update(kw)
     return f
 
@@ -297,8 +300,10 @@ def cenarios(D):
         ("ultimos_30_etapa_mql", filtros_base(d30, h, etapas=[345])),
         ("tudo_etiqueta_digital", filtros_base("2000-01-01", h, etiquetas=["Digital"])),
         ("tudo_busca_trd", filtros_base("2000-01-01", h, busca="trd")),
-        ("ultimos_7_so_trd", filtros_base(d7, h, so_trd=True)),
-        ("tudo_so_trd", filtros_base("2000-01-01", h, so_trd=True)),
+        ("ultimos_7_so_trd", filtros_base(d7, h, campanha="trd")),
+        ("tudo_so_trd", filtros_base("2000-01-01", h, campanha="trd")),
+        ("tudo_so_diag", filtros_base("2000-01-01", h, campanha="diag")),
+        ("ultimos_30_so_diag", filtros_base(d30, h, campanha="diag")),
         ("ultimos_30_sem_base", filtros_base(d30, h, incluir_base=False)),
     ]
 
