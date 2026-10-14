@@ -66,9 +66,9 @@ def get(path, **p):
     # curl é mais estável que o SSL da stdlib neste Windows. A URL (com token) vai por stdin.
     config = f'url = "{url_for(path, **p)}"\n'
     last = "falha desconhecida"
-    for i in range(3):
+    for i in range(5):
         try:
-            r = subprocess.run(["curl", "--config", "-", "-fsS", "--retry", "2", "--retry-all-errors",
+            r = subprocess.run(["curl", "--config", "-", "-fsS", "--retry", "4", "--retry-all-errors", "--retry-delay", "3",
                                 "--connect-timeout", "10", "--max-time", "40"],
                                input=config, capture_output=True, text=True, timeout=60)
             if r.returncode == 0:
@@ -76,7 +76,7 @@ def get(path, **p):
             last = (r.stderr or f"curl código {r.returncode}")[-300:]
         except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
             last = str(e)
-        time.sleep(3 * (i + 1))
+        time.sleep((15 if "429" in last else 3) * (i + 1))  # 429 = limite de requisições do Pipedrive
     raise RuntimeError(f"Falha de conexão com o Pipedrive em {path}: {last}") from None
 
 
@@ -91,8 +91,8 @@ def get_many(paths):
                 f = (pathlib.Path(tmp) / f"{i}.json").as_posix(); files[k] = f
                 cfg += [f'url = "{url_for(path, **params)}"', f'output = "{f}"']
             try:
-                subprocess.run(["curl", "--config", "-", "-fsS", "--parallel", "--parallel-max", "4",
-                                "--retry", "3", "--retry-all-errors", "--connect-timeout", "10", "--max-time", "40"],
+                subprocess.run(["curl", "--config", "-", "-fsS", "--parallel", "--parallel-max", "3", "--rate", "6/s",
+                                "--retry", "5", "--retry-all-errors", "--connect-timeout", "10", "--max-time", "40"],
                                input="\n".join(cfg) + "\n", capture_output=True, text=True, timeout=900)
             except subprocess.TimeoutExpired:
                 pass
@@ -102,7 +102,7 @@ def get_many(paths):
                 except (OSError, json.JSONDecodeError):
                     pass
         todo = {k: v for k, v in todo.items() if k not in out}
-        if todo: time.sleep(5)
+        if todo: time.sleep(20)
     for k, (path, params) in todo.items():  # último recurso, em série
         out[k] = get(path, **params)
     return out
