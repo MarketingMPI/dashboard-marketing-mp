@@ -151,7 +151,7 @@ Header mostra "Dados do Pipedrive em dd/mm/aaaa hh:mm" + selo "atualização aut
 - **Uma pessoa = um lead POR CICLO:** negócios com mesmo e-mail/telefone (hash; 8 últimos dígitos) criados com até 14 dias de
   diferença viram um lead (canônico = aberto/ganho antes de perdido, depois o mais recente; entrada = a mais antiga; contatos =
   união; `dd` = absorvidos). Conversão nova depois disso = lead novo no próprio período, com `re` = data da entrada anterior.
-- **Varredura de cadência:** conclusões do mesmo tipo em < 10 min no mesmo lead = um contato (o consultor marcando A01..A15 de uma vez).
+- **Contatos:** cada atividade de contato CONCLUÍDA = 1 contato (sem agrupar conclusões no mesmo minuto, decisão do usuário 14/10/2026).
 - Filtros extras no contrato: `filtros.incluir_base` (padrão **true** = funil inteiro; false tira `b=1`) e `filtros.so_trd`
   (bool, padrão false; true = só títulos `^\s*TRD\s*\|`, sem TRD-INT). A UI mostra o funil inteiro e oferece o seletor "Somente leads TRD".
 - Conferência contra a fonte: `python data/verif/crosscheck.py` refaz pela API v2 uma amostra (semana + 20 aleatórios + duplicados)

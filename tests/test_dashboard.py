@@ -69,11 +69,15 @@ class VeracidadeTests(unittest.TestCase):
         self.assertEqual(sorted(l["e"][:10] for l in out), ["2026-09-12", "2026-10-13"])
         self.assertEqual([l.get("re") for l in out if l["id"] == 2], ["2026-09-12"])
 
-    def test_collapse_sweeps(self):
-        k = [["2026-09-23T11:36:00", "call"]] * 1 + [["2026-09-23T11:36:30", "call"], ["2026-09-23T11:37:00", "msg"],
-             ["2026-09-23T11:40:00", "call"], ["2026-09-24T16:34:00", "call"]]
-        self.assertEqual(painel.collapse_sweeps(k), [["2026-09-23T11:36:00", "call"], ["2026-09-23T11:37:00", "msg"],
-                                                     ["2026-09-24T16:34:00", "call"]])
+    def test_each_done_contact_counts(self):
+        cache = {"users": {"1": "Consultor"}, "labels": {}, "stage_pipe": {}, "deals": [
+            {"id": 9, "title": "TRD | X", "status": "lost", "stage_id": 345, "owner_id": 1, "label_ids": [],
+             "add_time": "2026-10-06T12:00:00Z", "lost_time": "2026-10-07T12:00:00Z", "lost_reason": "Sem contato"}],
+            "per_deal": {"9": {"pk": [], "log": [], "acts": [
+                {"id": i, "type": "call", "done": i < 3, "done_at": "2026-10-06 18:56:00" if i < 3 else None,
+                 "add": "2026-10-06 12:00:00", "due": "2026-10-06", "due_t": None} for i in range(1, 6)]}}}
+        leads, _ = painel.model(cache)
+        self.assertEqual(len(leads[0]["k"]), 2)  # A01 e A02 concluídas no mesmo minuto = 2 contatos; pendentes não contam
 
     def test_moved_into_alpha_from_base(self):
         deal = {"add_time": "2024-10-21T14:00:00Z"}

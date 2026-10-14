@@ -313,18 +313,6 @@ def contact_time(a):
     return a["due"] + "T12:00:00" if a.get("due") else None
 
 
-def collapse_sweeps(contacts, minutes=10):
-    """Conclusões do MESMO tipo em menos de 10 min no mesmo lead = um único toque. Na prática é o consultor
-    marcando a cadência inteira (A01..A15) como feita de uma vez; contar 5 contatos inflaria 'contatos por lead'."""
-    out = []
-    for t, typ in contacts:
-        prev = next((x for x in reversed(out) if x[1] == typ), None)
-        if prev and (parse_utc(t.replace("T", " ")) - parse_utc(prev[0].replace("T", " "))).total_seconds() < minutes * 60:
-            continue
-        out.append([t, typ])
-    return out
-
-
 def moved_into_alpha(deal, log, stage_pipe):
     """(entrada BRT, funil de origem) da ÚLTIMA vez que o negócio veio de outro funil para o Alpha, se isso aconteceu
     mais de 1 dia depois da criação. None quando o negócio nasceu no Alpha."""
@@ -369,10 +357,10 @@ def model(cache):
         lb = [labels.get(i, str(i)) for i in (d.get("label_ids") or [])]
         owner = users.get(d.get("owner_id"), "Sem responsável")
         if owner == "Marketing": owner = "Sem consultor (Marketing)"
-        # set(): o mesmo contato lançado em duplicidade (mesmo instante e tipo) conta uma vez só
-        contacts = [list(x) for x in sorted({(contact_time(a), a["type"])
-                    for a in info["acts"] if a["done"] and a["type"] in CONTACT_TYPES and contact_time(a)})]
-        contacts = collapse_sweeps(contacts)
+        # Cada atividade de contato CONCLUÍDA = 1 contato (pedido do usuário: A01 e A02 marcadas = 2 contatos,
+        # mesmo concluídas no mesmo minuto). Pendentes não contam.
+        contacts = sorted([contact_time(a), a["type"]]
+                          for a in info["acts"] if a["done"] and a["type"] in CONTACT_TYPES and contact_time(a))
         crm = brt(d.get("add_time")); ent = info.get("ent")
         hist = stage_history(d, info["log"])
         reat = False
@@ -431,7 +419,7 @@ def dedupe(leads, window_days=14):
                 first = cl[0]
                 c["e"] = first["e"]
                 c["ef"] = first["ef"] if first is cl_sorted[0] else f"{first['ef']} — negócio anterior #{first['id']}"
-                c["k"] = [list(x) for x in sorted({tuple(x) for l in cl for x in l["k"]})]
+                c["k"] = sorted(x for l in cl for x in l["k"])
                 c["b"] = min(l["b"] for l in cl)
                 c["dd"] = [l["id"] for l in cl_sorted[1:]]
             if i > 0:
