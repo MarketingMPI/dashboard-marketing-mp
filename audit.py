@@ -417,7 +417,7 @@ def mppro(MP, f, agora_day):
                  "mrr": mrr, "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
                  "taxa_reembolso": _div(sum(1 for o in aprT if ef_ref(o)) * 100, len(aprT)), "pagamentos_por_assinante": ppa,
                  "liquido_medio": liq_medio, "ltv": ltv},
-        "unit": {"cac": cac, "cac_liquido": _div(m["inv"], novas - novas_re), "custo_por_ativa": _div(m["inv"], subs_at),
+        "unit": {"cac": cac, "roas": _div(liq_p, m["inv"]), "cac_liquido": _div(m["inv"], novas - novas_re), "custo_por_ativa": _div(m["inv"], subs_at),
                  "payback_meses": cac / liq_medio if cac is not None and liq_medio else None,
                  "ltv_cac": ltv / cac if cac and ltv is not None else None},
         "churn": {"janelas": janelas, "medio": _media(j["churn"] for j in janelas), "ultimo": churn_ult, "vida_media_meses": vida,

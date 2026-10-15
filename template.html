@@ -859,7 +859,7 @@ function computeMPPro(MP, f, agoraDay) {
     base: {compradores: nComp, ativos, assinaturas_ativas: subsAtivas, cancelaram: cancel, reembolsados, mrr,
       churn_acumulado: div(cancel * 100, nComp), churn_acumulado_com_reembolso: div((cancel + reembolsados) * 100, nComp),
       taxa_reembolso: div(aprT.filter(efRef).length * 100, aprT.length), pagamentos_por_assinante: ppa, liquido_medio: liqMedio, ltv},
-    unit: {cac, cac_liquido: div(m.inv, novas - novasRe), custo_por_ativa: div(m.inv, subsAtivas), payback_meses: cac != null && liqMedio ? cac / liqMedio : null,
+    unit: {cac, roas: div(liqP, m.inv), cac_liquido: div(m.inv, novas - novasRe), custo_por_ativa: div(m.inv, subsAtivas), payback_meses: cac != null && liqMedio ? cac / liqMedio : null,
       ltv_cac: cac && ltv != null ? ltv / cac : null},
     churn: {janelas, medio: churnMedio, ultimo: churnUlt, vida_media_meses: vida, ltv_projetado: vida != null && liqMedio != null ? vida * liqMedio : null},
     evolucao: evol, coortes, pagamentos, compradores
@@ -1401,6 +1401,7 @@ function viewPerformance() {
 }
 
 /* ---- MP PRO (B2B) ---- */
+const fX = v => v == null ? '–' : new Intl.NumberFormat('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(v);
 const fRc = v => v == null ? '–' : fR(v / 100), fRc0 = v => v == null ? '–' : fR0(v / 100);
 const MOTIVO_NOME = {refused_bank: 'Recusa do banco emissor', insufficient_funds: 'Saldo ou limite insuficiente', subscription_canceled: 'Assinatura cancelada',
   nao_informado: 'Não informado (Pix automático)', pix_aguardando: 'Pix aguardando pagamento'};
@@ -1470,8 +1471,9 @@ function viewMPPro() {
       tip: 'Investimento ÷ novas assinaturas na Kiwify (100% atribuídas à campanha: os pedidos não trazem UTM)'}),
     kpiCard({label: 'Payback do CAC', v: u.payback_meses == null ? '–' : `${f1(u.payback_meses)}<small>meses</small>`, sub: `a ${fRc(b.liquido_medio)} líquidos por mês`, d: delta(u.payback_meses, pu.payback_meses, -1, x => f1(x) + ' m'), tip: 'CAC ÷ receita líquida mensal de uma assinatura'}),
     kpiCard({label: 'LTV líquido atual', v: fRc(b.ltv), sub: `${f1(b.pagamentos_por_assinante)} pagamentos por assinante`, d: delta(b.ltv, pb.ltv, 1, fRc), tip: 'Pagamentos médios por assinante (sem reembolsados) × líquido médio por pagamento, até o fim do período'}),
-    kpiCard({label: 'LTV / CAC', cls: u.ltv_cac != null && u.ltv_cac < 1 ? 'red' : '', v: u.ltv_cac == null ? '–' : nf1.format(Math.round(u.ltv_cac * 100) / 100).replace(/,(\d)$/, ',$10'), sub: u.ltv_cac == null ? 'sem CAC no período' : u.ltv_cac < 1 ? 'abaixo de 1: o CAC ainda não se pagou' : 'o CAC já se pagou',
-      d: delta(u.ltv_cac, pu.ltv_cac, 1, x => f1(x)), tip: 'LTV líquido atual ÷ CAC do período'}),
+    kpiCard({label: 'ROAS', cls: u.roas != null && u.roas < 1 ? 'red' : '', v: u.roas == null ? '–' : fX(u.roas) + '<small>x</small>',
+      sub: u.roas == null ? 'sem investimento no período' : `cada R$ 1 em mídia trouxe ${fR(u.roas)} líquidos`, d: delta(u.roas, pu.roas, 1, x => fX(x) + 'x'),
+      tip: 'Receita líquida do período (MP PRO + Formação de Consultores) ÷ investimento em mídia Perpétuo.\nAbaixo de 1: a receita do período não cobriu a mídia.'}),
     kpiCard({label: 'Usuários ativos', cls: 'hero', v: fN(b.ativos), sub: `${pl(b.assinaturas_ativas, 'assinatura', 'assinaturas')} · MRR ${fRc(b.mrr)}`, d: delta(b.ativos, pb.ativos),
       tip: `Assinantes com cobrança confirmada nos últimos 40 dias, em ${fDay(base)} (não mede consumo das aulas).\nMRR = assinaturas ativas × valor da última cobrança.`})
   ].join('') + '</div>';
