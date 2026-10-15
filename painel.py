@@ -537,6 +537,8 @@ def midia_payload(m):
 # ---------------------------------------------------------------- MP PRO (Kiwify + Meta Perpétuo, SOMENTE LEITURA)
 KIWIFY_API = "https://public-api.kiwify.com/v1"
 MPPRO_PRODUTO = "5243d100-6347-11f1-9029-d1b5a9444144"   # MP PRO (club, R$ 49/mês, Janela Fundadora)
+FORMACAO_PRODUTO = "a35d7750-16fb-11f1-834f-21c1163effb3"  # MP PRO - Formação de Consultores de Investimentos (venda avulsa)
+FORMACAO_DESDE = "2026-03-01"
 MPPRO_DESDE = "2026-07-01"
 KIWIFY_ENV = pathlib.Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / "profiles" / "apine" / ".env"
 
@@ -564,18 +566,18 @@ def kiwify_get(path, tok, **q):
             time.sleep(8 * (tent + 1))
 
 
-def kiwify_sales():
-    """Todos os pedidos do produto MP PRO. Janelas de 90 dias; end_date é EXCLUSIVO (a próxima janela começa nele)."""
+def kiwify_sales(produto=MPPRO_PRODUTO, desde=MPPRO_DESDE):
+    """Todos os pedidos de um produto (padrão: MP PRO). Janelas de 90 dias; end_date é EXCLUSIVO (a próxima janela começa nele)."""
     cid, sec = kiwify_cfg("KIWIFY_CLIENT_ID"), kiwify_cfg("KIWIFY_CLIENT_SECRET")
     if not (cid and sec and kiwify_cfg("KIWIFY_ACCOUNT_ID")): raise RuntimeError("sem credenciais da Kiwify")
     body = urllib.parse.urlencode({"client_id": cid, "client_secret": sec}).encode()
     tok = json.loads(urllib.request.urlopen(urllib.request.Request(KIWIFY_API + "/oauth/token", data=body, method="POST",
         headers={"User-Agent": "mp-dashboard/1.0", "Content-Type": "application/x-www-form-urlencoded"}), timeout=60).read())["access_token"]
-    ini, fim, out = datetime.fromisoformat(MPPRO_DESDE).date(), datetime.now(BRT).date() + timedelta(days=2), {}
+    ini, fim, out = datetime.fromisoformat(desde).date(), datetime.now(BRT).date() + timedelta(days=2), {}
     while ini < fim:
         e = min(ini + timedelta(days=90), fim); page = 1
         while True:
-            d = kiwify_get("/sales", tok, start_date=ini.isoformat(), end_date=e.isoformat(), product_id=MPPRO_PRODUTO,
+            d = kiwify_get("/sales", tok, start_date=ini.isoformat(), end_date=e.isoformat(), product_id=produto,
                            page_size=100, page_number=page, view_full_sale_details="true").get("data") or []
             for x in d: out[x["id"]] = x
             if len(d) < 100: break
@@ -595,7 +597,13 @@ def _mes_seguinte(day):
     return f"{y:04d}-{m:02d}-{min(d, ult):02d}"
 
 
-def mppro_pedidos(sales):
+def _bruto(x):
+    """Preço do produto (sem os juros do parcelamento, que o comprador paga à Kiwify): bruto − taxa = líquido."""
+    pg = x.get("payment") or {}
+    return int(pg.get("product_base_price") or pg.get("charge_amount") or 0)
+
+
+def mppro_pedidos(sales, avulsas=()):
     """Pedidos -> payload. Assinatura reconstruída por cliente (a API não expõe assinaturas): um pagamento novo
     entra na assinatura cujo último pagamento foi há 20+ dias (a de vencimento mais antigo); senão abre outra
     assinatura (cliente com duas assinaturas paralelas). E-mail só serve de chave e NÃO vai para o payload."""
@@ -622,9 +630,20 @@ def mppro_pedidos(sales):
                 sub = nsub; subs[ci].append([nsub, day]); nsub += 1
         pg = x.get("payment") or {}
         pedidos.append([ts, ci, sub, st, "pix" if "pix" in (x.get("payment_method") or "") else "cartao",
-                        int(pg.get("charge_amount") or 0), int(pg.get("fee") or 0), int(x.get("net_amount") or pg.get("net_amount") or 0),
+                        _bruto(x), int(pg.get("fee") or 0), int(x.get("net_amount") or pg.get("net_amount") or 0),
                         x.get("card_rejection_reason") or None, _brt(x.get("refunded_at"))])
-    return {"clientes": nomes, "pedidos": pedidos}
+    # Formação de Consultores: venda avulsa (não é assinatura) -> só soma na receita
+    av = []
+    for x in avulsas:
+        if x.get("status") not in ("paid", "refunded"): continue
+        c = x["customer"]; key = (c.get("email") or c.get("id") or "").strip().lower()
+        if key not in cli: cli[key] = len(nomes); nomes.append((c.get("name") or "").strip() or "(sem nome)")
+        pg = x.get("payment") or {}
+        av.append([_brt(x.get("approved_date") or x.get("created_at")), cli[key], x["status"],
+                   "pix" if "pix" in (x.get("payment_method") or "") else "cartao", _bruto(x), int(pg.get("fee") or 0),
+                   int(x.get("net_amount") or pg.get("net_amount") or 0), _brt(x.get("refunded_at")), int(x.get("installments") or 1)])
+    av.sort(key=lambda r: r[0])
+    return {"clientes": nomes, "pedidos": pedidos, "avulsos": av}
 
 
 def eh_perpetuo(nome):
@@ -635,7 +654,7 @@ def mppro_payload(midia, old):
     """MP PRO = Kiwify (vendas/assinantes) + Meta só das campanhas 'MP PRO ... Perpétuo'. Falha numa fonte mantém o último dado."""
     out = dict(old or {})
     try:
-        out.update(mppro_pedidos(kiwify_sales())); out["erro_kiwify"] = None
+        out.update(mppro_pedidos(kiwify_sales(), kiwify_sales(FORMACAO_PRODUTO, FORMACAO_DESDE))); out["erro_kiwify"] = None
         out["kiwify_em"] = datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")
     except Exception as e:
         out["erro_kiwify"] = f"falha ao consultar a Kiwify ({getattr(e, 'code', None) or type(e).__name__})"
@@ -649,7 +668,7 @@ def mppro_payload(midia, old):
             idx[cid] = len(camps); camps.append({"id": cid, "nome": nome, "status": (midia.get("status") or {}).get(cid)})
         dias.append([day, idx[cid]] + (list(v) + [0, 0, 0])[:6])
     out["midia"] = {"camps": camps, "dias": dias, "atualizado_em": (midia or {}).get("atualizado_em"), "erro": (midia or {}).get("erro")}
-    out.setdefault("clientes", []); out.setdefault("pedidos", [])
+    out.setdefault("clientes", []); out.setdefault("pedidos", []); out.setdefault("avulsos", [])
     return out
 
 

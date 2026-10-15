@@ -130,10 +130,11 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .mprs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.mprs span{font-size:11.5px;background:#fbefed;color:#7a2a20;border-radius:99px;padding:3px 10px}
 .mpk{display:inline-block;font-size:11px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}.mpk.nov{background:#e3f3ea;color:#0b6b3a}.mpk.ren{background:#eef1f0;color:#3b4a44}
 .mpk.ree{background:#fbe9e6;color:#a3362a}
-.mpk.tnov{background:#f5ebcf;color:#7a5c12;box-shadow:inset 0 0 0 1px #e6d39f}.mpk.tren{background:#00503c;color:#fff}.mpk.abe{background:#fdf2dc;color:#8a5a0f}
+.mpk.tfor{background:#e8eef9;color:#28457a}.mpk.tnov{background:#f5ebcf;color:#7a5c12;box-shadow:inset 0 0 0 1px #e6d39f}.mpk.tren{background:#00503c;color:#fff}.mpk.abe{background:#fdf2dc;color:#8a5a0f}
 .mpco div{display:grid;grid-template-columns:52px minmax(0,1fr) 46px 64px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #edf1ef;font-size:13px}
 .mpco div:last-child{border-bottom:0}.mpco .mpt i.ov{background:var(--verde)}.mpco small{color:var(--cinza);font-size:11px}
 table.t tr.sel td{background:#f6faf3}
+table.t.mprc th,table.t.mprc td{padding-left:7px;padding-right:7px}table.t.mprc th.num{min-width:0}
 .mpd{background:#fff;border:1px solid var(--linha);border-radius:var(--r);padding:14px 20px;font-size:13px;color:#46534e}.mpd summary{cursor:pointer;font-weight:600;color:var(--prof)}
 .mpd ul{margin:10px 0 0;padding-left:18px;line-height:1.55}.mpd.mt{margin-top:22px}
 .note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
@@ -727,6 +728,9 @@ function computeMPPro(MP, f, agoraDay) {
   const O = MP.pedidos.map((r, i) => ({i, ts: r[0], day: r[0].slice(0, 10), c: r[1], sub: r[2], st: r[3], met: r[4],
     bruto: r[5], taxa: r[6], liq: r[7], mot: r[8], rday: r[9] ? r[9].slice(0, 10) : null}));
   const apr = O.filter(o => o.st === 'paid' || o.st === 'refunded'), rec = O.filter(o => o.st === 'refused');
+  // Formação de Consultores (venda avulsa): entra só na receita, não na base de assinantes
+  const AV = (MP.avulsos || []).map(r => ({ts: r[0], day: r[0].slice(0, 10), c: r[1], st: r[2], met: r[3], bruto: r[4], taxa: r[5], liq: r[6], rday: r[7] ? r[7].slice(0, 10) : null, parc: r[8]}));
+  const avP = AV.filter(o => o.st === 'paid' && inP(o.day)), avRe = AV.filter(o => o.st === 'refunded' && o.rday && inP(o.rday));
   const tentativas = O.filter(o => o.st === 'refused' || o.st === 'waiting');  // cobrança tentada (recusada ou Pix aguardando)
   const first = new Map(), prevSub = new Map(), nextSub = new Map(), lastSub = new Map(), prevCli = new Map(), lastCli = new Map();
   for (const o of apr) {
@@ -792,7 +796,7 @@ function computeMPPro(MP, f, agoraDay) {
   const liqMedio = pagosBase ? liqBase / pagosBase : null, ppa = naoRe ? pagosBase / naoRe : null;
   const ltv = ppa != null && liqMedio != null ? ppa * liqMedio : null;
   // ---- churn mês a mês (janela M -> M+1 só conta quando M+1 terminou até T)
-  const meses = []; if (apr.length) for (let ym = apr[0].day.slice(0, 7); ym <= agoraDay.slice(0, 7); ym = ymNext(ym)) meses.push(ym);
+  const meses = [], ini0 = [apr[0] && apr[0].day, AV[0] && AV[0].day].filter(Boolean).sort()[0]; if (ini0) for (let ym = ini0.slice(0, 7); ym <= agoraDay.slice(0, 7); ym = ymNext(ym)) meses.push(ym);
   const pagouMes = ym => new Set(aprT.filter(o => !efRef(o) && o.day.slice(0, 7) === ym).map(o => o.c));
   const janelas = [];
   for (const ym of meses) {
@@ -813,13 +817,13 @@ function computeMPPro(MP, f, agoraDay) {
     pc.investimento += r[2]; pc.impressoes += r[3]; pc.cliques += r[4]; pc.visitas += r[5]; pc.checkouts += r[6]; porCamp.set(r[1], pc);
   }
   const div = (a, b) => b ? a / b : null, novas = novasSubs.length, novasRe = novasSubs.filter(o => o.st === 'refunded').length;
-  const cac = div(m.inv, novas), liqP = sumc(pagos, 'liq');
+  const cac = div(m.inv, novas), liqP = sumc(pagos, 'liq') + sumc(avP, 'liq');
   // ---- evolução mensal (todos os meses) e coortes
   const evol = meses.map(ym => {
     const pm = apr.filter(o => o.st === 'paid' && o.day.slice(0, 7) === ym), ns = [...first.values()].filter(o => o.day.slice(0, 7) === ym).length;
-    const inv = MD.dias.filter(r => r[0].slice(0, 7) === ym).reduce((x, r) => x + r[2], 0);
+    const inv = MD.dias.filter(r => r[0].slice(0, 7) === ym).reduce((x, r) => x + r[2], 0), fm = AV.filter(o => o.st === 'paid' && o.day.slice(0, 7) === ym);
     return {mes: ym, pagamentos: pm.length, novas: pm.filter(isFirst).length, renovacoes: pm.filter(o => !isFirst(o)).length, novas_assinaturas: ns,
-      bruto: sumc(pm, 'bruto'), liquido: sumc(pm, 'liq'), base_paga: new Set(pm.map(o => o.c)).size, investimento: inv, cac: div(inv, ns),
+      formacao: fm.length, formacao_liquido: sumc(fm, 'liq'), bruto: sumc(pm, 'bruto') + sumc(fm, 'bruto'), liquido: sumc(pm, 'liq') + sumc(fm, 'liq'), base_paga: new Set(pm.map(o => o.c)).size, investimento: inv, cac: div(inv, ns),
       parcial: ym === agoraDay.slice(0, 7)};
   });
   const coortes = [];
@@ -830,18 +834,20 @@ function computeMPPro(MP, f, agoraDay) {
   const pagamentos = apr.filter(o => inP(o.day)).map(o => {
     const pv = prevSub.get(o.i), due = pv ? addMonth1(pv.day) : null, rr = recusasAntes(o);
     return {tipo: isFirst(o) ? (o.st === 'refunded' ? 'Nova, reembolsada' : 'Nova') : 'Renovação', cliente: nome(o.c), dia: o.day, vencimento: due,
-      atraso: due ? diffDays(due, o.day) : null, metodo: o.met, recusas: rr.length, motivo: rr.length ? (rr[rr.length - 1].mot || 'nao_informado') : null};
-  });
+      atraso: due ? diffDays(due, o.day) : null, metodo: o.met, recusas: rr.length, motivo: rr.length ? (rr[rr.length - 1].mot || 'nao_informado') : null, ts: o.ts};
+  }).concat(AV.filter(o => inP(o.day)).map(o => ({tipo: o.st === 'refunded' ? 'Formação, reembolsada' : 'Formação', cliente: nome(o.c), dia: o.day, vencimento: null,
+      atraso: null, metodo: o.met, recusas: 0, motivo: null, ts: o.ts}))).sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0).map(({ts, ...x}) => x);
   return {
     periodo: {de: f.de || null, ate: f.ate || null, base_em: T},
     midia: {investimento: m.inv, impressoes: m.imp, cliques: m.cl, visitas: m.lpv, checkouts: m.ic, compras_pixel: m.px,
       ctr: div(m.cl * 100, m.imp), cpc: div(m.inv, m.cl), cpm: div(m.inv * 1000, m.imp), custo_visita: div(m.inv, m.lpv), custo_checkout: div(m.inv, m.ic),
       campanhas: [...porCamp.values()].filter(x => x.investimento > 0).sort((a, b) => b.investimento - a.investimento)},
-    vendas: {novas_assinaturas: novas, novas_reembolsadas: novasRe, renovacoes_pagas: pagRen.length, pagamentos: pagos.length,
-      bruto: sumc(pagos, 'bruto'), taxa: sumc(pagos, 'taxa'), liquido: liqP,
+    vendas: {novas_assinaturas: novas, novas_reembolsadas: novasRe, renovacoes_pagas: pagRen.length, pagamentos: pagos.length + avP.length,
+      bruto: sumc(pagos, 'bruto') + sumc(avP, 'bruto'), taxa: sumc(pagos, 'taxa') + sumc(avP, 'taxa'), liquido: liqP,
+      assinatura_liquido: sumc(pagos, 'liq'), formacao_qtd: avP.length, formacao_bruto: sumc(avP, 'bruto'), formacao_taxa: sumc(avP, 'taxa'), formacao_liquido: sumc(avP, 'liq'),
       novas_qtd: pagNovas.length, novas_bruto: sumc(pagNovas, 'bruto'), novas_taxa: sumc(pagNovas, 'taxa'), novas_liquido: sumc(pagNovas, 'liq'),
       ren_bruto: sumc(pagRen, 'bruto'), ren_taxa: sumc(pagRen, 'taxa'), ren_liquido: sumc(pagRen, 'liq'),
-      reembolsos: reemb.length, reembolsos_valor: sumc(reemb, 'bruto'), recusas: recP.length, recusas_clientes: new Set(recP.map(o => o.c)).size,
+      reembolsos: reemb.length + avRe.length, reembolsos_valor: sumc(reemb, 'bruto') + sumc(avRe, 'bruto'), recusas: recP.length, recusas_clientes: new Set(recP.map(o => o.c)).size,
       recusas_novos: recNovos, motivos_recusa: motivos, resultado: liqP - m.inv},
     renovacoes: {previstas: prev.length, pagas: prev.filter(x => x.pago).length, em_dia: prev.filter(x => x.status === 'em_dia').length,
       atrasaram_pagas: atrasou.length, em_aberto: prev.filter(x => x.status === 'em_aberto').length, inadimplentes: prev.filter(x => x.status === 'inadimplente').length,
@@ -1424,7 +1430,7 @@ function mpEvolChart(ev, width) {
     if (e.novas) g += `<rect class="bar" x="${cx - w / 2}" y="${y(e.pagamentos)}" width="${w}" height="${y(e.renovacoes) - y(e.pagamentos) - (e.renovacoes ? 1 : 0)}" fill="#c9a94f" rx="3"/>`;
     g += `<text class="ax" x="${cx}" y="${y(e.pagamentos) - 6}" text-anchor="middle" style="fill:#33413b;font-weight:600">${e.pagamentos}</text>`;
     g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${MESN(e.mes)}${e.parcial ? '*' : ''}</text>`;
-    const tip = `${MESN(e.mes)}${e.parcial ? ' (mês em andamento)' : ''}\nPagamentos: ${fN(e.pagamentos)}\nNovas: ${fN(e.novas)} · Renovações: ${fN(e.renovacoes)}\nReceita bruta: ${fRc(e.bruto)} · líquida: ${fRc(e.liquido)}\nInvestimento Perpétuo: ${fRc(e.investimento)}\nCAC do mês: ${fRc(e.cac)}`;
+    const tip = `${MESN(e.mes)}${e.parcial ? ' (mês em andamento)' : ''}\nPagamentos: ${fN(e.pagamentos)}\nNovas: ${fN(e.novas)} · Renovações: ${fN(e.renovacoes)}${e.formacao ? `\nFormação de Consultores: ${e.formacao} (${fRc(e.formacao_liquido)} líq.)` : ''}\nReceita bruta: ${fRc(e.bruto)} · líquida: ${fRc(e.liquido)}\nInvestimento Perpétuo: ${fRc(e.investimento)}\nCAC do mês: ${fRc(e.cac)}`;
     g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(tip)}" data-range="${e.mes}-01|${ymLast(e.mes) > TODAY ? TODAY : ymLast(e.mes)}"/>`;
   });
   return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pagamentos por mês">${g}</svg></div>`;
@@ -1443,7 +1449,7 @@ function viewMPPro() {
   h += '<div class="kpis">' + [
     kpiCard({label: 'Investimento em mídia', cls: 'hero gold', v: fRc(md.investimento), sub: `${pl(md.campanhas.length, 'campanha', 'campanhas')} Perpétuo com gasto`, d: delta(md.investimento, pmd.investimento, 0, fRc0),
       tip: 'Gasto na Meta Ads das campanhas "MP PRO ... Perpétuo" no período. Lives, captação de leads e outras campanhas ficam de fora.'}),
-    kpiCard({label: 'Receita líquida', v: fRc(v.liquido), sub: `${fRc(v.bruto)} bruto · ${pl(v.pagamentos, 'pagamento', 'pagamentos')}`, d: delta(v.liquido, pv.liquido, 1, fRc0), tip: 'Pagamentos aprovados no período, já descontada a taxa da Kiwify'}),
+    kpiCard({label: 'Receita líquida', v: fRc(v.liquido), sub: `${fRc(v.bruto)} bruto · ${pl(v.pagamentos, 'pagamento', 'pagamentos')}`, d: delta(v.liquido, pv.liquido, 1, fRc0), tip: `Pagamentos aprovados no período, já descontada a taxa da Kiwify:\nMP PRO (assinatura): ${fRc(v.assinatura_liquido)}\nFormação de Consultores: ${fRc(v.formacao_liquido)}`}),
     kpiCard({label: 'Resultado do período', cls: v.resultado < 0 ? 'red' : '', v: fRc(v.resultado), sub: 'receita líquida − investimento', d: delta(v.resultado, pv.resultado, 1, fRc0), tip: 'Receita líquida menos o investimento em mídia do período'}),
     kpiCard({label: 'Novas assinaturas', v: fN(v.novas_assinaturas), sub: v.novas_reembolsadas ? `${pl(v.novas_reembolsadas, 'reembolsada', 'reembolsadas')} no período` : 'nenhuma reembolsada', d: delta(v.novas_assinaturas, pv.novas_assinaturas),
       tip: 'Assinaturas com o primeiro pagamento no período (número bruto, inclui as reembolsadas)'}),
@@ -1461,10 +1467,11 @@ function viewMPPro() {
   // ---------- funil + receita
   const vw = document.getElementById('view').clientWidth || 900;
   h += `<div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Funil da campanha</h3><p>Da impressão à assinatura · custo por unidade = investimento ÷ volume da etapa</p></div></div>${md.impressoes || v.novas_assinaturas ? mpFunnel(md, v.novas_assinaturas) : emptyBox('Sem mídia nem vendas no período')}</div>
-    <div class="card"><div class="ch"><div><h3>Composição da receita</h3><p>Pagamentos aprovados no período</p></div></div>
-      <div class="tw"><table class="t"><thead><tr><th></th><th class="num">Qtd</th><th class="num">Bruto</th><th class="num">Taxa Kiwify</th><th class="num">Líquido</th></tr></thead><tbody>
+    <div class="card"><div class="ch"><div><h3>Composição da receita</h3><p>Pagamentos aprovados no período · MP PRO (assinatura) + Formação de Consultores</p></div></div>
+      <div class="tw"><table class="t mprc"><thead><tr><th></th><th class="num">Qtd</th><th class="num">Bruto</th><th class="num">Taxa</th><th class="num">Líquido</th></tr></thead><tbody>
       <tr><td>Novas assinaturas</td><td class="num">${fN(v.novas_qtd)}</td><td class="num">${fRc(v.novas_bruto)}</td><td class="num">${fRc(v.novas_taxa)}</td><td class="num">${fRc(v.novas_liquido)}</td></tr>
       <tr><td>Renovações</td><td class="num">${fN(v.renovacoes_pagas)}</td><td class="num">${fRc(v.ren_bruto)}</td><td class="num">${fRc(v.ren_taxa)}</td><td class="num">${fRc(v.ren_liquido)}</td></tr>
+      <tr><td>Formação de Consultores</td><td class="num">${fN(v.formacao_qtd)}</td><td class="num">${fRc(v.formacao_bruto)}</td><td class="num">${fRc(v.formacao_taxa)}</td><td class="num">${fRc(v.formacao_liquido)}</td></tr>
       <tr class="tot"><td>Total</td><td class="num">${fN(v.pagamentos)}</td><td class="num">${fRc(v.bruto)}</td><td class="num">${fRc(v.taxa)}</td><td class="num">${fRc(v.liquido)}</td></tr></tbody></table></div>
       <div class="mpm">
         <div><b>${fN(v.reembolsos)}</b>reembolsos no período<small>${fRc(v.reembolsos_valor)} devolvidos (fora da receita)</small></div>
@@ -1485,8 +1492,8 @@ function viewMPPro() {
   ].join('') + '</div>';
   const pgCols = `<th>Tipo</th><th>Assinante</th><th>Pagamento</th><th>Vencimento</th><th class="num">Atraso</th><th>Método</th><th class="num">Tentativas recusadas</th><th>Motivo da recusa</th>`;
   const atrasoTxt = a => a == null ? '–' : a <= 0 ? '<span style="color:#0b7a3b;font-weight:600">em dia</span>' : `<span class="${a > 5 ? 'red b' : ''}">+${a}d</span>`;
-  h += `<div class="card np mt"><div class="ch"><div><h3>Pagamentos do período, um a um</h3><p>${pl(v.novas_assinaturas, 'nova', 'novas')} e ${pl(v.renovacoes_pagas, 'renovação', 'renovações')} · vencimento = pagamento anterior da assinatura + 1 mês</p></div></div><div class="tw" style="max-height:440px"><table class="t stk"><thead><tr>${pgCols}</tr></thead><tbody>` +
-    (m.pagamentos.length ? m.pagamentos.map(x => `<tr><td><span class="mpk ${x.tipo === 'Renovação' ? 'tren' : x.tipo === 'Nova' ? 'tnov' : 'ree'}">${x.tipo}</span></td><td><b>${ESC(x.cliente)}</b></td><td>${fDM(x.dia)}</td><td>${x.vencimento ? fDM(x.vencimento) : '–'}</td><td class="num">${atrasoTxt(x.atraso)}</td><td>${METN[x.metodo] || x.metodo}</td><td class="num">${x.recusas || '–'}</td><td>${x.motivo ? ESC(motivoNome(x.motivo)) : '–'}</td></tr>`).join('')
+  h += `<div class="card np mt"><div class="ch"><div><h3>Pagamentos do período, um a um</h3><p>${pl(v.novas_assinaturas, 'nova', 'novas')} e ${pl(v.renovacoes_pagas, 'renovação', 'renovações')}${v.formacao_qtd ? ` · ${pl(v.formacao_qtd, 'venda', 'vendas')} da Formação de Consultores` : ''} · vencimento = pagamento anterior da assinatura + 1 mês</p></div></div><div class="tw" style="max-height:440px"><table class="t stk"><thead><tr>${pgCols}</tr></thead><tbody>` +
+    (m.pagamentos.length ? m.pagamentos.map(x => `<tr><td><span class="mpk ${x.tipo === 'Renovação' ? 'tren' : x.tipo === 'Nova' ? 'tnov' : x.tipo === 'Formação' ? 'tfor' : 'ree'}">${x.tipo}</span></td><td><b>${ESC(x.cliente)}</b></td><td>${fDM(x.dia)}</td><td>${x.vencimento ? fDM(x.vencimento) : '–'}</td><td class="num">${atrasoTxt(x.atraso)}</td><td>${METN[x.metodo] || x.metodo}</td><td class="num">${x.recusas || '–'}</td><td>${x.motivo ? ESC(motivoNome(x.motivo)) : '–'}</td></tr>`).join('')
       : `<tr><td colspan="8">${emptyBox('Nenhum pagamento no período')}</td></tr>`) + `</tbody></table></div></div>
     <div class="card np mt"><div class="ch"><div><h3>Renovações que não entraram</h3><p>Vencidas no período e ainda sem pagamento (posição de hoje)</p></div></div><div class="tw"><table class="t"><thead><tr><th>Assinante</th><th>Situação</th><th>Último pagamento</th><th>Vencimento</th><th class="num">Dias sem pagar</th><th class="num">Tentativas recusadas</th><th>Motivo da recusa</th></tr></thead><tbody>` +
     (r.abertas.length ? r.abertas.map(x => `<tr><td><b>${ESC(x.cliente)}</b></td><td><span class="mpk ${x.status === 'inadimplente' ? 'ree' : 'abe'}">${x.status === 'inadimplente' ? 'inadimplente' : 'em aberto'}</span></td><td>${fDM(x.ultimo)}</td><td>${fDM(x.vencimento)}</td><td class="num">${x.dias}</td><td class="num">${x.recusas || '–'}</td><td>${ESC(motivoNome(x.motivo))}</td></tr>`).join('')
@@ -1506,8 +1513,8 @@ function viewMPPro() {
   h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Pagamentos por mês</h3><p>Todos os meses · clique numa barra para ver o mês · * mês em andamento</p></div>
       <div class="lg"><span><i style="background:#c9a94f"></i>Novas</span><span><i style="background:#00503c"></i>Renovações</span></div></div>${mpEvolChart(m.evolucao, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44)}</div>
     <div class="card"><div class="ch"><div><h3>Sobrevivência por coorte</h3><p>Mês de entrada → % que segue ativo em ${fDay(base)}</p></div></div>${coh}</div></div>`;
-  h += `<div class="card np mt"><div class="ch"><div><h3>Evolução mensal</h3><p>Meses completos e o mês atual (parcial)</p></div></div><div class="tw"><table class="t"><thead><tr><th>Mês</th><th class="num">Pagamentos</th><th class="num">Novas</th><th class="num">Renovações</th><th class="num">Base paga</th><th class="num">Receita bruta</th><th class="num">Receita líquida</th><th class="num">Investimento</th><th class="num">CAC</th><th class="num">Resultado</th></tr></thead><tbody>` +
-    m.evolucao.map(e => `<tr${e.mes >= S.de.slice(0, 7) && e.mes <= S.ate.slice(0, 7) ? ' class="sel"' : ''}><td><b>${MESN(e.mes)}</b>${e.parcial ? ' <span class="mut">(parcial)</span>' : ''}</td><td class="num">${fN(e.pagamentos)}</td><td class="num">${fN(e.novas)}</td><td class="num">${fN(e.renovacoes)}</td><td class="num">${fN(e.base_paga)}</td><td class="num">${fRc(e.bruto)}</td><td class="num">${fRc(e.liquido)}</td><td class="num">${fRc(e.investimento)}</td><td class="num">${fRc(e.cac)}</td><td class="num ${e.liquido - e.investimento < 0 ? 'red' : ''}">${fRc(e.liquido - e.investimento)}</td></tr>`).join('') +
+  h += `<div class="card np mt"><div class="ch"><div><h3>Evolução mensal</h3><p>Meses completos e o mês atual (parcial) · receita = MP PRO + Formação de Consultores</p></div></div><div class="tw"><table class="t"><thead><tr><th>Mês</th><th class="num">Pagamentos</th><th class="num">Novas</th><th class="num">Renovações</th><th class="num">Base paga</th><th class="num">Formação</th><th class="num">Receita bruta</th><th class="num">Receita líquida</th><th class="num">Investimento</th><th class="num">CAC</th><th class="num">Resultado</th></tr></thead><tbody>` +
+    m.evolucao.map(e => `<tr${e.mes >= S.de.slice(0, 7) && e.mes <= S.ate.slice(0, 7) ? ' class="sel"' : ''}><td><b>${MESN(e.mes)}</b>${e.parcial ? ' <span class="mut">(parcial)</span>' : ''}</td><td class="num">${fN(e.pagamentos)}</td><td class="num">${fN(e.novas)}</td><td class="num">${fN(e.renovacoes)}</td><td class="num">${fN(e.base_paga)}</td><td class="num">${e.formacao ? fN(e.formacao) : '–'}</td><td class="num">${fRc(e.bruto)}</td><td class="num">${fRc(e.liquido)}</td><td class="num">${fRc(e.investimento)}</td><td class="num">${fRc(e.cac)}</td><td class="num ${e.liquido - e.investimento < 0 ? 'red' : ''}">${fRc(e.liquido - e.investimento)}</td></tr>`).join('') +
     `</tbody></table></div></div>`;
   // ---------- churn
   h += `<div class="mph mt"><span>CHURN</span>Taxa de saída · janela M → M+1 só conta quando o mês seguinte já terminou</div>`;
@@ -1531,7 +1538,7 @@ function viewMPPro() {
     (md.campanhas.length ? md.campanhas.map(c => `<tr><td><b>${ESC(c.campanha)}</b></td><td class="num">${fRc(c.investimento)}</td><td class="num">${fN(c.impressoes)}</td><td class="num">${fN(c.cliques)}</td><td class="num">${fN(c.visitas)}</td><td class="num">${fN(c.checkouts)}</td><td class="num">${fP(pctOf(c.cliques, c.impressoes))}</td><td class="num">${fRc(c.cliques ? c.investimento / c.cliques : null)}</td></tr>`).join('')
       : `<tr><td colspan="8">${emptyBox('Nenhuma campanha Perpétuo com gasto no período')}</td></tr>`) + `</tbody></table></div></div>`;
   h += `<details class="mpd mt"><summary>Como ler esta aba e ressalvas</summary><ul>
-    <li><b>Fontes:</b> vendas e assinantes da API da Kiwify (produto MP PRO); mídia da Meta Ads, só campanhas "MP PRO ... Perpétuo" da conta Meu Patrimônio CA. Atualiza junto com o dashboard, a cada 30 min.</li>
+    <li><b>Fontes:</b> vendas e assinantes da API da Kiwify (produto MP PRO); a receita soma também o produto <b>MP PRO - Formação de Consultores de Investimentos</b> (venda avulsa, não entra na base de assinantes nem no CAC); mídia da Meta Ads, só campanhas "MP PRO ... Perpétuo" da conta Meu Patrimônio CA. Atualiza junto com o dashboard, a cada 30 min.</li>
     <li><b>Só o período vale nesta aba.</b> Os números do período usam a data do pagamento; a base (ativos, cancelados, churn acumulado, LTV) é a posição no último dia do período, ou hoje.</li>
     <li><b>Assinaturas:</b> a Kiwify não expõe assinaturas na API; cada cobrança é um pedido. A base é reconstruída pelos pedidos de cada cliente (quem tem duas assinaturas paralelas aparece com as duas).</li>
     <li><b>Usuário ativo</b> = cobrança confirmada nos últimos 40 dias. Não mede consumo das aulas (a API não informa).</li>

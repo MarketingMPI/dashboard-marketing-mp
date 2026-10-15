@@ -228,6 +228,10 @@ def mppro(MP, f, agora_day):
     apr = [o for o in O if o["st"] in ("paid", "refunded")]
     rec = [o for o in O if o["st"] == "refused"]
     tent = [o for o in O if o["st"] in ("refused", "waiting")]
+    AV = [dict(ts=r[0], day=r[0][:10], c=r[1], st=r[2], met=r[3], bruto=r[4], taxa=r[5], liq=r[6], rday=r[7][:10] if r[7] else None)
+          for r in MP.get("avulsos") or []]
+    av_p = [o for o in AV if o["st"] == "paid" and inP(o["day"])]
+    av_re = [o for o in AV if o["st"] == "refunded" and o["rday"] and inP(o["rday"])]
     # sequência por assinatura e por cliente
     por_sub, por_cli = {}, {}
     for o in apr:
@@ -320,8 +324,9 @@ def mppro(MP, f, agora_day):
 
     # churn por janela de meses
     meses = []
-    if apr:
-        ym = apr[0]["day"][:7]
+    ini0 = min([x for x in (apr[0]["day"] if apr else None, AV[0]["day"] if AV else None) if x], default=None)
+    if ini0:
+        ym = ini0[:7]
         while ym <= agora_day[:7]:
             meses.append(ym); ym = _mais1mes(ym + "-01")[:7]
     pagou = lambda ym: {o["c"] for o in aprT if not ef_ref(o) and o["day"][:7] == ym}
@@ -351,16 +356,18 @@ def mppro(MP, f, agora_day):
         for k, v in zip(("investimento", "impressoes", "cliques", "visitas", "checkouts"), r[2:7]):
             pc[k] += v
     novas = len(novas_subs); novas_re = sum(1 for o in novas_subs if o["st"] == "refunded")
-    cac = _div(m["inv"], novas); liq_p = soma(pagos, "liq")
+    cac = _div(m["inv"], novas); liq_p = soma(pagos, "liq") + soma(av_p, "liq")
 
     evol = []
     for ym in meses:
         pm = [o for o in apr if o["st"] == "paid" and o["day"][:7] == ym]
         ns = sum(1 for o in firsts if o["day"][:7] == ym)
         inv = sum(r[2] for r in MD["dias"] if r[0][:7] == ym)
+        fm = [o for o in AV if o["st"] == "paid" and o["day"][:7] == ym]
         evol.append({"mes": ym, "pagamentos": len(pm), "novas": sum(1 for o in pm if is_first(o)),
-                     "renovacoes": sum(1 for o in pm if not is_first(o)), "novas_assinaturas": ns, "bruto": soma(pm, "bruto"),
-                     "liquido": soma(pm, "liq"), "base_paga": len({o["c"] for o in pm}), "investimento": inv, "cac": _div(inv, ns),
+                     "renovacoes": sum(1 for o in pm if not is_first(o)), "novas_assinaturas": ns,
+                     "formacao": len(fm), "formacao_liquido": soma(fm, "liq"), "bruto": soma(pm, "bruto") + soma(fm, "bruto"),
+                     "liquido": soma(pm, "liq") + soma(fm, "liq"), "base_paga": len({o["c"] for o in pm}), "investimento": inv, "cac": _div(inv, ns),
                      "parcial": ym == agora_day[:7]})
     coortes = []
     for ym in meses:
@@ -375,18 +382,27 @@ def mppro(MP, f, agora_day):
         pagamentos.append({"tipo": ("Nova, reembolsada" if o["st"] == "refunded" else "Nova") if is_first(o) else "Renovação",
                            "cliente": nome(o["c"]), "dia": o["day"], "vencimento": due,
                            "atraso": (_d(o["day"]) - _d(due)).days if due else None, "metodo": o["met"], "recusas": len(rr),
-                           "motivo": (rr[-1]["mot"] or "nao_informado") if rr else None})
+                           "motivo": (rr[-1]["mot"] or "nao_informado") if rr else None, "_ts": o["ts"]})
+    for o in AV:
+        if inP(o["day"]):
+            pagamentos.append({"tipo": "Formação, reembolsada" if o["st"] == "refunded" else "Formação", "cliente": nome(o["c"]), "dia": o["day"],
+                               "vencimento": None, "atraso": None, "metodo": o["met"], "recusas": 0, "motivo": None, "_ts": o["ts"]})
+    pagamentos.sort(key=lambda x: x["_ts"])
+    for x in pagamentos:
+        del x["_ts"]
     return {
         "periodo": {"de": f.get("de") or None, "ate": f.get("ate") or None, "base_em": T},
         "midia": {"investimento": m["inv"], "impressoes": m["imp"], "cliques": m["cl"], "visitas": m["lpv"], "checkouts": m["ic"],
                   "compras_pixel": m["px"], "ctr": _div(m["cl"] * 100, m["imp"]), "cpc": _div(m["inv"], m["cl"]),
                   "cpm": _div(m["inv"] * 1000, m["imp"]), "custo_visita": _div(m["inv"], m["lpv"]), "custo_checkout": _div(m["inv"], m["ic"]),
                   "campanhas": sorted([x for x in por_camp.values() if x["investimento"] > 0], key=lambda x: -x["investimento"])},
-        "vendas": {"novas_assinaturas": novas, "novas_reembolsadas": novas_re, "renovacoes_pagas": len(pag_ren), "pagamentos": len(pagos),
-                   "bruto": soma(pagos, "bruto"), "taxa": soma(pagos, "taxa"), "liquido": liq_p,
+        "vendas": {"novas_assinaturas": novas, "novas_reembolsadas": novas_re, "renovacoes_pagas": len(pag_ren), "pagamentos": len(pagos) + len(av_p),
+                   "bruto": soma(pagos, "bruto") + soma(av_p, "bruto"), "taxa": soma(pagos, "taxa") + soma(av_p, "taxa"), "liquido": liq_p,
+                   "assinatura_liquido": soma(pagos, "liq"), "formacao_qtd": len(av_p), "formacao_bruto": soma(av_p, "bruto"),
+                   "formacao_taxa": soma(av_p, "taxa"), "formacao_liquido": soma(av_p, "liq"),
                    "novas_qtd": len(pag_novas), "novas_bruto": soma(pag_novas, "bruto"), "novas_taxa": soma(pag_novas, "taxa"),
                    "novas_liquido": soma(pag_novas, "liq"), "ren_bruto": soma(pag_ren, "bruto"), "ren_taxa": soma(pag_ren, "taxa"),
-                   "ren_liquido": soma(pag_ren, "liq"), "reembolsos": len(reemb), "reembolsos_valor": soma(reemb, "bruto"),
+                   "ren_liquido": soma(pag_ren, "liq"), "reembolsos": len(reemb) + len(av_re), "reembolsos_valor": soma(reemb, "bruto") + soma(av_re, "bruto"),
                    "recusas": len(rec_p), "recusas_clientes": len({o["c"] for o in rec_p}), "recusas_novos": rec_novos,
                    "motivos_recusa": dict(motivos), "resultado": liq_p - m["inv"]},
         "renovacoes": {"previstas": len(prev), "pagas": sum(1 for x in prev if x["pago"]),
