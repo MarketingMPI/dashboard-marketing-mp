@@ -401,50 +401,6 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
   .hb-r{grid-template-columns:minmax(80px,40%) minmax(0,1fr) auto}
 }
 .dates{display:inline-flex;gap:6px;align-items:center}
-
-/* =====================================================================
-   GLASSMORPHISM — camada visual por cima do layout (cores da marca MP)
-   ===================================================================== */
-:root{--gl:rgba(255,255,255,.56);--gl2:rgba(255,255,255,.74);--glb:rgba(255,255,255,.7);--glbl:blur(18px) saturate(170%);
-  --glsh:0 10px 34px -14px rgba(0,51,38,.22),0 1px 0 rgba(255,255,255,.85) inset;--linha:rgba(0,80,60,.10)}
-body{background:#e9f1ed}
-body::before{content:'';position:fixed;inset:-10%;z-index:-1;pointer-events:none;
-  background:radial-gradient(38% 42% at 12% 8%,rgba(0,166,17,.20),transparent 70%),
-    radial-gradient(34% 40% at 88% 14%,rgba(201,169,79,.22),transparent 70%),
-    radial-gradient(46% 46% at 70% 78%,rgba(0,80,60,.22),transparent 70%),
-    radial-gradient(40% 40% at 18% 86%,rgba(97,206,112,.20),transparent 70%),
-    linear-gradient(160deg,#eef5f1 0%,#e3eee8 55%,#eef3ee 100%);filter:saturate(110%)}
-header.top{background:linear-gradient(115deg,rgba(0,51,38,.88) 0%,rgba(0,80,60,.82) 55%,rgba(11,100,71,.80) 100%);
-  backdrop-filter:var(--glbl);-webkit-backdrop-filter:var(--glbl);border-bottom:1px solid rgba(255,255,255,.18);box-shadow:0 8px 30px -18px rgba(0,51,38,.6)}
-nav.side{background:rgba(255,255,255,.42);backdrop-filter:var(--glbl);-webkit-backdrop-filter:var(--glbl);border-right:1px solid var(--glb);box-shadow:1px 0 0 rgba(0,80,60,.05)}
-nav.side button:hover{background:rgba(255,255,255,.55)}
-nav.side button.on{background:rgba(255,255,255,.78);box-shadow:inset 3px 0 0 var(--verde),0 6px 18px -10px rgba(0,51,38,.35)}
-.fbar{background:rgba(240,246,243,.50);backdrop-filter:var(--glbl);-webkit-backdrop-filter:var(--glbl);border-bottom:1px solid var(--glb)}
-.card,.kpi,footer.howto,.mpd{background:var(--gl);backdrop-filter:var(--glbl);-webkit-backdrop-filter:var(--glbl);border:1px solid var(--glb);box-shadow:var(--glsh)}
-.kpi{transition:transform .18s ease,box-shadow .18s ease}.kpi:hover{transform:translateY(-2px);box-shadow:0 16px 40px -16px rgba(0,51,38,.32),0 1px 0 rgba(255,255,255,.9) inset}
-.kpi.hero{background:linear-gradient(135deg,rgba(0,80,60,.86),rgba(0,51,38,.90));border:1px solid rgba(255,255,255,.22);box-shadow:0 14px 36px -14px rgba(0,51,38,.55),0 1px 0 rgba(255,255,255,.25) inset}
-.kpi.hero.gold{background:linear-gradient(135deg,rgba(32,28,20,.88),rgba(18,16,12,.92));border-color:rgba(228,214,167,.28)}
-.ctl,.cps,.chip,.search input{background:rgba(255,255,255,.62)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:var(--glb)!important}
-.ctl:hover{background:rgba(255,255,255,.85)!important}
-.cp.on{box-shadow:0 4px 14px -6px rgba(0,80,60,.6)}
-#pop{background:rgba(255,255,255,.80);backdrop-filter:var(--glbl);-webkit-backdrop-filter:var(--glbl);border:1px solid var(--glb)}
-#pop .pf{background:rgba(255,255,255,.5)}
-#drawer{background:rgba(255,255,255,.80);backdrop-filter:blur(24px) saturate(170%);-webkit-backdrop-filter:blur(24px) saturate(170%);border-left:1px solid var(--glb)}
-#tip{background:rgba(16,35,28,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.12)}
-table.t th{background:rgba(244,249,246,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-table.t.stk td:first-child{background:rgba(255,255,255,.86)}table.t.stk th:first-child{background:rgba(244,249,246,.92)}
-table.t tbody tr:hover td{background:rgba(255,255,255,.55)}
-table.t tr.tot td{background:rgba(238,245,241,.75)}
-table.hm td.tt{background:rgba(242,247,244,.7)}
-.mpm div,.mpet div{background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.75)}
-.note{background:rgba(251,246,234,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-.mph span{background:rgba(246,240,222,.8);border:1px solid rgba(255,255,255,.7)}
-.hb-t,.pst,.mpt,.prog{background:rgba(0,80,60,.07)!important}
-#lock{background:radial-gradient(40% 50% at 15% 10%,rgba(97,206,112,.45),transparent 70%),radial-gradient(40% 50% at 85% 85%,rgba(201,169,79,.35),transparent 70%),
-  radial-gradient(1200px 600px at 20% 0%,#0a6a50,var(--verde) 45%,var(--prof))}
-#lock form{background:rgba(255,255,255,.80);backdrop-filter:blur(22px) saturate(170%);-webkit-backdrop-filter:blur(22px) saturate(170%);border:1px solid rgba(255,255,255,.6)}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .card,.kpi,footer.howto,.mpd,nav.side,.fbar,#pop,#drawer{background:rgba(255,255,255,.93)}}
 </style>
 </head>
 <body class="locked">
