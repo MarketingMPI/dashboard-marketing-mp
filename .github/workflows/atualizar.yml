@@ -38,12 +38,15 @@ jobs:
           key: dash-${{ github.run_id }}
           restore-keys: dash-
 
-      - name: Coletar Pipedrive + Meta Ads e gerar o site
+      - name: Coletar Pipedrive + Meta Ads + Kiwify e gerar o site
         env:
           PIPEDRIVE_API_TOKEN: ${{ secrets.PIPEDRIVE_API_TOKEN }}
           PAINEL_SENHA: ${{ secrets.PAINEL_SENHA }}
           DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          KIWIFY_CLIENT_ID: ${{ secrets.KIWIFY_CLIENT_ID }}
+          KIWIFY_CLIENT_SECRET: ${{ secrets.KIWIFY_CLIENT_SECRET }}
+          KIWIFY_ACCOUNT_ID: ${{ secrets.KIWIFY_ACCOUNT_ID }}
           TZ: America/Sao_Paulo
         run: python3 painel.py ci
 
