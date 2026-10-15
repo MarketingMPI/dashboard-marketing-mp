@@ -1687,11 +1687,11 @@ function viewMPHub() {
   const lin = c.base.map(u => { const l = c.ult(u), n = u.dias.filter(d => d <= c.T).length; return {u, l, ts: l ? hubHora(u, l) : null, n, total: n * u.minutosSessao}; })
     .sort((a, b) => (b.ts || '') > (a.ts || '') ? 1 : (b.ts || '') < (a.ts || '') ? -1 : (b.u.criado > a.u.criado ? 1 : -1));
   const lista = lin.slice(0, 60);
-  h += `<div class="card np mt"><div class="ch"><div><h3>Usuários</h3><p>Ordenados pelo último acesso, do mais recente para o mais antigo (60 primeiros) · nomes fictícios</p></div></div><div class="tw" style="max-height:480px"><table class="t stk"><thead><tr><th>Usuário</th><th>Último acesso</th><th>Situação</th><th class="num">Tempo médio no MP HUB</th><th class="num">Tempo total</th><th class="num">Acessos</th><th>Ferramenta favorita</th><th>Perfil</th><th>Origem</th><th>Plano</th><th>UF</th><th>Cadastro</th><th>1º acesso</th></tr></thead><tbody>` +
+  h += `<div class="card np mt"><div class="ch"><div><h3>Usuários</h3><p>Ordenados pelo último acesso, do mais recente para o mais antigo (60 primeiros) · nomes fictícios</p></div></div><div class="tw" style="max-height:480px"><table class="t stk"><thead><tr><th>Usuário</th><th>Último acesso</th><th>Situação</th><th class="num">Tempo médio no MP HUB</th><th class="num">Tempo total</th><th class="num">Acessos</th><th>Ferramenta favorita</th><th>Perfil</th><th>UF</th><th>Cadastro</th><th>1º acesso</th></tr></thead><tbody>` +
     lista.map(({u, ts, n, total}) => { const s2 = STN[c.st(u)], fav = HUB_FERR.slice().sort((a, b) => u.uso[b] - u.uso[a])[0];
       return `<tr><td><b>${ESC(u.nome)}</b><div class="mut">#${u.id}</div></td><td>${ts ? `<b>${fDay(ts.slice(0, 10))} ${ts.slice(11, 16)}</b><div class="mut">${hubHa(ts)}</div>` : '<span class="mut">nunca acessou</span>'}</td>
         <td><span class="mpk ${s2[1]}">${s2[0]}</span></td><td class="num">${n ? `<b>${fMin(u.minutosSessao)}</b><div class="mut">por acesso</div>` : '–'}</td><td class="num">${n ? fMin(total) : '–'}</td><td class="num">${n || '–'}</td>
-        <td>${n ? ESC(fav) : '–'}</td><td>${ESC(u.perfil)}</td><td>${ESC(u.origem)}</td><td>${u.plano}</td><td>${u.uf}</td><td>${fDay(u.criado)}</td><td>${u.primeiro ? fDay(u.primeiro) : '–'}</td></tr>`; }).join('') +
+        <td>${n ? ESC(fav) : '–'}</td><td>${ESC(u.perfil)}</td><td>${u.uf}</td><td>${fDay(u.criado)}</td><td>${u.primeiro ? fDay(u.primeiro) : '–'}</td></tr>`; }).join('') +
     `</tbody></table></div></div>`;
   // dicionário de dados
   const DIC = [
