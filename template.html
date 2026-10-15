@@ -121,10 +121,12 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .mph{font-size:13px;color:var(--cinza);margin:4px 0 12px;display:flex;align-items:center;gap:10px}.mph.mt{margin-top:28px}
 .mph span{font-size:11px;letter-spacing:.1em;font-weight:700;color:#8f7a3e;background:#f6f0de;border-radius:6px;padding:3px 8px}
 .kpi.hero.gold{background:linear-gradient(135deg,#1d1a13,#12100c);border-color:#2b261b}.kpi.hero.gold .kv{color:#e4d6a7}.kpi.hero.gold .kl,.kpi.hero.gold .ks{color:#bfb48f}
-.mpf .mpr{display:grid;grid-template-columns:150px minmax(0,1fr) 128px 92px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #edf1ef}
+.mpf .mpr{display:grid;grid-template-columns:190px minmax(0,1fr) 150px 96px 110px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #edf1ef}
 .mpf .mpr:last-of-type{border-bottom:0}.mpl b,.mpv b,.mpc{display:block;font-size:13px}.mpl small,.mpv small,.mpc small{display:block;color:var(--cinza);font-size:11px;font-weight:400}
 .mpt{position:relative;height:12px;background:#f1f4f2;border-radius:99px;overflow:hidden}.mpt i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;animation:growx .6s cubic-bezier(.2,.7,.2,1) both;transform-origin:left}
-.mpc{text-align:right;font-weight:600}.mut{color:var(--cinza);font-size:11.5px}.mpf p.mut{margin:10px 0 0}
+.mpc{text-align:right;font-weight:600}
+.mpe{text-align:center}.mpe b{display:inline-block;font-size:12.5px;background:#e3f3ea;color:#0b6b3a;border-radius:99px;padding:2px 9px}.mpe b.na{background:#eef1f0;color:#56635d}.mpe small{display:block;color:var(--cinza);font-size:10.5px;margin-top:2px}
+.mpet{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}.mpet div{background:#f7faf8;border-radius:10px;padding:9px 10px;font-size:11.5px;color:#56635d}.mpet b{display:block;font-size:16px;color:var(--prof)}.mut{color:var(--cinza);font-size:11.5px}.mpf p.mut{margin:10px 0 0}
 .mpm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.mpm div{background:#f7faf8;border-radius:10px;padding:10px 12px;font-size:12px;color:#56635d}
 .mpm b{display:block;font-size:17px;color:var(--txt)}.mpm small{display:block;color:var(--cinza);font-size:11px;margin-top:2px}
 .mprs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.mprs span{font-size:11.5px;background:#fbefed;color:#7a2a20;border-radius:99px;padding:3px 10px}
@@ -1411,12 +1413,21 @@ function mpFunnel(m, novas) {
     ['Assinaturas na Kiwify', 'Pagamento aprovado (venda real)', novas]];
   const mx = Math.log10(Math.max(10, st[0][2] + 1));
   const cols = ['#c9b77f', '#b59c5a', '#8f7a3e', '#00503c', '#003326'];
-  return '<div class="mpf">' + st.map(([n, d, v], i) => {
-    const conv = i ? pctOf(v, st[i - 1][2]) : null, cu = v ? m.investimento / v : null;
-    const tip = `${n}\n${d}\nVolume: ${fN(v)}${i ? `\nConversão da etapa anterior: ${fP(conv)}` : ''}\n% das impressões: ${fP(pctOf(v, st[0][2]))}\nCusto por unidade: ${fRc(cu)}`;
+  // eficiência da etapa = volume ÷ volume da etapa anterior
+  const ef = st.map(([, , v], i) => i ? pctOf(v, st[i - 1][2]) : null);
+  const fef = v => v == null ? '–' : (v < 1 ? new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 2, minimumFractionDigits: 2}).format(v) + '%' : fP(v));
+  const rows = st.map(([n, d, v], i) => {
+    const cu = v ? m.investimento / v : null, pi = pctOf(v, st[0][2]);
+    const tip = `${n}\n${d}\nVolume: ${fN(v)}${i ? `\nEficiência (vs. ${st[i - 1][0].toLowerCase()}): ${fef(ef[i])}` : ''}\n% das impressões: ${fef(pi)}\nCusto por unidade: ${fRc(cu)}`;
     return `<div class="mpr" data-tip="${ESC(tip)}"><span class="mpl"><b>${n}</b><small>${d}</small></span><span class="mpt"><i style="width:${Math.max(2, Math.log10(v + 1) / mx * 100)}%;background:${cols[i]};animation-delay:${i * 70}ms"></i></span>
-      <span class="mpv"><b>${fN(v)}</b><small>${i ? fP(conv) + ' da etapa anterior' : '100%'}</small></span><span class="mpc">${fRc(cu)}<small>por unidade</small></span></div>`;
-  }).join('') + `<p class="mut">Barras em escala logarítmica para as etapas finais ficarem visíveis. A última etapa é a venda registrada na Kiwify, não a atribuição do pixel (o pixel do Meta atribuiu ${fN(m.compras_pixel)}).</p></div>`;
+      <span class="mpv"><b>${fN(v)}</b><small>${i ? fef(pi) + ' das impressões' : 'base do funil'}</small></span>
+      <span class="mpe">${i ? `<b>${fef(ef[i])}</b><small>eficiência</small>` : '<b class="na">100%</b><small>base</small>'}</span>
+      <span class="mpc">${fRc(cu)}<small>por unidade</small></span></div>`;
+  });
+  const tot = pctOf(novas, st[0][2]), tc = pctOf(novas, st[1][2]), tv = pctOf(novas, st[2][2]);
+  return '<div class="mpf">' + rows.join('') +
+    `<div class="mpet"><div><b>${fef(tot)}</b>impressão → assinatura</div><div><b>${fef(tc)}</b>clique → assinatura</div><div><b>${fef(tv)}</b>visita → assinatura</div><div><b>${fef(ef[4])}</b>checkout → assinatura</div></div>` +
+    `<p class="mut">Eficiência = volume da etapa ÷ volume da etapa anterior. Barras em escala logarítmica para as etapas finais ficarem visíveis. A última etapa é a venda registrada na Kiwify, não a atribuição do pixel (o pixel do Meta atribuiu ${fN(m.compras_pixel)}).</p></div>`;
 }
 function mpEvolChart(ev, width) {
   if (!ev.length) return emptyBox('Sem vendas registradas');
@@ -1466,14 +1477,15 @@ function viewMPPro() {
   ].join('') + '</div>';
   // ---------- funil + receita
   const vw = document.getElementById('view').clientWidth || 900;
-  h += `<div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Funil da campanha</h3><p>Da impressão à assinatura · custo por unidade = investimento ÷ volume da etapa</p></div></div>${md.impressoes || v.novas_assinaturas ? mpFunnel(md, v.novas_assinaturas) : emptyBox('Sem mídia nem vendas no período')}</div>
-    <div class="card"><div class="ch"><div><h3>Composição da receita</h3><p>Pagamentos aprovados no período · MP PRO (assinatura) + Formação de Consultores</p></div></div>
+  h += `<div class="card mt"><div class="ch"><div><h3>Funil da campanha</h3><p>Da impressão à assinatura · custo por unidade = investimento ÷ volume da etapa</p></div></div>${md.impressoes || v.novas_assinaturas ? mpFunnel(md, v.novas_assinaturas) : emptyBox('Sem mídia nem vendas no período')}</div>
+    <div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Composição da receita</h3><p>Pagamentos aprovados no período · MP PRO (assinatura) + Formação de Consultores</p></div></div>
       <div class="tw"><table class="t mprc"><thead><tr><th></th><th class="num">Qtd</th><th class="num">Bruto</th><th class="num">Taxa</th><th class="num">Líquido</th></tr></thead><tbody>
       <tr><td>Novas assinaturas</td><td class="num">${fN(v.novas_qtd)}</td><td class="num">${fRc(v.novas_bruto)}</td><td class="num">${fRc(v.novas_taxa)}</td><td class="num">${fRc(v.novas_liquido)}</td></tr>
       <tr><td>Renovações</td><td class="num">${fN(v.renovacoes_pagas)}</td><td class="num">${fRc(v.ren_bruto)}</td><td class="num">${fRc(v.ren_taxa)}</td><td class="num">${fRc(v.ren_liquido)}</td></tr>
       <tr><td>Formação de Consultores</td><td class="num">${fN(v.formacao_qtd)}</td><td class="num">${fRc(v.formacao_bruto)}</td><td class="num">${fRc(v.formacao_taxa)}</td><td class="num">${fRc(v.formacao_liquido)}</td></tr>
       <tr class="tot"><td>Total</td><td class="num">${fN(v.pagamentos)}</td><td class="num">${fRc(v.bruto)}</td><td class="num">${fRc(v.taxa)}</td><td class="num">${fRc(v.liquido)}</td></tr></tbody></table></div>
-      <div class="mpm">
+      </div><div class="card"><div class="ch"><div><h3>Reembolsos, recusas e eficiência de mídia</h3><p>No período</p></div></div>
+      <div class="mpm" style="margin-top:0">
         <div><b>${fN(v.reembolsos)}</b>reembolsos no período<small>${fRc(v.reembolsos_valor)} devolvidos (fora da receita)</small></div>
         <div><b>${fN(v.recusas)}</b>cobranças recusadas<small>${pl(v.recusas_clientes, 'assinante', 'assinantes')} · ${pl(v.recusas_novos, 'de cliente novo', 'de clientes novos')}</small></div>
         <div><b>${fRc(u.custo_por_ativa)}</b>custo por assinatura ativa<small>investimento ÷ ${fN(b.assinaturas_ativas)} ativas</small></div>
