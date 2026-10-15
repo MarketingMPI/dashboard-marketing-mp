@@ -40,6 +40,18 @@ TYPE_NAMES = {"call": "Ligação", "whatsapp_chat1": "WhatsApp", "whatsapp_chat"
               "email": "E-mail", "meeting": "Reunião", "qualificacao": "Reunião de qualificação"}
 # Consultores da equipe atual: aparecem sempre no dashboard, mesmo sem leads no recorte.
 EQUIPE = ["Danilo Ribeiro", "Pedro Francisco", "Victor Carvalho"]
+PII_RX = [(re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "(e-mail oculto)"),
+          (re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)"), "(CPF oculto)"),
+          (re.compile(r"(?<!\d)(\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}(?!\d)"), "(telefone oculto)")]
+
+
+def sem_pii(txt):
+    """Dashboard mostra só o nome: e-mail, CPF ou telefone digitados no título do negócio são mascarados."""
+    for rx, rep in PII_RX:
+        txt = rx.sub(rep, txt or "")
+    return txt
+
+
 TEST_RX = re.compile(r"\b(teste|test lead|zzteste|dummy)\b|registro de teste", re.I)
 
 
@@ -383,7 +395,7 @@ def model(cache):
                 entry, fonte = contacts[0][0], "1º contato registrado (anterior à criação no CRM)"
         pend = sorted(a["due"] for a in info["acts"] if not a["done"] and a.get("due"))
         leads.append({
-            "id": d["id"], "n": title, "s": d["status"], "sg": d["stage_id"], "c": owner, "o": origem(title, lb), "lb": lb,
+            "id": d["id"], "n": sem_pii(title), "s": d["status"], "sg": d["stage_id"], "c": owner, "o": origem(title, lb), "lb": lb,
             "e": entry, "ec": crm, "ef": fonte, "b": 1 if (d["id"] in base or reat) else 0, "pk": info.get("pk") or [], "w": brt(d.get("won_time")), "l": brt(d.get("lost_time")),
             "lr": (d.get("lost_reason") or "").strip() or ("Sem motivo informado" if d["status"] == "lost" else None),
             "k": contacts,
@@ -619,7 +631,7 @@ def mppro_pedidos(sales, avulsas=()):
         c = x["customer"]
         key = (c.get("email") or c.get("id") or "").strip().lower()
         if key not in cli: cli[key] = len(nomes); nomes.append(None)
-        ci = cli[key]; nomes[ci] = (c.get("name") or "").strip() or "(sem nome)"
+        ci = cli[key]; nomes[ci] = sem_pii((c.get("name") or "").strip()) or "(sem nome)"
         st, sub = {"waiting_payment": "waiting"}.get(x["status"], x["status"]), -1   # waiting = cobrança em andamento (Pix)
         if st in ("paid", "refunded"):
             day = ts[:10]
@@ -757,6 +769,7 @@ def build_dev(out=None):
     s = json.loads(SNAP.read_text(encoding="utf-8"))
     out = pathlib.Path(out) if out else DATA / "dev.html"
     html = template().replace("/*__RAW__*/null", json.dumps(s, ensure_ascii=False))
+    html = re.sub(r'<meta http-equiv="Content-Security-Policy"[^>]*>\n', "", html)
     html = html.replace('href="assets/', f'href="{ASSETS.as_uri()}/').replace('src="assets/', f'src="{ASSETS.as_uri()}/')
     html = html.replace("url(assets/", f"url({ASSETS.as_uri()}/")
     out.write_text(html, encoding="utf-8")

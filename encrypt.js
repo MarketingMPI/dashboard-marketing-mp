@@ -6,7 +6,7 @@ process.stdin.on('data', c => chunks.push(c));
 process.stdin.on('end', () => {
   const pw = process.env.PAINEL_SENHA;
   if (!pw) { console.error('PAINEL_SENHA ausente'); process.exit(2); }
-  const iter = 310000;
+  const iter = 600000;
   const salt = crypto.randomBytes(16), iv = crypto.randomBytes(12);
   const key = crypto.pbkdf2Sync(pw, salt, iter, 32, 'sha256');
   const c = crypto.createCipheriv('aes-256-gcm', key, iv);
