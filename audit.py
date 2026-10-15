@@ -107,7 +107,7 @@ def lead_metrics(l, agora):
 
 
 # ----------------------------------------------------------------------------- filtro
-CAMPANHAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|"}  # prefixo do título
+CAMPANHAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "rcon": r"^\s*RCON\b"}  # prefixo do título
 
 
 def filtra(leads, f):
@@ -304,6 +304,8 @@ def cenarios(D):
         ("tudo_so_trd", filtros_base("2000-01-01", h, campanha="trd")),
         ("tudo_so_diag", filtros_base("2000-01-01", h, campanha="diag")),
         ("ultimos_30_so_diag", filtros_base(d30, h, campanha="diag")),
+        ("tudo_so_rcon", filtros_base("2000-01-01", h, campanha="rcon")),
+        ("ultimos_7_so_rcon", filtros_base(d7, h, campanha="rcon")),
         ("ultimos_30_sem_base", filtros_base(d30, h, incluir_base=False)),
     ]
 
