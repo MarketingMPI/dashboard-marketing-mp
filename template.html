@@ -117,6 +117,11 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .vh h2{margin:0;font-size:22px;color:var(--prof);letter-spacing:-.01em;font-weight:700}
 .vh p{margin:3px 0 0;color:var(--cinza);font-size:13.5px}
 .g{display:grid;gap:16px}
+.note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
+.psh{padding:10px 0;border-bottom:1px solid #edf1ef}.psh:last-child{border-bottom:0}.psl{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}
+.psl span{display:flex;align-items:center;gap:8px}.psl i{width:10px;height:10px;border-radius:3px;display:inline-block}.pst{height:8px;background:#eef3f1;border-radius:99px;overflow:hidden}
+.pst i{display:block;height:100%;border-radius:99px}.psh small{color:var(--cinza);font-size:11.5px}
+table.t tr.tot td{background:#f7faf8;font-weight:700;border-top:1px solid var(--linha)}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g32{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 .mt{margin-top:16px}
@@ -428,6 +433,7 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
         <div><dt>Agendado e Reunião</dt><dd><b>Agendado</b>: o lead chegou à etapa Reunião, Negociação ou Fechamento (ou foi ganho). <b>Reunião</b>: existe uma reunião (ou reunião de qualificação) concluída.</dd></div>
         <div><dt>Dias sem contato e parados</dt><dd>Só para leads abertos: dias desde o último contato (ou desde a entrada, se nunca houve contato). <b>Parado</b> = mais de 7 dias sem contato.</dd></div>
         <div><dt>Funil / Mapa do CRM</dt><dd>Etapas do funil sem o Cultivo. <b>Entraram</b>: leads que estiveram na etapa. <b>Avançaram</b>: chegaram a uma etapa seguinte (em Fechamento: ganhos). <b>Ainda estão</b>: abertos na etapa hoje. <b>Saíram sem avançar</b>: perdidos na etapa, enviados ao Cultivo ou que voltaram de etapa. Entraram = avançaram + ainda estão + saíram sem avançar. <b>Média até avançar</b>: dias da entrada na etapa até chegar à próxima (só quem avançou).</dd></div>
+        <div><dt>Performance</dt><dd>Investimento na Meta Ads das campanhas B2C (Tríade, Diagnóstico Financeiro e Iscas) dividido pelo que aconteceu <b>no Pipedrive</b> com os leads que entraram no período: custo por lead, por agendamento, por reunião e por fechamento. Os leads contados pela Meta são ignorados. TRD = campanhas Tríade; DIAG = campanhas Diagnóstico Financeiro; RCON não tem mídia paga. Só o período e a campanha valem nesta aba.</dd></div>
         <div><dt>Perdidos</dt><dd>Lead-time até a perda = dias da entrada até a perda. Contatos até a perda = contatos concluídos até o momento da perda. Opcionalmente, a aba Perdidos pode recortar o período pela data da perda.</dd></div>
       </dl>
       <div class="fm">Datas e horários de Brasília · fonte: Pipedrive · Meu Patrimônio, uso interno. Material de acompanhamento comercial, sem recomendação de investimento.</div>
@@ -640,7 +646,45 @@ function computeFull(leads, f, agoraStr) {
     media_dias_ate_perda: mPerda,
     media_dias_ate_ganho: mean(rows.filter(r => r.d.dGanho != null).map(r => r.d.dGanho))
   };
-  return {res: {kpis, etapas, consultores, perdidos, lead_time}, rows, agora};
+  const performance = computePerf(leads, f, agora);
+  return {res: {kpis, etapas, consultores, perdidos, lead_time, performance}, rows, agora};
+}
+
+/* Performance: investimento em mídia (Meta Ads, B2C) × leads que ENTRARAM no Pipedrive no período.
+   Os leads contados pela própria Meta são ignorados. Só período e campanha valem aqui (o investimento
+   não se divide por consultor/etapa). Investimento em centavos para a soma ser exata. */
+const PAGAS = {trd: {nome: 'Tríade', rx: TRD_RX}, diag: {nome: 'Diagnóstico Financeiro', rx: /^\s*DIAG\s*\|/i},
+  isca: {nome: 'Iscas', rx: /^\s*\[ISCA/i}, outros: {nome: 'Outras B2C', rx: null}};
+function computePerf(leads, f, agora) {
+  f = f || {};
+  const M = (D && D.midia) || {camps: [], dias: []};
+  const camp = f.campanha || (f.so_trd ? 'trd' : '');
+  const sel = camp ? (PAGAS[camp] ? [camp] : []) : Object.keys(PAGAS);
+  const de = f.de || '', ate = f.ate || '';
+  const z = id => ({id, investimento_centavos: 0, impressoes: 0, cliques: 0, leads: 0, contatados: 0, agendados: 0, reunioes: 0, ganhos: 0});
+  const G = {}; for (const id of Object.keys(PAGAS)) G[id] = z(id);
+  for (const r of M.dias || []) {
+    if ((de && r[0] < de) || (ate && r[0] > ate)) continue;
+    const c = M.camps[r[1]], g = c && G[c.grupo]; if (!g) continue;
+    g.investimento_centavos += r[2]; g.impressoes += r[3]; g.cliques += r[4];
+  }
+  for (const l of leads || []) {
+    const day = String(l.e || '').slice(0, 10);
+    if (!day || (de && day < de) || (ate && day > ate)) continue;
+    let id = null; for (const k of ['trd', 'diag', 'isca']) if (PAGAS[k].rx.test(l.n || '')) { id = k; break; }
+    if (!id) continue;
+    const d = derive(l, agora), g = G[id];
+    g.leads++; if (d.nk > 0) g.contatados++; if (d.agendado) g.agendados++; if (d.reuniao) g.reunioes++; if (d.won) g.ganhos++;
+  }
+  const fin = g => {
+    const inv = g.investimento_centavos / 100, by = n => n ? inv / n : null;
+    return Object.assign(g, {investimento: inv, custo_lead: by(g.leads), custo_contatado: by(g.contatados), custo_agendamento: by(g.agendados),
+      custo_reuniao: by(g.reunioes), custo_ganho: by(g.ganhos), ctr: g.impressoes ? g.cliques / g.impressoes * 100 : null,
+      cpc: by(g.cliques), cpm: g.impressoes ? inv / g.impressoes * 1000 : null, taxa_reuniao: g.leads ? g.reunioes / g.leads * 100 : null});
+  };
+  const tot = z('total');
+  for (const id of sel) for (const k of Object.keys(tot)) if (k !== 'id') tot[k] += G[id][k];
+  return {selecionados: sel, total: fin(tot), grupos: Object.keys(PAGAS).map(id => fin(G[id]))};
 }
 
 window.MP_DASH = {
@@ -723,6 +767,7 @@ const ICONS = {
   perdidos: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg>',
   mppro: '<svg viewBox="0 0 24 24"><path d="M2 9.5 12 4.5l10 5-10 5z"/><path d="M6 11.5v4.8c0 1.5 2.7 3.2 6 3.2s6-1.7 6-3.2v-4.8"/><path d="M22 9.5v5.5"/></svg>',
   aplicacao: '<svg viewBox="0 0 24 24"><circle cx="12" cy="6.5" r="3.5"/><path d="M4.5 21c.5-4.3 3.5-7 7.5-7s7 2.7 7.5 7"/><path d="M10.9 14.2h2.2l-.5 1.6h-1.2z"/><path d="M11.4 15.8l-.9 3.7 1.5 1.3 1.5-1.3-.9-3.7"/></svg>',
+  performance: '<svg viewBox="0 0 24 24"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>',
   consultores: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .7 3.2 2.5 3.6 5.2"/></svg>'
 };
 const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>';
@@ -731,7 +776,7 @@ const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20
    4. ESTADO, FILTROS E URL
    ========================================================================= */
 const TABS = [
-  {id: 'macro', nome: 'Visão Macro'}, {id: 'lista', nome: 'Lead a Lead'}, {id: 'tempo', nome: 'Lead-time'},
+  {id: 'macro', nome: 'Visão Macro'}, {id: 'performance', nome: 'Performance'}, {id: 'lista', nome: 'Lead a Lead'}, {id: 'tempo', nome: 'Lead-time'},
   {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'perdidos', nome: 'Perdidos'}, {id: 'consultores', nome: 'Consultores'}];
 // B2B: seções em construção (sem dados do Funil Alpha; filtros B2C ficam ocultos)
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
@@ -1063,6 +1108,116 @@ function viewMacro() {
     <div class="card"><div class="ch"><div><h3>Leads por origem</h3><p>Verde = contatados · cinza = sem contato · clique para filtrar</p></div></div>${hbars(oItems, {dim: 'origens'})}</div>
     <div class="card"><div class="ch"><div><h3>Leads por consultor</h3><p>Verde = contatados · cinza = sem contato · clique para filtrar</p></div></div>${hbars(cItems, {dim: 'consultores'})}</div>
   </div>`;
+  return h;
+}
+
+/* ---- Performance ---- */
+const nfBRL = new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL'}), nfBRL0 = new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL', maximumFractionDigits: 0});
+const fR = v => v == null ? '–' : nfBRL.format(v);
+const fR0 = v => v == null ? '–' : nfBRL0.format(v);
+function chartSpend(de, ate, width, sel) {
+  const M = D.midia || {camps: [], dias: []}, n = diffDays(de, ate) + 1;
+  const mode = n <= 62 ? 'dia' : n <= 420 ? 'semana' : 'mes';
+  const monday = d => addDays(d, -((weekday(d) + 6) % 7));
+  const bins = [], idx = new Map();
+  if (mode === 'dia') for (let d = de; d <= ate; d = addDays(d, 1)) { idx.set(d, bins.length); bins.push({from: d, to: d, inv: 0, l: 0}); }
+  else if (mode === 'semana') for (let d = monday(de); d <= ate; d = addDays(d, 7)) { idx.set(d, bins.length); bins.push({from: d < de ? de : d, to: addDays(d, 6) > ate ? ate : addDays(d, 6), inv: 0, l: 0}); }
+  else for (let d = de.slice(0, 8) + '01'; d <= ate; d = addMonths(d, 1)) { idx.set(d.slice(0, 7), bins.length); bins.push({from: d < de ? de : d, to: lastOfMonth(d) > ate ? ate : lastOfMonth(d), inv: 0, l: 0, m: d}); }
+  const key = day => mode === 'dia' ? day : mode === 'semana' ? monday(day) : day.slice(0, 7);
+  const S2 = new Set(sel);
+  for (const r of M.dias) { if (r[0] < de || r[0] > ate || !S2.has(M.camps[r[1]].grupo)) continue; const b = bins[idx.get(key(r[0]))]; if (b) b.inv += r[2] / 100; }
+  for (const l of LEADS) {
+    const day = String(l.e || '').slice(0, 10); if (day < de || day > ate) continue;
+    if (!sel.some(k => PAGAS[k].rx && PAGAS[k].rx.test(l.n || ''))) continue;
+    const b = bins[idx.get(key(day))]; if (b) b.l++;
+  }
+  const W = Math.max(300, width), H = 300, pl = 58, pr = 34, pt = 18, pb = 30, pw = W - pl - pr, ph = H - pt - pb;
+  const mx = niceMax(Math.max(1, ...bins.map(b => b.inv))), ml = niceMax(Math.max(1, ...bins.map(b => b.l)));
+  const bw = pw / bins.length, w = Math.max(1.5, Math.min(bw * 0.62, 46));
+  const y = v => pt + ph - ph * v / mx, yl = v => pt + ph - ph * v / ml;
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const yy = y(mx * i / 4);
+    g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fR0(mx * i / 4)}</text>`;
+    g += `<text class="ax" x="${W - pr + 6}" y="${yy + 3.5}" style="fill:#a8701c">${fN(Math.round(ml * i / 4 * 10) / 10)}</text>`;
+  }
+  const step = Math.max(1, Math.ceil(bins.length / Math.max(1, Math.floor(pw / 48))));
+  const pts = [];
+  bins.forEach((b, i) => {
+    const x0 = pl + i * bw, cx = x0 + bw / 2;
+    if (b.inv) g += `<rect class="bar" style="animation-delay:${Math.min(i * 12, 400)}ms" x="${cx - w / 2}" y="${y(b.inv)}" width="${w}" height="${y(0) - y(b.inv)}" fill="#b4d6c6" rx="${Math.min(3, w / 4)}"/>`;
+    pts.push([cx, yl(b.l)]);
+    if (i % step === 0) {
+      const lab = mode === 'dia' ? fDM(b.from) : mode === 'semana' ? fDM(b.from) : `${MES[+b.m.slice(5, 7) - 1]}/${b.m.slice(2, 4)}`;
+      g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${lab}</text>`;
+    }
+  });
+  g += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#c98a1b" stroke-width="2" stroke-linejoin="round"/>`;
+  bins.forEach((b, i) => {
+    const [cx, cy] = pts[i];
+    if (b.l) g += `<circle cx="${cx}" cy="${cy}" r="3.2" fill="#fff" stroke="#c98a1b" stroke-width="2"/>`;
+    const per = b.from === b.to ? `${WD[weekday(b.from)]}, ${fDay(b.from)}` : `${fDay(b.from)} a ${fDay(b.to)}`;
+    const tip = `${per}\nInvestimento: ${fR(b.inv)}\nLeads no Pipedrive: ${fN(b.l)}\nCusto por lead: ${b.l ? fR(b.inv / b.l) : '–'}`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(tip)}" data-range="${b.from}|${b.to}"/>`;
+  });
+  const lbl = {dia: 'por dia', semana: 'por semana', mes: 'por mês'}[mode];
+  return {svg: `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Investimento e leads ${lbl}">${g}</svg></div>`, lbl};
+}
+function viewPerformance() {
+  const C = cur(), P = prev(), pf = C.res.performance, pp = P.res.performance, t = pf.total, tp = pp.total;
+  const M = D.midia || {camps: [], dias: [], erro: 'sem dados'};
+  let h = viewHead('Performance', `Investimento em mídia (Meta Ads) × leads no Pipedrive · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
+  if (!M.dias.length) return h + `<div class="card">${emptyBox('Dados de mídia indisponíveis', 'Não foi possível ler o investimento da Meta nesta atualização.')}</div>`;
+  if (!pf.selecionados.length) return h + `<div class="card">${emptyBox('Esta campanha não tem investimento em mídia', 'Os leads RCON chegam pelo site (pedido de análise de carteira), sem campanha paga na Meta. Escolha "Todos os leads", TRD ou DIAG para ver custos.')}</div>`;
+  const outros = ['consultores', 'origens', 'status', 'etapas', 'etiquetas', 'motivos'].some(k => S[k].length) || S.busca.trim();
+  if (outros) h += `<div class="note">Os filtros de consultor, origem, status, etapa, etiqueta e busca não se aplicam a esta aba: o investimento não se divide por eles. Aqui valem só o período e a campanha.</div>`;
+  const nomeSel = S.camp ? PAGAS[S.camp].nome : 'todas as campanhas B2C (Tríade, Diagnóstico Financeiro e Iscas)';
+  const dias = diffDays(S.de, S.ate) + 1;
+  const ativos = new Set(); for (const r of M.dias) if (r[0] >= S.de && r[0] <= S.ate && r[2] > 0 && pf.selecionados.includes(M.camps[r[1]].grupo)) ativos.add(r[1]);
+  const custo = (v, pv, rotulo, base, tip) => kpiCard({label: rotulo, v: fR(v), sub: base, d: delta(v, pv, -1, fR), tip});
+  h += '<div class="kpis">' + [
+    kpiCard({label: 'Investimento no período', cls: 'hero', v: fR0(t.investimento), sub: `${fR(t.investimento / dias)} por dia · ${fN(ativos.size)} ${ativos.size === 1 ? 'campanha' : 'campanhas'} com gasto`,
+      d: delta(t.investimento, tp.investimento, 0, fR0), tip: `Valor gasto na Meta Ads em ${nomeSel}, no período selecionado`}),
+    kpiCard({label: 'Leads no Pipedrive', v: fN(t.leads), sub: `${fN(t.contatados)} com contato · ${fN(t.agendados)} agendados`, d: delta(t.leads, tp.leads),
+      tip: 'Leads das campanhas pagas que ENTRARAM no Pipedrive no período (TRD |, DIAG |, [ISCA).\nOs leads contados pela Meta são ignorados.'}),
+    custo(t.custo_lead, tp.custo_lead, 'Custo por lead', `${fN(t.leads)} leads`, 'Investimento ÷ leads que entraram no Pipedrive'),
+    custo(t.custo_agendamento, tp.custo_agendamento, 'Custo por agendamento', `${fN(t.agendados)} ${t.agendados === 1 ? 'agendado' : 'agendados'}`, 'Investimento ÷ leads do período que chegaram à etapa Reunião ou além (ou ganhos)'),
+    custo(t.custo_reuniao, tp.custo_reuniao, 'Custo por reunião', `${fN(t.reunioes)} ${t.reunioes === 1 ? 'reunião' : 'reuniões'}`, 'Investimento ÷ leads do período com reunião realizada'),
+    custo(t.custo_ganho, tp.custo_ganho, 'Custo por fechamento', `${fN(t.ganhos)} ${t.ganhos === 1 ? 'ganho' : 'ganhos'}`, 'Investimento ÷ leads do período ganhos (CAC de mídia)'),
+    custo(t.custo_contatado, tp.custo_contatado, 'Custo por lead contatado', `${fN(t.contatados)} contatados`, 'Investimento ÷ leads do período com ao menos um contato concluído'),
+    kpiCard({label: 'Lead → reunião', v: fP(t.taxa_reuniao), sub: `${fN(t.reunioes)} de ${fN(t.leads)} leads`, d: delta(t.taxa_reuniao, tp.taxa_reuniao, 1, fP), tip: '% dos leads do período que tiveram reunião'}),
+    kpiCard({label: 'Cliques no anúncio', v: fN(t.cliques), sub: `CTR ${fP(t.ctr)} · CPC ${fR(t.cpc)}`, d: delta(t.cliques, tp.cliques), tip: 'Cliques no link dos anúncios (Meta).\nCTR = cliques ÷ impressões · CPC = investimento ÷ cliques'}),
+    kpiCard({label: 'Impressões', v: fN(t.impressoes), sub: `CPM ${fR(t.cpm)}`, d: delta(t.impressoes, tp.impressoes, 0), tip: 'Vezes que os anúncios apareceram (Meta).\nCPM = custo por mil impressões'})
+  ].join('') + '</div>';
+  const vw = document.getElementById('view').clientWidth || 900;
+  const ch = chartSpend(S.de, S.ate, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44, pf.selecionados);
+  const gs = pf.grupos.filter(g => pf.selecionados.includes(g.id) && (g.investimento || g.leads));
+  const share = gs.map(g => ({label: PAGAS[g.id].nome, v: g.investimento_centavos, extra: fP(pctOf(g.investimento, t.investimento)), c: {trd: '#00503c', diag: '#3d9a6f', isca: '#c98a1b', outros: '#8a958f'}[g.id],
+    tip: `${PAGAS[g.id].nome}\nInvestimento: ${fR(g.investimento)}\nLeads no Pipedrive: ${fN(g.leads)}\nCusto por lead: ${fR(g.custo_lead)}`}));
+  const shareHtml = share.length ? share.map(i => `<div class="psh" data-tip="${ESC(i.tip)}"><div class="psl"><span><i style="background:${i.c}"></i>${ESC(i.label)}</span><b>${fR0(i.v / 100)}</b></div><div class="pst"><i style="width:${Math.max(1, i.v / Math.max(1, t.investimento_centavos) * 100)}%;background:${i.c}"></i></div><small>${i.extra} do investimento</small></div>`).join('') : emptyBox('Sem investimento no período');
+  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Investimento × leads no Pipedrive</h3><p>Agrupado ${ch.lbl} · barras = investimento (eixo esquerdo) · linha = leads (eixo direito)</p></div>
+      <div class="lg"><span><i style="background:#b4d6c6"></i>Investimento</span><span><i style="background:#c98a1b"></i>Leads no Pipedrive</span></div></div>${ch.svg}</div>
+    <div class="card"><div class="ch"><div><h3>Divisão do investimento</h3><p>Por campanha no período</p></div></div>${shareHtml}</div></div>`;
+  // tabela por grupo
+  const td = v => `<td class="num">${v}</td>`;
+  h += `<div class="card np mt"><div class="ch"><div><h3>Custo por etapa do funil, por campanha</h3><p>Leads, agendamentos, reuniões e fechamentos dos leads que entraram no período</p></div></div><div class="tw"><table class="t stk"><thead><tr>
+    <th>Campanha</th><th class="num">Investimento</th><th class="num">Leads</th><th class="num">Custo/lead</th><th class="num">Agendados</th><th class="num">Custo/agend.</th><th class="num">Reuniões</th><th class="num">Custo/reunião</th><th class="num">Ganhos</th><th class="num">Custo/ganho</th></tr></thead><tbody>` +
+    gs.concat(gs.length > 1 ? [Object.assign({}, t, {id: 'total'})] : []).map(g => `<tr${g.id === 'total' ? ' class="tot"' : ''}><td><b>${g.id === 'total' ? 'Total' : ESC(PAGAS[g.id].nome)}</b></td>${td(fR(g.investimento))}${td(fN(g.leads))}${td(fR(g.custo_lead))}${td(fN(g.agendados))}${td(fR(g.custo_agendamento))}${td(fN(g.reunioes))}${td(fR(g.custo_reuniao))}${td(fN(g.ganhos))}${td(fR(g.custo_ganho))}</tr>`).join('') +
+    `</tbody></table></div></div>`;
+  // tabela por campanha da Meta
+  const byC = new Map();
+  for (const r of M.dias) {
+    if (r[0] < S.de || r[0] > S.ate) continue; const c = M.camps[r[1]]; if (!pf.selecionados.includes(c.grupo)) continue;
+    const o = byC.get(r[1]) || {c, inv: 0, imp: 0, cl: 0, d0: r[0], d1: r[0]}; o.inv += r[2] / 100; o.imp += r[3]; o.cl += r[4]; if (r[0] < o.d0) o.d0 = r[0]; if (r[0] > o.d1) o.d1 = r[0]; byC.set(r[1], o);
+  }
+  const ST = {ACTIVE: ['Ativa', 'var(--verde)'], PAUSED: ['Pausada', '#8a958f'], CAMPAIGN_PAUSED: ['Pausada', '#8a958f'], ARCHIVED: ['Arquivada', '#8a958f'], DELETED: ['Excluída', '#8a958f']};
+  const cl = [...byC.values()].filter(o => o.inv > 0).sort((a, b) => b.inv - a.inv);
+  h += `<div class="card np mt"><div class="ch"><div><h3>Campanhas na Meta</h3><p>Investimento e entrega de cada campanha no período · dados da Meta atualizados em ${M.atualizado_em ? fDay(M.atualizado_em.slice(0, 10)) + ' ' + M.atualizado_em.slice(11, 16) : '–'}${M.erro ? ' · <span class="red">última leitura falhou: ' + ESC(M.erro) + '</span>' : ''}</p></div></div><div class="tw"><table class="t stk"><thead><tr>
+    <th>Campanha na Meta</th><th>Grupo</th><th>Situação</th><th class="num">Investimento</th><th class="num">% do total</th><th class="num">Impressões</th><th class="num">Cliques</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">CPM</th><th>Gasto entre</th></tr></thead><tbody>` +
+    (cl.length ? cl.map(o => { const st = ST[o.c.status] || ['–', '#8a958f'];
+      return `<tr><td class="wrap" style="max-width:340px"><b>${ESC(o.c.nome)}</b></td><td>${ESC(PAGAS[o.c.grupo].nome)}</td><td><span style="color:${st[1]};font-weight:600">${st[0]}</span></td>${td(fR(o.inv))}${td(fP(pctOf(o.inv, t.investimento)))}${td(fN(o.imp))}${td(fN(o.cl))}${td(fP(pctOf(o.cl, o.imp)))}${td(fR(o.cl ? o.inv / o.cl : null))}${td(fR(o.imp ? o.inv / o.imp * 1000 : null))}<td>${fDM(o.d0)} a ${fDM(o.d1)}</td></tr>`; }).join('')
+      : `<tr><td colspan="11">${emptyBox('Nenhuma campanha com gasto no período')}</td></tr>`) + `</tbody></table></div></div>`;
+  h += `<div class="note mt">Leads, agendamentos, reuniões e fechamentos são dos leads que <b>entraram no Pipedrive</b> no período (os números de leads da Meta são ignorados). Leads recentes ainda podem avançar, então os custos de reunião e fechamento dos últimos dias tendem a cair com o tempo.</div>`;
   return h;
 }
 
@@ -1405,7 +1560,7 @@ function viewB2B() {
   const t = TABS_B2B.find(x => x.id === S.tab);
   return viewHead(ESC(t.nome), 'B2B - Análises') + `<div class="card"><div class="empty"><b>Seção em construção</b>Esta área vai reunir as análises de ${ESC(t.nome)}. Os filtros e dados do B2C Funil Alpha não se aplicam aqui.</div></div>`;
 }
-const VIEWS = {macro: viewMacro, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewB2B, aplicacao: viewB2B};
+const VIEWS = {macro: viewMacro, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewB2B, aplicacao: viewB2B};
 function renderView(anim) {
   const v = document.getElementById('view');
   document.getElementById('tip').classList.remove('on');

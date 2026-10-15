@@ -145,6 +145,50 @@ def filtra(leads, f):
     return out
 
 
+# ----------------------------------------------------------------------------- performance (mídia × Pipedrive)
+MIDIA = None   # D["midia"]; definido por load()/expected_all()/compare() (ou por quem importa o módulo)
+PAGAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "isca": r"^\s*\[ISCA", "outros": None}
+
+
+def performance(leads, f, agora, midia):
+    """Investimento (Meta, B2C, centavos) ÷ resultados no Pipedrive dos leads que ENTRARAM no período.
+    Só período e campanha valem; leads da Meta são ignorados."""
+    midia = midia or {"camps": [], "dias": []}
+    camp = f.get("campanha") or ("trd" if f.get("so_trd") else "")
+    sel = ([camp] if camp in PAGAS else []) if camp else list(PAGAS)
+    de, ate = f.get("de") or "", f.get("ate") or ""
+    def z(i): return {"id": i, "investimento_centavos": 0, "impressoes": 0, "cliques": 0, "leads": 0,
+                      "contatados": 0, "agendados": 0, "reunioes": 0, "ganhos": 0}
+    G = {i: z(i) for i in PAGAS}
+    for day, ci, cent, imp, cl in midia["dias"]:
+        if (de and day < de) or (ate and day > ate): continue
+        g = G.get(midia["camps"][ci]["grupo"])
+        if g is None: continue
+        g["investimento_centavos"] += cent; g["impressoes"] += imp; g["cliques"] += cl
+    for l in leads:
+        day = (l.get("e") or "")[:10]
+        if not day or (de and day < de) or (ate and day > ate): continue
+        gid = next((k for k in ("trd", "diag", "isca") if re.match(PAGAS[k], l.get("n") or "", re.I)), None)
+        if not gid: continue
+        m = lead_metrics(l, agora); g = G[gid]
+        g["leads"] += 1; g["contatados"] += m["contatado"]; g["agendados"] += m["agendado"]
+        g["reunioes"] += m["reuniao"]; g["ganhos"] += l["s"] == "won"
+    def fin(g):
+        inv = g["investimento_centavos"] / 100
+        by = lambda n: inv / n if n else None
+        g.update(investimento=inv, custo_lead=by(g["leads"]), custo_contatado=by(g["contatados"]),
+                 custo_agendamento=by(g["agendados"]), custo_reuniao=by(g["reunioes"]), custo_ganho=by(g["ganhos"]),
+                 ctr=g["cliques"] / g["impressoes"] * 100 if g["impressoes"] else None, cpc=by(g["cliques"]),
+                 cpm=inv / g["impressoes"] * 1000 if g["impressoes"] else None,
+                 taxa_reuniao=g["reunioes"] / g["leads"] * 100 if g["leads"] else None)
+        return g
+    tot = z("total")
+    for i in sel:
+        for k in tot:
+            if k != "id": tot[k] += G[i][k]
+    return {"selecionados": sel, "total": fin(tot), "grupos": [fin(G[i]) for i in PAGAS]}
+
+
 # ----------------------------------------------------------------------------- função de contrato
 def bloco(P, M):
     """Agregados comuns a kpis e consultores."""
@@ -192,7 +236,7 @@ def avanco(P, sid):
     return {"avancaram": av, "sem_avancar": sem, "media_dias_ate_avancar": media(ate)}
 
 
-def compute(leads, filtros, agora_str, stages, equipe=()):
+def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
     agora = dt(agora_str)
     P = filtra(leads, filtros)
     M = {l["id"]: lead_metrics(l, agora) for l in P}
@@ -271,7 +315,8 @@ def compute(leads, filtros, agora_str, stages, equipe=()):
         "media_dias_ate_ganho": media(m["dias_ate_ganho"] for m in ms if m["dias_ate_ganho"] is not None),
     }
     return {"kpis": kpis, "etapas": etapas, "consultores": consultores,
-            "perdidos": perdidos, "lead_time": lead_time}
+            "perdidos": perdidos, "lead_time": lead_time,
+            "performance": performance(leads, filtros, agora, midia if midia is not None else MIDIA)}
 
 
 # ----------------------------------------------------------------------------- cenários
@@ -307,12 +352,17 @@ def cenarios(D):
         ("tudo_so_rcon", filtros_base("2000-01-01", h, campanha="rcon")),
         ("ultimos_7_so_rcon", filtros_base(d7, h, campanha="rcon")),
         ("ultimos_30_sem_base", filtros_base(d30, h, incluir_base=False)),
+        ("ultimos_30_consultor_top_perf", filtros_base(d30, h, consultores=[top], campanha="trd")),
+        ("mes_passado_diag", filtros_base(iso(hoje.replace(day=1) - timedelta(days=hoje.replace(day=1).day + 27)), iso(hoje.replace(day=1) - timedelta(days=1)), campanha="diag")),
     ]
 
 
 def load():
+    global MIDIA
     with open(DATA, encoding="utf-8") as fh:
-        return json.load(fh)
+        D = json.load(fh)
+    MIDIA = D.get("midia")
+    return D
 
 
 def expected_all(D):

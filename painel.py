@@ -436,13 +436,111 @@ def dedupe(leads, window_days=14):
     return out
 
 
+# ---------------------------------------------------------------- Meta Ads (investimento em mídia, SOMENTE LEITURA)
+META_ACCOUNT = "act_451721936206114"   # Meu Patrimônio CA (única conta autorizada)
+META_API = "https://graph.facebook.com/v26.0/"
+META_DESDE = "2025-01-01"
+
+
+def meta_token():
+    """Token da Meta: segredo do Actions/.env (META_ACCESS_TOKEN) ou o login OAuth do Hermes (local). Nunca impresso."""
+    t = env("META_ACCESS_TOKEN")
+    if t: return t
+    f = pathlib.Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / "mcp-tokens" / "meta-ads.json"
+    if f.exists():
+        try: return json.loads(f.read_text(encoding="utf-8"))["access_token"]
+        except Exception: return None
+    return None
+
+
+def meta_get(path, tok, **q):
+    q["access_token"] = tok
+    url, rows = META_API + path + "?" + urllib.parse.urlencode(q), []
+    while url:
+        for tent in range(4):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "mp-dashboard/1.0"})
+                d = json.loads(urllib.request.urlopen(req, timeout=120).read())
+                break
+            except urllib.error.HTTPError as e:
+                if e.code in (400, 401, 403) or tent == 3: raise
+                time.sleep(5 * (tent + 1))
+            except Exception:
+                if tent == 3: raise
+                time.sleep(5 * (tent + 1))
+        rows += d.get("data", [])
+        url = (d.get("paging") or {}).get("next")
+    return rows
+
+
+def grupo_midia(nome):
+    """Campanhas B2C da Meta, agrupadas pelo nome. B2B (MP PRO, lives, consultores) fica de fora (None)."""
+    n = nome or ""
+    b2c = re.search(r"\[B2C\]", n, re.I) or re.search(r"tr[ií]ade|diagn[oó]stico", n, re.I)
+    if not b2c or re.search(r"\[B2B\]", n, re.I): return None
+    if re.search(r"tr[ií]ade", n, re.I): return "trd"
+    if re.search(r"diagn[oó]stico", n, re.I): return "diag"
+    if re.search(r"\[ISCA\]", n, re.I): return "isca"
+    return "outros"
+
+
+def sync_midia(old):
+    """Investimento diário por campanha (incremental: reprocessa os últimos 35 dias, que a Meta ainda ajusta)."""
+    old = old or {}
+    tok = meta_token()
+    if not tok:
+        return {**old, "erro": "sem token da Meta"}
+    hoje = datetime.now(BRT).date()
+    dias = old.get("dias") or {}
+    since = META_DESDE if not dias else (hoje - timedelta(days=35)).isoformat()
+    try:
+        rows = meta_get(f"{META_ACCOUNT}/insights", tok, level="campaign", time_increment=1, limit=500,
+                        time_range=json.dumps({"since": since, "until": hoje.isoformat()}),
+                        fields="campaign_id,campaign_name,spend,impressions,inline_link_clicks")
+        camps = {c["id"]: c for c in meta_get(f"{META_ACCOUNT}/campaigns", tok, limit=500,
+                                               fields="id,name,effective_status")}
+    except Exception as e:
+        code = getattr(e, "code", None)
+        return {**old, "erro": f"falha ao consultar a Meta ({code or type(e).__name__})"}
+    dias = {k: v for k, v in dias.items() if k[:10] < since}
+    nomes = dict(old.get("nomes") or {})
+    for r in rows:
+        cid = r["campaign_id"]; nomes[cid] = r["campaign_name"]
+        dias[f"{r['date_start']}|{cid}"] = [int(round(float(r.get("spend") or 0) * 100)), int(r.get("impressions") or 0),
+                                            int(r.get("inline_link_clicks") or 0)]
+    for cid, c in camps.items():
+        if cid in nomes: nomes[cid] = c["name"]
+    status = {cid: c.get("effective_status") for cid, c in camps.items()}
+    return {"dias": dias, "nomes": nomes, "status": status, "erro": None,
+            "atualizado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")}
+
+
+def midia_payload(m):
+    """Só campanhas B2C. Investimento em CENTAVOS (inteiro) para a soma ser exata no dashboard e na auditoria."""
+    if not m or not m.get("dias"):
+        return {"camps": [], "dias": [], "atualizado_em": None, "erro": (m or {}).get("erro") or "sem dados"}
+    camps, idx, dias = [], {}, []
+    for key in sorted(m["dias"]):
+        day, cid = key.split("|")
+        g = grupo_midia(m["nomes"].get(cid, ""))
+        v = m["dias"][key]
+        if g is None or not any(v): continue
+        if cid not in idx:
+            idx[cid] = len(camps)
+            camps.append({"id": cid, "nome": m["nomes"].get(cid, cid), "grupo": g, "status": (m.get("status") or {}).get(cid)})
+        dias.append([day, idx[cid]] + v)
+    return {"camps": camps, "dias": dias, "atualizado_em": m.get("atualizado_em"), "erro": m.get("erro")}
+
+
 def collect(full=False):
     now = datetime.now(timezone.utc)
     cache, n_changed, was_full = sync(full)
     leads, excl = model(cache)
+    cache["midia"] = sync_midia(cache.get("midia"))
+    tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads,
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)"}}
     tmp = SNAP.with_suffix(".tmp"); tmp.write_text(json.dumps(snap, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"); tmp.replace(SNAP)
@@ -537,7 +635,7 @@ def ci():
     CACHE_ENC.write_bytes(crypt("enc", CACHE.read_bytes()))
     build_pages()
     # Logs do Actions são PÚBLICOS: nada de nomes, consultores ou números do negócio aqui.
-    print("ok", s["gerado_em"], s["meta"]["coleta"])
+    print("ok", s["gerado_em"], s["meta"]["coleta"], "| midia:", "ok" if not s["midia"]["erro"] else s["midia"]["erro"])
 
 
 def github_token():
