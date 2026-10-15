@@ -365,6 +365,11 @@ def model(cache):
         hist = stage_history(d, info["log"])
         reat = False
         moved = moved_into_alpha(d, info["log"], cache.get("stage_pipe") or {})
+        fechado = brt(d.get("won_time") or d.get("lost_time"))
+        if moved and fechado and fechado < moved[0]:
+            # ganho/perdido em OUTRO funil e só depois arquivado no Alpha: o ciclo aconteceu antes da mudança,
+            # então a entrada continua sendo a criação (senão o tempo até ganho/perda fica negativo)
+            moved = None
         if moved:
             # Negócio que já existia em outro funil e foi (re)colocado no Alpha: a entrada é a chegada ao Alpha,
             # e os contatos do ciclo anterior não contam para este ciclo.

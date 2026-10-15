@@ -79,6 +79,15 @@ class VeracidadeTests(unittest.TestCase):
         leads, _ = painel.model(cache)
         self.assertEqual(len(leads[0]["k"]), 2)  # A01 e A02 concluídas no mesmo minuto = 2 contatos; pendentes não contam
 
+    def test_closed_before_moving_keeps_creation_as_entry(self):
+        cache = {"users": {"1": "C"}, "labels": {}, "stage_pipe": {"10": "Outro funil"}, "deals": [
+            {"id": 7, "title": "X", "status": "won", "stage_id": 350, "owner_id": 1, "label_ids": [],
+             "add_time": "2025-01-31T18:47:00Z", "won_time": "2025-01-31T18:47:30Z"}],
+            "per_deal": {"7": {"pk": [], "acts": [], "log": [{"k": "stage_id", "o": "10", "n": "350", "t": "2025-09-04 13:30:00"}]}}}
+        l = painel.model(cache)[0][0]
+        self.assertEqual(l["e"][:16], "2025-01-31T15:47")
+        self.assertLessEqual(l["e"], l["w"])
+
     def test_moved_into_alpha_from_base(self):
         deal = {"add_time": "2024-10-21T14:00:00Z"}
         log = [{"k": "stage_id", "o": "351", "n": "345", "t": "2026-10-08 19:40:00"}]
