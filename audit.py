@@ -189,6 +189,227 @@ def performance(leads, f, agora, midia):
     return {"selecionados": sel, "total": fin(tot), "grupos": [fin(G[i]) for i in PAGAS]}
 
 
+# ----------------------------------------------------------------------------- MP PRO (Kiwify + Meta Perpétuo)
+MPPRO = None   # D["mppro"]; definido por load() ou por quem importa o módulo
+ATIVO_DIAS, INADIMPLENTE_DIAS = 40, 25
+
+
+def _d(s):
+    return date.fromisoformat(s[:10])
+
+
+def _mais1mes(day):
+    y, m, d = int(day[:4]), int(day[5:7]) + 1, int(day[8:10])
+    if m > 12:
+        y, m = y + 1, 1
+    prox = date(y + (m == 12), m % 12 + 1, 1)
+    return f"{y:04d}-{m:02d}-{min(d, (prox - timedelta(days=1)).day):02d}"
+
+
+def _media(xs):
+    xs = list(xs)
+    return sum(xs) / len(xs) if xs else None
+
+
+def _div(a, b):
+    return a / b if b else None
+
+
+def mppro(MP, f, agora_day):
+    """Recalcula a aba MP PRO de forma independente (mesmas regras do SPEC/template)."""
+    if not MP or not MP.get("pedidos"):
+        return None
+    de, ate = f.get("de") or "0000-00-00", f.get("ate") or "9999-12-31"
+    T = min(ate, agora_day)
+    inP = lambda d: de <= d <= ate
+    nome = lambda c: MP["clientes"][c]
+    O = [dict(i=i, ts=r[0], day=r[0][:10], c=r[1], sub=r[2], st=r[3], met=r[4], bruto=r[5], taxa=r[6], liq=r[7],
+              mot=r[8], rday=r[9][:10] if r[9] else None) for i, r in enumerate(MP["pedidos"])]
+    apr = [o for o in O if o["st"] in ("paid", "refunded")]
+    rec = [o for o in O if o["st"] == "refused"]
+    tent = [o for o in O if o["st"] in ("refused", "waiting")]
+    # sequência por assinatura e por cliente
+    por_sub, por_cli = {}, {}
+    for o in apr:
+        por_sub.setdefault(o["sub"], []).append(o); por_cli.setdefault(o["c"], []).append(o)
+    first_ids = {v[0]["i"] for v in por_sub.values()}
+    prev_sub, next_sub, prev_cli = {}, {}, {}
+    for v in por_sub.values():
+        for a, b in zip(v, v[1:]):
+            prev_sub[b["i"]] = a; next_sub[a["i"]] = b
+    for v in por_cli.values():
+        for a, b in zip(v, v[1:]):
+            prev_cli[b["i"]] = a
+    is_first = lambda o: o["i"] in first_ids
+
+    def recusas_antes(o):
+        lo = (prev_sub.get(o["i"]) or prev_cli.get(o["i"]) or {"ts": ""})["ts"]
+        return [r for r in rec if r["c"] == o["c"] and lo < r["ts"] <= o["ts"]]
+    soma = lambda xs, k: sum(x[k] for x in xs)
+
+    firsts = [v[0] for v in por_sub.values()]
+    novas_subs = [o for o in firsts if inP(o["day"])]
+    pagos = [o for o in apr if o["st"] == "paid" and inP(o["day"])]
+    pag_novas = [o for o in pagos if is_first(o)]
+    pag_ren = [o for o in pagos if not is_first(o)]
+    reemb = [o for o in apr if o["st"] == "refunded" and o["rday"] and inP(o["rday"])]
+    rec_p = [o for o in rec if inP(o["day"])]
+    motivos = Counter((o["mot"] or "nao_informado") for o in rec_p)
+    rec_novos = sum(1 for o in rec_p if not any(a["c"] == o["c"] and a["ts"] < o["ts"] for a in apr))
+
+    prev, sem_cob = [], []
+    for o in apr:
+        if o["st"] != "paid":
+            continue
+        due = _mais1mes(o["day"])
+        if not inP(due) or due > agora_day:
+            continue
+        n = next_sub.get(o["i"])
+        if n:
+            at = (_d(n["day"]) - _d(due)).days
+            prev.append(dict(c=o["c"], ult=o["day"], due=due, pago=n["day"], atraso=at,
+                             status="em_dia" if at <= 0 else "atrasou", recusas=len(recusas_antes(n)), motivo=None))
+        else:
+            ab = (_d(agora_day) - _d(due)).days
+            rr = [r for r in rec if r["c"] == o["c"] and r["ts"] > o["ts"]]
+            tt = [r for r in tent if r["c"] == o["c"] and r["ts"] > o["ts"]]
+            if ab > INADIMPLENTE_DIAS and not tt:
+                sem_cob.append({"cliente": nome(o["c"]), "ultimo": o["day"], "vencimento": due})
+                continue
+            mot = (rr[-1]["mot"] or "nao_informado") if rr else ("pix_aguardando" if any(r["st"] == "waiting" for r in tt) else None)
+            prev.append(dict(c=o["c"], ult=o["day"], due=due, pago=None, atraso=ab,
+                             status="inadimplente" if ab > INADIMPLENTE_DIAS else "em_aberto", recusas=len(rr), motivo=mot))
+    atrasou = [x for x in prev if x["status"] == "atrasou"]
+
+    # base em T
+    aprT = [o for o in apr if o["day"] <= T]
+    ef_ref = lambda o: o["st"] == "refunded" and o["rday"] and o["rday"] <= T
+    cliT = {}
+    for o in aprT:
+        cliT.setdefault(o["c"], []).append(o)
+    ativos = cancel = reemb_cli = subs_at = mrr = pagos_base = liq_base = 0
+    compradores, status = [], {}
+    for c, os_ in cliT.items():
+        pg = [o for o in os_ if not ef_ref(o)]
+        if not pg:
+            st = "reembolsado"; reemb_cli += 1
+        else:
+            ult_sub = {}
+            for o in pg:
+                ult_sub[o["sub"]] = o
+            a = 0
+            for o in ult_sub.values():
+                if (_d(T) - _d(o["day"])).days <= ATIVO_DIAS:
+                    a += 1; mrr += o["bruto"]
+            subs_at += a
+            st = "ativo" if a else "cancelou"
+            if a: ativos += 1
+            else: cancel += 1
+            pagos_base += len(pg); liq_base += soma(pg, "liq")
+        status[c] = st
+        compradores.append({"cliente": nome(c), "status": st, "pagamentos": len(pg), "entrada": os_[0]["day"],
+                            "ultimo": pg[-1]["day"] if pg else None, "total_pago": soma(pg, "bruto"), "metodo": os_[-1]["met"],
+                            "recusas": sum(1 for r in rec if r["c"] == c and r["day"] <= T),
+                            "reembolso": next((o["rday"] for o in os_ if ef_ref(o)), None)})
+    ordem = {"ativo": 0, "cancelou": 1, "reembolsado": 2}
+    compradores.sort(key=lambda x: (ordem[x["status"]], -x["pagamentos"], x["entrada"], x["cliente"]))
+    n_comp = len(cliT); nao_re = n_comp - reemb_cli
+    liq_medio = _div(liq_base, pagos_base)
+    ppa = _div(pagos_base, nao_re)
+    ltv = ppa * liq_medio if ppa is not None and liq_medio is not None else None
+
+    # churn por janela de meses
+    meses = []
+    if apr:
+        ym = apr[0]["day"][:7]
+        while ym <= agora_day[:7]:
+            meses.append(ym); ym = _mais1mes(ym + "-01")[:7]
+    pagou = lambda ym: {o["c"] for o in aprT if not ef_ref(o) and o["day"][:7] == ym}
+    janelas = []
+    for ym in meses:
+        nx = _mais1mes(ym + "-01")[:7]
+        if (_d(_mais1mes(nx + "-01")) - timedelta(days=1)).isoformat() > T:
+            break
+        b, r = pagou(ym), pagou(nx)
+        if not b:
+            continue
+        sairam = [c for c in b if c not in r]
+        janelas.append({"de": ym, "para": nx, "base": len(b), "renovaram": len(b) - len(sairam), "sairam": len(sairam),
+                        "churn": len(sairam) / len(b) * 100, "quem": sorted(nome(c) for c in sairam)})
+    churn_ult = janelas[-1]["churn"] if janelas else None
+    vida = 100 / churn_ult if churn_ult else None
+
+    MD = MP.get("midia") or {"camps": [], "dias": []}
+    m = dict(inv=0, imp=0, cl=0, lpv=0, ic=0, px=0); por_camp = {}
+    for r in MD["dias"]:
+        if not inP(r[0]):
+            continue
+        for k, v in zip(("inv", "imp", "cl", "lpv", "ic", "px"), r[2:8]):
+            m[k] += v
+        pc = por_camp.setdefault(r[1], {"campanha": MD["camps"][r[1]]["nome"], "status": MD["camps"][r[1]].get("status"),
+                                        "investimento": 0, "impressoes": 0, "cliques": 0, "visitas": 0, "checkouts": 0})
+        for k, v in zip(("investimento", "impressoes", "cliques", "visitas", "checkouts"), r[2:7]):
+            pc[k] += v
+    novas = len(novas_subs); novas_re = sum(1 for o in novas_subs if o["st"] == "refunded")
+    cac = _div(m["inv"], novas); liq_p = soma(pagos, "liq")
+
+    evol = []
+    for ym in meses:
+        pm = [o for o in apr if o["st"] == "paid" and o["day"][:7] == ym]
+        ns = sum(1 for o in firsts if o["day"][:7] == ym)
+        inv = sum(r[2] for r in MD["dias"] if r[0][:7] == ym)
+        evol.append({"mes": ym, "pagamentos": len(pm), "novas": sum(1 for o in pm if is_first(o)),
+                     "renovacoes": sum(1 for o in pm if not is_first(o)), "novas_assinaturas": ns, "bruto": soma(pm, "bruto"),
+                     "liquido": soma(pm, "liq"), "base_paga": len({o["c"] for o in pm}), "investimento": inv, "cac": _div(inv, ns),
+                     "parcial": ym == agora_day[:7]})
+    coortes = []
+    for ym in meses:
+        cs = [c for c, v in cliT.items() if v[0]["day"][:7] == ym]
+        if cs:
+            coortes.append({"mes": ym, "entraram": len(cs), "ativos": sum(1 for c in cs if status[c] == "ativo")})
+    pagamentos = []
+    for o in apr:
+        if not inP(o["day"]):
+            continue
+        pv = prev_sub.get(o["i"]); due = _mais1mes(pv["day"]) if pv else None; rr = recusas_antes(o)
+        pagamentos.append({"tipo": ("Nova, reembolsada" if o["st"] == "refunded" else "Nova") if is_first(o) else "Renovação",
+                           "cliente": nome(o["c"]), "dia": o["day"], "vencimento": due,
+                           "atraso": (_d(o["day"]) - _d(due)).days if due else None, "metodo": o["met"], "recusas": len(rr),
+                           "motivo": (rr[-1]["mot"] or "nao_informado") if rr else None})
+    return {
+        "periodo": {"de": f.get("de") or None, "ate": f.get("ate") or None, "base_em": T},
+        "midia": {"investimento": m["inv"], "impressoes": m["imp"], "cliques": m["cl"], "visitas": m["lpv"], "checkouts": m["ic"],
+                  "compras_pixel": m["px"], "ctr": _div(m["cl"] * 100, m["imp"]), "cpc": _div(m["inv"], m["cl"]),
+                  "cpm": _div(m["inv"] * 1000, m["imp"]), "custo_visita": _div(m["inv"], m["lpv"]), "custo_checkout": _div(m["inv"], m["ic"]),
+                  "campanhas": sorted([x for x in por_camp.values() if x["investimento"] > 0], key=lambda x: -x["investimento"])},
+        "vendas": {"novas_assinaturas": novas, "novas_reembolsadas": novas_re, "renovacoes_pagas": len(pag_ren), "pagamentos": len(pagos),
+                   "bruto": soma(pagos, "bruto"), "taxa": soma(pagos, "taxa"), "liquido": liq_p,
+                   "novas_qtd": len(pag_novas), "novas_bruto": soma(pag_novas, "bruto"), "novas_taxa": soma(pag_novas, "taxa"),
+                   "novas_liquido": soma(pag_novas, "liq"), "ren_bruto": soma(pag_ren, "bruto"), "ren_taxa": soma(pag_ren, "taxa"),
+                   "ren_liquido": soma(pag_ren, "liq"), "reembolsos": len(reemb), "reembolsos_valor": soma(reemb, "bruto"),
+                   "recusas": len(rec_p), "recusas_clientes": len({o["c"] for o in rec_p}), "recusas_novos": rec_novos,
+                   "motivos_recusa": dict(motivos), "resultado": liq_p - m["inv"]},
+        "renovacoes": {"previstas": len(prev), "pagas": sum(1 for x in prev if x["pago"]),
+                       "em_dia": sum(1 for x in prev if x["status"] == "em_dia"), "atrasaram_pagas": len(atrasou),
+                       "em_aberto": sum(1 for x in prev if x["status"] == "em_aberto"),
+                       "inadimplentes": sum(1 for x in prev if x["status"] == "inadimplente"),
+                       "atraso_medio": _media(x["atraso"] for x in atrasou), "atraso_max": max((x["atraso"] for x in atrasou), default=None),
+                       "cancelaram_sem_cobranca": sem_cob,
+                       "abertas": [{"cliente": nome(x["c"]), "ultimo": x["ult"], "vencimento": x["due"], "dias": x["atraso"],
+                                    "recusas": x["recusas"], "motivo": x["motivo"], "status": x["status"]} for x in prev if not x["pago"]]},
+        "base": {"compradores": n_comp, "ativos": ativos, "assinaturas_ativas": subs_at, "cancelaram": cancel, "reembolsados": reemb_cli,
+                 "mrr": mrr, "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
+                 "taxa_reembolso": _div(sum(1 for o in aprT if ef_ref(o)) * 100, len(aprT)), "pagamentos_por_assinante": ppa,
+                 "liquido_medio": liq_medio, "ltv": ltv},
+        "unit": {"cac": cac, "cac_liquido": _div(m["inv"], novas - novas_re), "custo_por_ativa": _div(m["inv"], subs_at),
+                 "payback_meses": cac / liq_medio if cac is not None and liq_medio else None,
+                 "ltv_cac": ltv / cac if cac and ltv is not None else None},
+        "churn": {"janelas": janelas, "medio": _media(j["churn"] for j in janelas), "ultimo": churn_ult, "vida_media_meses": vida,
+                  "ltv_projetado": vida * liq_medio if vida is not None and liq_medio is not None else None},
+        "evolucao": evol, "coortes": coortes, "pagamentos": pagamentos, "compradores": compradores,
+    }
+
+
 # ----------------------------------------------------------------------------- função de contrato
 def bloco(P, M):
     """Agregados comuns a kpis e consultores."""
@@ -316,7 +537,8 @@ def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
     }
     return {"kpis": kpis, "etapas": etapas, "consultores": consultores,
             "perdidos": perdidos, "lead_time": lead_time,
-            "performance": performance(leads, filtros, agora, midia if midia is not None else MIDIA)}
+            "performance": performance(leads, filtros, agora, midia if midia is not None else MIDIA),
+            "mppro": mppro(MPPRO, filtros, agora_str[:10])}
 
 
 # ----------------------------------------------------------------------------- cenários
@@ -352,16 +574,19 @@ def cenarios(D):
         ("tudo_so_rcon", filtros_base("2000-01-01", h, campanha="rcon")),
         ("ultimos_7_so_rcon", filtros_base(d7, h, campanha="rcon")),
         ("ultimos_30_sem_base", filtros_base(d30, h, incluir_base=False)),
+        ("mppro_setembro", filtros_base("2026-09-01", "2026-09-30")),
+        ("mppro_julho_ate_hoje", filtros_base("2026-07-01", h)),
         ("ultimos_30_consultor_top_perf", filtros_base(d30, h, consultores=[top], campanha="trd")),
         ("mes_passado_diag", filtros_base(iso(hoje.replace(day=1) - timedelta(days=hoje.replace(day=1).day + 27)), iso(hoje.replace(day=1) - timedelta(days=1)), campanha="diag")),
     ]
 
 
 def load():
-    global MIDIA
+    global MIDIA, MPPRO
     with open(DATA, encoding="utf-8") as fh:
         D = json.load(fh)
     MIDIA = D.get("midia")
+    MPPRO = D.get("mppro")
     return D
 
 

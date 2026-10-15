@@ -117,6 +117,24 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .vh h2{margin:0;font-size:22px;color:var(--prof);letter-spacing:-.01em;font-weight:700}
 .vh p{margin:3px 0 0;color:var(--cinza);font-size:13.5px}
 .g{display:grid;gap:16px}
+#fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
+.mph{font-size:13px;color:var(--cinza);margin:4px 0 12px;display:flex;align-items:center;gap:10px}.mph.mt{margin-top:28px}
+.mph span{font-size:11px;letter-spacing:.1em;font-weight:700;color:#8f7a3e;background:#f6f0de;border-radius:6px;padding:3px 8px}
+.kpi.hero.gold{background:linear-gradient(135deg,#1d1a13,#12100c);border-color:#2b261b}.kpi.hero.gold .kv{color:#e4d6a7}.kpi.hero.gold .kl,.kpi.hero.gold .ks{color:#bfb48f}
+.mpf .mpr{display:grid;grid-template-columns:150px minmax(0,1fr) 128px 92px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #edf1ef}
+.mpf .mpr:last-of-type{border-bottom:0}.mpl b,.mpv b,.mpc{display:block;font-size:13px}.mpl small,.mpv small,.mpc small{display:block;color:var(--cinza);font-size:11px;font-weight:400}
+.mpt{position:relative;height:12px;background:#f1f4f2;border-radius:99px;overflow:hidden}.mpt i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;animation:growx .6s cubic-bezier(.2,.7,.2,1) both;transform-origin:left}
+.mpc{text-align:right;font-weight:600}.mut{color:var(--cinza);font-size:11.5px}.mpf p.mut{margin:10px 0 0}
+.mpm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.mpm div{background:#f7faf8;border-radius:10px;padding:10px 12px;font-size:12px;color:#56635d}
+.mpm b{display:block;font-size:17px;color:var(--txt)}.mpm small{display:block;color:var(--cinza);font-size:11px;margin-top:2px}
+.mprs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.mprs span{font-size:11.5px;background:#fbefed;color:#7a2a20;border-radius:99px;padding:3px 10px}
+.mpk{display:inline-block;font-size:11px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}.mpk.nov{background:#e3f3ea;color:#0b6b3a}.mpk.ren{background:#eef1f0;color:#3b4a44}
+.mpk.ree{background:#fbe9e6;color:#a3362a}.mpk.abe{background:#fdf2dc;color:#8a5a0f}
+.mpco div{display:grid;grid-template-columns:52px minmax(0,1fr) 46px 64px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #edf1ef;font-size:13px}
+.mpco div:last-child{border-bottom:0}.mpco .mpt i.ov{background:var(--verde)}.mpco small{color:var(--cinza);font-size:11px}
+table.t tr.sel td{background:#f6faf3}
+.mpd{background:#fff;border:1px solid var(--linha);border-radius:var(--r);padding:14px 20px;font-size:13px;color:#46534e}.mpd summary{cursor:pointer;font-weight:600;color:var(--prof)}
+.mpd ul{margin:10px 0 0;padding-left:18px;line-height:1.55}.mpd.mt{margin-top:22px}
 .note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
 .psh{padding:10px 0;border-bottom:1px solid #edf1ef}.psh:last-child{border-bottom:0}.psl{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}
 .psl span{display:flex;align-items:center;gap:8px}.psl i{width:10px;height:10px;border-radius:3px;display:inline-block}.pst{height:8px;background:#eef3f1;border-radius:99px;overflow:hidden}
@@ -647,7 +665,8 @@ function computeFull(leads, f, agoraStr) {
     media_dias_ate_ganho: mean(rows.filter(r => r.d.dGanho != null).map(r => r.d.dGanho))
   };
   const performance = computePerf(leads, f, agora);
-  return {res: {kpis, etapas, consultores, perdidos, lead_time, performance}, rows, agora};
+  const mppro = computeMPPro(D && D.mppro, f, String(agoraStr || (D && D.gerado_em) || '').slice(0, 10));
+  return {res: {kpis, etapas, consultores, perdidos, lead_time, performance, mppro}, rows, agora};
 }
 
 /* Performance: investimento em mídia (Meta Ads, B2C) × leads que ENTRARAM no Pipedrive no período.
@@ -685,6 +704,157 @@ function computePerf(leads, f, agora) {
   const tot = z('total');
   for (const id of sel) for (const k of Object.keys(tot)) if (k !== 'id') tot[k] += G[id][k];
   return {selecionados: sel, total: fin(tot), grupos: Object.keys(PAGAS).map(id => fin(G[id]))};
+}
+
+/* MP PRO (B2B): Kiwify (pedidos do produto MP PRO, assinatura reconstruída no painel.py) + Meta (campanhas
+   "MP PRO ... Perpétuo"). Só o período vale aqui. Valores em CENTAVOS. A "base" é a fotografia no fim do período
+   (ou hoje, se o período chega até hoje). Espelho em audit.mppro(). */
+const MP_ATIVO_DIAS = 40, MP_INADIMPLENTE_DIAS = 25;
+function addMonth1(day) {
+  let y = +day.slice(0, 4), m = +day.slice(5, 7) + 1; const d = +day.slice(8, 10);
+  if (m > 12) { m = 1; y++; }
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+}
+const ymNext = ym => addMonth1(ym + '-01').slice(0, 7);
+const ymLast = ym => addDays(addMonth1(ym + '-01'), -1);
+function computeMPPro(MP, f, agoraDay) {
+  if (!MP || !MP.pedidos || !MP.pedidos.length) return null;
+  f = f || {};
+  const de = f.de || '0000-00-00', ate = f.ate || '9999-12-31', T = ate < agoraDay ? ate : agoraDay;
+  const inP = d => d >= de && d <= ate, nome = c => MP.clientes[c];
+  const O = MP.pedidos.map((r, i) => ({i, ts: r[0], day: r[0].slice(0, 10), c: r[1], sub: r[2], st: r[3], met: r[4],
+    bruto: r[5], taxa: r[6], liq: r[7], mot: r[8], rday: r[9] ? r[9].slice(0, 10) : null}));
+  const apr = O.filter(o => o.st === 'paid' || o.st === 'refunded'), rec = O.filter(o => o.st === 'refused');
+  const tentativas = O.filter(o => o.st === 'refused' || o.st === 'waiting');  // cobrança tentada (recusada ou Pix aguardando)
+  const first = new Map(), prevSub = new Map(), nextSub = new Map(), lastSub = new Map(), prevCli = new Map(), lastCli = new Map();
+  for (const o of apr) {
+    if (!first.has(o.sub)) first.set(o.sub, o); else { const pv = lastSub.get(o.sub); prevSub.set(o.i, pv); nextSub.set(pv.i, o); }
+    lastSub.set(o.sub, o);
+    if (lastCli.has(o.c)) prevCli.set(o.i, lastCli.get(o.c));
+    lastCli.set(o.c, o);
+  }
+  const isFirst = o => first.get(o.sub) === o;
+  const recusasAntes = o => { const lo = (prevSub.get(o.i) || prevCli.get(o.i) || {ts: ''}).ts; return rec.filter(r => r.c === o.c && r.ts > lo && r.ts <= o.ts); };
+  const sumc = (a, k) => a.reduce((x, o) => x + o[k], 0);
+  // ---- período
+  const novasSubs = [...first.values()].filter(o => inP(o.day));
+  const pagos = apr.filter(o => o.st === 'paid' && inP(o.day)), pagNovas = pagos.filter(isFirst), pagRen = pagos.filter(o => !isFirst(o));
+  const reemb = apr.filter(o => o.st === 'refunded' && o.rday && inP(o.rday));
+  const recP = rec.filter(o => inP(o.day)), motivos = {};
+  for (const o of recP) { const m = o.mot || 'nao_informado'; motivos[m] = (motivos[m] || 0) + 1; }
+  const recNovos = recP.filter(o => !apr.some(a => a.c === o.c && a.ts < o.ts)).length;
+  // renovações previstas: vencimento (último pagamento + 1 mês) dentro do período e já vencido
+  const prev = [], semCobranca = [];
+  for (const o of apr) {
+    if (o.st !== 'paid') continue;
+    const due = addMonth1(o.day);
+    if (!inP(due) || due > agoraDay) continue;
+    const n = nextSub.get(o.i);
+    if (n) { const at = diffDays(due, n.day); prev.push({c: o.c, ult: o.day, due, pago: n.day, atraso: at, status: at <= 0 ? 'em_dia' : 'atrasou', recusas: recusasAntes(n).length}); }
+    else {
+      const ab = diffDays(due, agoraDay), rr = rec.filter(r => r.c === o.c && r.ts > o.ts);
+      // passou do prazo sem NENHUMA tentativa de cobrança: cancelou antes da renovação (não é cobrança prevista)
+      if (ab > MP_INADIMPLENTE_DIAS && !tentativas.some(r => r.c === o.c && r.ts > o.ts)) { semCobranca.push({cliente: nome(o.c), ultimo: o.day, vencimento: due}); continue; }
+      const aguard = tentativas.some(r => r.c === o.c && r.ts > o.ts && r.st === 'waiting');
+      prev.push({c: o.c, ult: o.day, due, pago: null, atraso: ab, status: ab > MP_INADIMPLENTE_DIAS ? 'inadimplente' : 'em_aberto', recusas: rr.length,
+        motivo: rr.length ? (rr[rr.length - 1].mot || 'nao_informado') : aguard ? 'pix_aguardando' : null});
+    }
+  }
+  const atrasou = prev.filter(x => x.status === 'atrasou');
+  // ---- base no fim do período (T)
+  const aprT = apr.filter(o => o.day <= T);
+  const efRef = o => o.st === 'refunded' && o.rday && o.rday <= T;
+  const cliT = new Map();
+  for (const o of aprT) { if (!cliT.has(o.c)) cliT.set(o.c, []); cliT.get(o.c).push(o); }
+  let ativos = 0, cancel = 0, reembolsados = 0, subsAtivas = 0, mrr = 0, pagosBase = 0, liqBase = 0;
+  const compradores = [], status = new Map();
+  for (const [c, os] of cliT) {
+    const pg = os.filter(o => !efRef(o));
+    let st;
+    if (!pg.length) { st = 'reembolsado'; reembolsados++; }
+    else {
+      const ls = new Map(); for (const o of pg) ls.set(o.sub, o);
+      let a = 0; for (const o of ls.values()) if (diffDays(o.day, T) <= MP_ATIVO_DIAS) { a++; mrr += o.bruto; }
+      subsAtivas += a; st = a ? 'ativo' : 'cancelou'; a ? ativos++ : cancel++;
+      pagosBase += pg.length; liqBase += sumc(pg, 'liq');
+    }
+    status.set(c, st);
+    const ult = pg.length ? pg[pg.length - 1] : null;
+    compradores.push({cliente: nome(c), status: st, pagamentos: pg.length, entrada: os[0].day, ultimo: ult ? ult.day : null,
+      total_pago: sumc(pg, 'bruto'), metodo: os[os.length - 1].met, recusas: rec.filter(r => r.c === c && r.day <= T).length,
+      reembolso: os.filter(efRef).map(o => o.rday)[0] || null});
+  }
+  const ORD = {ativo: 0, cancelou: 1, reembolsado: 2};
+  compradores.sort((a, b) => ORD[a.status] - ORD[b.status] || b.pagamentos - a.pagamentos || (a.entrada < b.entrada ? -1 : a.entrada > b.entrada ? 1 : 0) || (a.cliente < b.cliente ? -1 : 1));
+  const nComp = cliT.size, naoRe = nComp - reembolsados;
+  const liqMedio = pagosBase ? liqBase / pagosBase : null, ppa = naoRe ? pagosBase / naoRe : null;
+  const ltv = ppa != null && liqMedio != null ? ppa * liqMedio : null;
+  // ---- churn mês a mês (janela M -> M+1 só conta quando M+1 terminou até T)
+  const meses = []; if (apr.length) for (let ym = apr[0].day.slice(0, 7); ym <= agoraDay.slice(0, 7); ym = ymNext(ym)) meses.push(ym);
+  const pagouMes = ym => new Set(aprT.filter(o => !efRef(o) && o.day.slice(0, 7) === ym).map(o => o.c));
+  const janelas = [];
+  for (const ym of meses) {
+    const nx = ymNext(ym); if (ymLast(nx) > T) break;
+    const b = pagouMes(ym), r = pagouMes(nx); if (!b.size) continue;
+    const sairam = [...b].filter(c => !r.has(c));
+    janelas.push({de: ym, para: nx, base: b.size, renovaram: b.size - sairam.length, sairam: sairam.length, churn: sairam.length / b.size * 100,
+      quem: sairam.map(nome).sort()});
+  }
+  const churnMedio = mean(janelas.map(j => j.churn)), churnUlt = janelas.length ? janelas[janelas.length - 1].churn : null;
+  const vida = churnUlt ? 100 / churnUlt : null;
+  // ---- mídia (Perpétuo)
+  const MD = MP.midia || {camps: [], dias: []}, m = {inv: 0, imp: 0, cl: 0, lpv: 0, ic: 0, px: 0}, porCamp = new Map();
+  for (const r of MD.dias) {
+    if (!inP(r[0])) continue;
+    m.inv += r[2]; m.imp += r[3]; m.cl += r[4]; m.lpv += r[5]; m.ic += r[6]; m.px += r[7];
+    const pc = porCamp.get(r[1]) || {campanha: MD.camps[r[1]].nome, status: MD.camps[r[1]].status || null, investimento: 0, impressoes: 0, cliques: 0, visitas: 0, checkouts: 0};
+    pc.investimento += r[2]; pc.impressoes += r[3]; pc.cliques += r[4]; pc.visitas += r[5]; pc.checkouts += r[6]; porCamp.set(r[1], pc);
+  }
+  const div = (a, b) => b ? a / b : null, novas = novasSubs.length, novasRe = novasSubs.filter(o => o.st === 'refunded').length;
+  const cac = div(m.inv, novas), liqP = sumc(pagos, 'liq');
+  // ---- evolução mensal (todos os meses) e coortes
+  const evol = meses.map(ym => {
+    const pm = apr.filter(o => o.st === 'paid' && o.day.slice(0, 7) === ym), ns = [...first.values()].filter(o => o.day.slice(0, 7) === ym).length;
+    const inv = MD.dias.filter(r => r[0].slice(0, 7) === ym).reduce((x, r) => x + r[2], 0);
+    return {mes: ym, pagamentos: pm.length, novas: pm.filter(isFirst).length, renovacoes: pm.filter(o => !isFirst(o)).length, novas_assinaturas: ns,
+      bruto: sumc(pm, 'bruto'), liquido: sumc(pm, 'liq'), base_paga: new Set(pm.map(o => o.c)).size, investimento: inv, cac: div(inv, ns),
+      parcial: ym === agoraDay.slice(0, 7)};
+  });
+  const coortes = [];
+  for (const ym of meses) {
+    const cs = [...cliT.keys()].filter(c => cliT.get(c)[0].day.slice(0, 7) === ym);
+    if (cs.length) coortes.push({mes: ym, entraram: cs.length, ativos: cs.filter(c => status.get(c) === 'ativo').length});
+  }
+  const pagamentos = apr.filter(o => inP(o.day)).map(o => {
+    const pv = prevSub.get(o.i), due = pv ? addMonth1(pv.day) : null, rr = recusasAntes(o);
+    return {tipo: isFirst(o) ? (o.st === 'refunded' ? 'Nova, reembolsada' : 'Nova') : 'Renovação', cliente: nome(o.c), dia: o.day, vencimento: due,
+      atraso: due ? diffDays(due, o.day) : null, metodo: o.met, recusas: rr.length, motivo: rr.length ? (rr[rr.length - 1].mot || 'nao_informado') : null};
+  });
+  return {
+    periodo: {de: f.de || null, ate: f.ate || null, base_em: T},
+    midia: {investimento: m.inv, impressoes: m.imp, cliques: m.cl, visitas: m.lpv, checkouts: m.ic, compras_pixel: m.px,
+      ctr: div(m.cl * 100, m.imp), cpc: div(m.inv, m.cl), cpm: div(m.inv * 1000, m.imp), custo_visita: div(m.inv, m.lpv), custo_checkout: div(m.inv, m.ic),
+      campanhas: [...porCamp.values()].filter(x => x.investimento > 0).sort((a, b) => b.investimento - a.investimento)},
+    vendas: {novas_assinaturas: novas, novas_reembolsadas: novasRe, renovacoes_pagas: pagRen.length, pagamentos: pagos.length,
+      bruto: sumc(pagos, 'bruto'), taxa: sumc(pagos, 'taxa'), liquido: liqP,
+      novas_qtd: pagNovas.length, novas_bruto: sumc(pagNovas, 'bruto'), novas_taxa: sumc(pagNovas, 'taxa'), novas_liquido: sumc(pagNovas, 'liq'),
+      ren_bruto: sumc(pagRen, 'bruto'), ren_taxa: sumc(pagRen, 'taxa'), ren_liquido: sumc(pagRen, 'liq'),
+      reembolsos: reemb.length, reembolsos_valor: sumc(reemb, 'bruto'), recusas: recP.length, recusas_clientes: new Set(recP.map(o => o.c)).size,
+      recusas_novos: recNovos, motivos_recusa: motivos, resultado: liqP - m.inv},
+    renovacoes: {previstas: prev.length, pagas: prev.filter(x => x.pago).length, em_dia: prev.filter(x => x.status === 'em_dia').length,
+      atrasaram_pagas: atrasou.length, em_aberto: prev.filter(x => x.status === 'em_aberto').length, inadimplentes: prev.filter(x => x.status === 'inadimplente').length,
+      atraso_medio: mean(atrasou.map(x => x.atraso)), atraso_max: atrasou.length ? Math.max(...atrasou.map(x => x.atraso)) : null,
+      cancelaram_sem_cobranca: semCobranca,
+      abertas: prev.filter(x => !x.pago).map(x => ({cliente: nome(x.c), ultimo: x.ult, vencimento: x.due, dias: x.atraso, recusas: x.recusas, motivo: x.motivo, status: x.status}))},
+    base: {compradores: nComp, ativos, assinaturas_ativas: subsAtivas, cancelaram: cancel, reembolsados, mrr,
+      churn_acumulado: div(cancel * 100, nComp), churn_acumulado_com_reembolso: div((cancel + reembolsados) * 100, nComp),
+      taxa_reembolso: div(aprT.filter(efRef).length * 100, aprT.length), pagamentos_por_assinante: ppa, liquido_medio: liqMedio, ltv},
+    unit: {cac, cac_liquido: div(m.inv, novas - novasRe), custo_por_ativa: div(m.inv, subsAtivas), payback_meses: cac != null && liqMedio ? cac / liqMedio : null,
+      ltv_cac: cac && ltv != null ? ltv / cac : null},
+    churn: {janelas, medio: churnMedio, ultimo: churnUlt, vida_media_meses: vida, ltv_projetado: vida != null && liqMedio != null ? vida * liqMedio : null},
+    evolucao: evol, coortes, pagamentos, compradores
+  };
 }
 
 window.MP_DASH = {
@@ -1221,6 +1391,155 @@ function viewPerformance() {
   return h;
 }
 
+/* ---- MP PRO (B2B) ---- */
+const fRc = v => v == null ? '–' : fR(v / 100), fRc0 = v => v == null ? '–' : fR0(v / 100);
+const MOTIVO_NOME = {refused_bank: 'Recusa do banco emissor', insufficient_funds: 'Saldo ou limite insuficiente', subscription_canceled: 'Assinatura cancelada',
+  nao_informado: 'Não informado (Pix automático)', pix_aguardando: 'Pix aguardando pagamento'};
+const motivoNome = m => m ? (MOTIVO_NOME[m] || m) : '–';
+const MESN = ym => `${MES[+ym.slice(5, 7) - 1]}/${ym.slice(2, 4)}`;
+const METN = {pix: 'Pix aut.', cartao: 'Cartão'};
+function mpFunnel(m, novas) {
+  const st = [['Impressões', 'Exibições do anúncio', m.impressoes], ['Cliques no link', 'Clicaram no anúncio', m.cliques],
+    ['Visitas à página', 'Carregaram a página de destino', m.visitas], ['Checkouts iniciados', 'Abriram o checkout', m.checkouts],
+    ['Assinaturas na Kiwify', 'Pagamento aprovado (venda real)', novas]];
+  const mx = Math.log10(Math.max(10, st[0][2] + 1));
+  const cols = ['#c9b77f', '#b59c5a', '#8f7a3e', '#00503c', '#003326'];
+  return '<div class="mpf">' + st.map(([n, d, v], i) => {
+    const conv = i ? pctOf(v, st[i - 1][2]) : null, cu = v ? m.investimento / v : null;
+    const tip = `${n}\n${d}\nVolume: ${fN(v)}${i ? `\nConversão da etapa anterior: ${fP(conv)}` : ''}\n% das impressões: ${fP(pctOf(v, st[0][2]))}\nCusto por unidade: ${fRc(cu)}`;
+    return `<div class="mpr" data-tip="${ESC(tip)}"><span class="mpl"><b>${n}</b><small>${d}</small></span><span class="mpt"><i style="width:${Math.max(2, Math.log10(v + 1) / mx * 100)}%;background:${cols[i]};animation-delay:${i * 70}ms"></i></span>
+      <span class="mpv"><b>${fN(v)}</b><small>${i ? fP(conv) + ' da etapa anterior' : '100%'}</small></span><span class="mpc">${fRc(cu)}<small>por unidade</small></span></div>`;
+  }).join('') + `<p class="mut">Barras em escala logarítmica para as etapas finais ficarem visíveis. A última etapa é a venda registrada na Kiwify, não a atribuição do pixel (o pixel do Meta atribuiu ${fN(m.compras_pixel)}).</p></div>`;
+}
+function mpEvolChart(ev, width) {
+  if (!ev.length) return emptyBox('Sem vendas registradas');
+  const W = Math.max(300, width), H = 250, pl = 30, pr = 8, pt = 22, pb = 34, pw = W - pl - pr, ph = H - pt - pb;
+  const mx = niceMax(Math.max(1, ...ev.map(e => e.pagamentos))), bw = pw / ev.length, w = Math.min(64, bw * 0.55), y = v => pt + ph - ph * v / mx;
+  let g = '';
+  for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mx * i / 4)}</text>`; }
+  ev.forEach((e, i) => {
+    const cx = pl + i * bw + bw / 2;
+    if (e.renovacoes) g += `<rect class="bar" x="${cx - w / 2}" y="${y(e.renovacoes)}" width="${w}" height="${y(0) - y(e.renovacoes)}" fill="#00503c" rx="3"/>`;
+    if (e.novas) g += `<rect class="bar" x="${cx - w / 2}" y="${y(e.pagamentos)}" width="${w}" height="${y(e.renovacoes) - y(e.pagamentos) - (e.renovacoes ? 1 : 0)}" fill="#c9a94f" rx="3"/>`;
+    g += `<text class="ax" x="${cx}" y="${y(e.pagamentos) - 6}" text-anchor="middle" style="fill:#33413b;font-weight:600">${e.pagamentos}</text>`;
+    g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${MESN(e.mes)}${e.parcial ? '*' : ''}</text>`;
+    const tip = `${MESN(e.mes)}${e.parcial ? ' (mês em andamento)' : ''}\nPagamentos: ${fN(e.pagamentos)}\nNovas: ${fN(e.novas)} · Renovações: ${fN(e.renovacoes)}\nReceita bruta: ${fRc(e.bruto)} · líquida: ${fRc(e.liquido)}\nInvestimento Perpétuo: ${fRc(e.investimento)}\nCAC do mês: ${fRc(e.cac)}`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(tip)}" data-range="${e.mes}-01|${ymLast(e.mes) > TODAY ? TODAY : ymLast(e.mes)}"/>`;
+  });
+  return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pagamentos por mês">${g}</svg></div>`;
+}
+function viewMPPro() {
+  const C = cur(), P = prev(), m = C.res.mppro, pm = P.res.mppro, MP = D.mppro || {};
+  const base = m ? m.periodo.base_em : TODAY;
+  let h = viewHead('MP PRO', `B2B - Análises · assinaturas (Kiwify) × mídia da campanha Perpétuo (Meta) · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
+  if (MP.erro_kiwify) h += `<div class="note">Última leitura da Kiwify falhou (${ESC(MP.erro_kiwify)}). Os números abaixo são da leitura anterior, de ${MP.kiwify_em ? fDay(MP.kiwify_em.slice(0, 10)) + ' ' + MP.kiwify_em.slice(11, 16) : '–'}.</div>`;
+  if (!m) return h + `<div class="card">${emptyBox('Dados do MP PRO indisponíveis', 'Não foi possível ler as vendas da Kiwify nesta atualização.')}</div>`;
+  const v = m.vendas, md = m.midia, r = m.renovacoes, b = m.base, u = m.unit, ch = m.churn;
+  const pv = pm ? pm.vendas : {}, pmd = pm ? pm.midia : {}, pu = pm ? pm.unit : {}, pb = pm ? pm.base : {};
+  const pl = (n, a, b2) => `${fN(n)} ${n === 1 ? a : b2}`;
+  // ---------- visão geral
+  h += `<div class="mph"><span>VISÃO GERAL</span>Números do período${base < S.ate ? '' : ` · base de assinantes em ${fDay(base)}`}</div>`;
+  h += '<div class="kpis">' + [
+    kpiCard({label: 'Investimento em mídia', cls: 'hero gold', v: fRc(md.investimento), sub: `${pl(md.campanhas.length, 'campanha', 'campanhas')} Perpétuo com gasto`, d: delta(md.investimento, pmd.investimento, 0, fRc0),
+      tip: 'Gasto na Meta Ads das campanhas "MP PRO ... Perpétuo" no período. Lives, captação de leads e outras campanhas ficam de fora.'}),
+    kpiCard({label: 'Receita líquida', v: fRc(v.liquido), sub: `${fRc(v.bruto)} bruto · ${pl(v.pagamentos, 'pagamento', 'pagamentos')}`, d: delta(v.liquido, pv.liquido, 1, fRc0), tip: 'Pagamentos aprovados no período, já descontada a taxa da Kiwify'}),
+    kpiCard({label: 'Resultado do período', cls: v.resultado < 0 ? 'red' : '', v: fRc(v.resultado), sub: 'receita líquida − investimento', d: delta(v.resultado, pv.resultado, 1, fRc0), tip: 'Receita líquida menos o investimento em mídia do período'}),
+    kpiCard({label: 'Novas assinaturas', v: fN(v.novas_assinaturas), sub: v.novas_reembolsadas ? `${pl(v.novas_reembolsadas, 'reembolsada', 'reembolsadas')} no período` : 'nenhuma reembolsada', d: delta(v.novas_assinaturas, pv.novas_assinaturas),
+      tip: 'Assinaturas com o primeiro pagamento no período (número bruto, inclui as reembolsadas)'}),
+    kpiCard({label: 'Renovações pagas', v: fN(v.renovacoes_pagas), sub: r.previstas ? `${fP(pctOf(r.pagas, r.previstas))} das ${fN(r.previstas)} previstas` : 'nenhuma prevista no período', d: delta(v.renovacoes_pagas, pv.renovacoes_pagas),
+      tip: 'Pagamentos recorrentes aprovados no período.\nPrevistas = assinaturas com vencimento no período (último pagamento + 1 mês).'}),
+    kpiCard({label: 'CAC', v: fRc(u.cac), sub: `${fRc(md.investimento)} ÷ ${pl(v.novas_assinaturas, 'nova', 'novas')} · líquido de reembolso ${fRc(u.cac_liquido)}`, d: delta(u.cac, pu.cac, -1, fRc),
+      tip: 'Investimento ÷ novas assinaturas na Kiwify (100% atribuídas à campanha: os pedidos não trazem UTM)'}),
+    kpiCard({label: 'Payback do CAC', v: u.payback_meses == null ? '–' : `${f1(u.payback_meses)}<small>meses</small>`, sub: `a ${fRc(b.liquido_medio)} líquidos por mês`, d: delta(u.payback_meses, pu.payback_meses, -1, x => f1(x) + ' m'), tip: 'CAC ÷ receita líquida mensal de uma assinatura'}),
+    kpiCard({label: 'LTV líquido atual', v: fRc(b.ltv), sub: `${f1(b.pagamentos_por_assinante)} pagamentos por assinante`, d: delta(b.ltv, pb.ltv, 1, fRc), tip: 'Pagamentos médios por assinante (sem reembolsados) × líquido médio por pagamento, até o fim do período'}),
+    kpiCard({label: 'LTV / CAC', cls: u.ltv_cac != null && u.ltv_cac < 1 ? 'red' : '', v: u.ltv_cac == null ? '–' : nf1.format(Math.round(u.ltv_cac * 100) / 100).replace(/,(\d)$/, ',$10'), sub: u.ltv_cac == null ? 'sem CAC no período' : u.ltv_cac < 1 ? 'abaixo de 1: o CAC ainda não se pagou' : 'o CAC já se pagou',
+      d: delta(u.ltv_cac, pu.ltv_cac, 1, x => f1(x)), tip: 'LTV líquido atual ÷ CAC do período'}),
+    kpiCard({label: 'Usuários ativos', cls: 'hero', v: fN(b.ativos), sub: `${pl(b.assinaturas_ativas, 'assinatura', 'assinaturas')} · MRR ${fRc(b.mrr)}`, d: delta(b.ativos, pb.ativos),
+      tip: `Assinantes com cobrança confirmada nos últimos 40 dias, em ${fDay(base)} (não mede consumo das aulas).\nMRR = assinaturas ativas × valor da última cobrança.`})
+  ].join('') + '</div>';
+  // ---------- funil + receita
+  const vw = document.getElementById('view').clientWidth || 900;
+  h += `<div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Funil da campanha</h3><p>Da impressão à assinatura · custo por unidade = investimento ÷ volume da etapa</p></div></div>${md.impressoes || v.novas_assinaturas ? mpFunnel(md, v.novas_assinaturas) : emptyBox('Sem mídia nem vendas no período')}</div>
+    <div class="card"><div class="ch"><div><h3>Composição da receita</h3><p>Pagamentos aprovados no período</p></div></div>
+      <div class="tw"><table class="t"><thead><tr><th></th><th class="num">Qtd</th><th class="num">Bruto</th><th class="num">Taxa Kiwify</th><th class="num">Líquido</th></tr></thead><tbody>
+      <tr><td>Novas assinaturas</td><td class="num">${fN(v.novas_qtd)}</td><td class="num">${fRc(v.novas_bruto)}</td><td class="num">${fRc(v.novas_taxa)}</td><td class="num">${fRc(v.novas_liquido)}</td></tr>
+      <tr><td>Renovações</td><td class="num">${fN(v.renovacoes_pagas)}</td><td class="num">${fRc(v.ren_bruto)}</td><td class="num">${fRc(v.ren_taxa)}</td><td class="num">${fRc(v.ren_liquido)}</td></tr>
+      <tr class="tot"><td>Total</td><td class="num">${fN(v.pagamentos)}</td><td class="num">${fRc(v.bruto)}</td><td class="num">${fRc(v.taxa)}</td><td class="num">${fRc(v.liquido)}</td></tr></tbody></table></div>
+      <div class="mpm">
+        <div><b>${fN(v.reembolsos)}</b>reembolsos no período<small>${fRc(v.reembolsos_valor)} devolvidos (fora da receita)</small></div>
+        <div><b>${fN(v.recusas)}</b>cobranças recusadas<small>${pl(v.recusas_clientes, 'assinante', 'assinantes')} · ${pl(v.recusas_novos, 'de cliente novo', 'de clientes novos')}</small></div>
+        <div><b>${fRc(u.custo_por_ativa)}</b>custo por assinatura ativa<small>investimento ÷ ${fN(b.assinaturas_ativas)} ativas</small></div>
+        <div><b>${fP(md.ctr)}</b>CTR · CPC ${fRc(md.cpc)}<small>CPM ${fRc(md.cpm)} · ${fN(md.impressoes)} impressões</small></div>
+      </div>
+      ${Object.keys(v.motivos_recusa).length ? `<div class="mprs">${Object.entries(v.motivos_recusa).sort((a, b2) => b2[1] - a[1]).map(([k, n]) => `<span>${ESC(motivoNome(k))} <b>${n}</b></span>`).join('')}</div>` : ''}
+    </div></div>`;
+  // ---------- renovações
+  h += `<div class="mph mt"><span>RENOVAÇÕES</span>Cobranças recorrentes com vencimento no período</div>`;
+  h += '<div class="kpis">' + [
+    kpiCard({label: 'Previstas', v: fN(r.previstas), sub: 'vencimentos no período', tip: 'Assinaturas com vencimento (último pagamento + 1 mês) no período, já vencidas.\nQuem passou do prazo sem nenhuma tentativa de cobrança cancelou antes da renovação e não entra aqui.'}),
+    kpiCard({label: 'Pagas em dia', v: fN(r.em_dia), sub: r.previstas ? fP(pctOf(r.em_dia, r.previstas)) + ' das previstas' : '', tip: 'Pagamento entrou até o dia do vencimento'}),
+    kpiCard({label: 'Pagas com atraso', v: fN(r.atrasaram_pagas), sub: r.atrasaram_pagas ? `média ${f1(r.atraso_medio)} dias · pico ${fN(r.atraso_max)} dias` : 'nenhuma', tip: 'Entraram depois do vencimento (em geral após a Kiwify repetir uma cobrança recusada)'}),
+    kpiCard({label: 'Em aberto', v: fN(r.em_aberto), sub: 'até 25 dias do vencimento', tip: 'Ainda não pagas, dentro do limite de 25 dias'}),
+    kpiCard({label: 'Inadimplentes', cls: r.inadimplentes ? 'red' : '', v: fN(r.inadimplentes), sub: 'mais de 25 dias sem pagar', tip: 'Passaram de 25 dias do vencimento sem pagamento, com cobrança tentada'})
+  ].join('') + '</div>';
+  const pgCols = `<th>Tipo</th><th>Assinante</th><th>Pagamento</th><th>Vencimento</th><th class="num">Atraso</th><th>Método</th><th class="num">Tentativas recusadas</th><th>Motivo da recusa</th>`;
+  const atrasoTxt = a => a == null ? '–' : a <= 0 ? '<span style="color:#0b7a3b;font-weight:600">em dia</span>' : `<span class="${a > 5 ? 'red b' : ''}">+${a}d</span>`;
+  h += `<div class="card np mt"><div class="ch"><div><h3>Pagamentos do período, um a um</h3><p>${pl(v.novas_assinaturas, 'nova', 'novas')} e ${pl(v.renovacoes_pagas, 'renovação', 'renovações')} · vencimento = pagamento anterior da assinatura + 1 mês</p></div></div><div class="tw" style="max-height:440px"><table class="t stk"><thead><tr>${pgCols}</tr></thead><tbody>` +
+    (m.pagamentos.length ? m.pagamentos.map(x => `<tr><td><span class="mpk ${x.tipo === 'Renovação' ? 'ren' : x.tipo === 'Nova' ? 'nov' : 'ree'}">${x.tipo}</span></td><td><b>${ESC(x.cliente)}</b></td><td>${fDM(x.dia)}</td><td>${x.vencimento ? fDM(x.vencimento) : '–'}</td><td class="num">${atrasoTxt(x.atraso)}</td><td>${METN[x.metodo] || x.metodo}</td><td class="num">${x.recusas || '–'}</td><td>${x.motivo ? ESC(motivoNome(x.motivo)) : '–'}</td></tr>`).join('')
+      : `<tr><td colspan="8">${emptyBox('Nenhum pagamento no período')}</td></tr>`) + `</tbody></table></div></div>
+    <div class="card np mt"><div class="ch"><div><h3>Renovações que não entraram</h3><p>Vencidas no período e ainda sem pagamento (posição de hoje)</p></div></div><div class="tw"><table class="t"><thead><tr><th>Assinante</th><th>Situação</th><th>Último pagamento</th><th>Vencimento</th><th class="num">Dias sem pagar</th><th class="num">Tentativas recusadas</th><th>Motivo da recusa</th></tr></thead><tbody>` +
+    (r.abertas.length ? r.abertas.map(x => `<tr><td><b>${ESC(x.cliente)}</b></td><td><span class="mpk ${x.status === 'inadimplente' ? 'ree' : 'abe'}">${x.status === 'inadimplente' ? 'inadimplente' : 'em aberto'}</span></td><td>${fDM(x.ultimo)}</td><td>${fDM(x.vencimento)}</td><td class="num">${x.dias}</td><td class="num">${x.recusas || '–'}</td><td>${ESC(motivoNome(x.motivo))}</td></tr>`).join('')
+      : `<tr><td colspan="7">${emptyBox('Nenhuma renovação pendente', 'Todas as cobranças previstas no período entraram.')}</td></tr>`) +
+    (r.cancelaram_sem_cobranca.length ? `<tr><td colspan="7" class="mut" style="white-space:normal">Cancelaram antes da renovação (sem tentativa de cobrança): ${r.cancelaram_sem_cobranca.map(x => `<b>${ESC(x.cliente)}</b> (venceu ${fDM(x.vencimento)})`).join(', ')}.</td></tr>` : '') +
+    `</tbody></table></div></div>`;
+  // ---------- base
+  h += `<div class="mph mt"><span>BASE</span>Assinantes MP PRO em ${fDay(base)} · plano Janela Fundadora</div>`;
+  h += '<div class="kpis">' + [
+    kpiCard({label: 'Compradores totais', v: fN(b.compradores), sub: 'já pagaram ao menos um mês', tip: 'Pessoas com pagamento aprovado desde o lançamento (17/07/2026) até a data da base'}),
+    kpiCard({label: 'Usuários ativos', v: fN(b.ativos), sub: `${fP(pctOf(b.ativos, b.compradores))} dos compradores · ${pl(b.assinaturas_ativas, 'assinatura', 'assinaturas')}`, tip: 'Cobrança confirmada nos últimos 40 dias'}),
+    kpiCard({label: 'Cancelaram', cls: 'red', v: fN(b.cancelaram), sub: `churn acumulado ${fP(b.churn_acumulado)}`, tip: 'Já pagaram e estão há mais de 40 dias sem pagamento'}),
+    kpiCard({label: 'Reembolsados', v: fN(b.reembolsados), sub: `taxa de reembolso ${fP(b.taxa_reembolso)} dos pagamentos`, tip: 'Clientes cujo único pagamento foi devolvido'}),
+    kpiCard({label: 'MRR', cls: 'hero', v: fRc(b.mrr), sub: `${pl(b.assinaturas_ativas, 'assinatura ativa', 'assinaturas ativas')}`, tip: 'Receita recorrente mensal bruta das assinaturas ativas'})
+  ].join('') + '</div>';
+  const coh = m.coortes.length ? '<div class="mpco">' + m.coortes.map(c => `<div data-tip="${ESC(`Entraram em ${MESN(c.mes)}: ${c.entraram}\nSeguem ativos em ${fDay(base)}: ${c.ativos}`)}"><span class="mut">${MESN(c.mes)}</span><span class="mpt"><i style="width:100%;background:#e6ece9"></i><i class="ov" style="width:${pctOf(c.ativos, c.entraram)}%"></i></span><b>${fP(pctOf(c.ativos, c.entraram)).replace(',0%', '%')}</b><small>${c.ativos} de ${c.entraram}</small></div>`).join('') + '</div>' : emptyBox('Sem compradores');
+  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Pagamentos por mês</h3><p>Todos os meses · clique numa barra para ver o mês · * mês em andamento</p></div>
+      <div class="lg"><span><i style="background:#c9a94f"></i>Novas</span><span><i style="background:#00503c"></i>Renovações</span></div></div>${mpEvolChart(m.evolucao, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44)}</div>
+    <div class="card"><div class="ch"><div><h3>Sobrevivência por coorte</h3><p>Mês de entrada → % que segue ativo em ${fDay(base)}</p></div></div>${coh}</div></div>`;
+  h += `<div class="card np mt"><div class="ch"><div><h3>Evolução mensal</h3><p>Meses completos e o mês atual (parcial)</p></div></div><div class="tw"><table class="t"><thead><tr><th>Mês</th><th class="num">Pagamentos</th><th class="num">Novas</th><th class="num">Renovações</th><th class="num">Base paga</th><th class="num">Receita bruta</th><th class="num">Receita líquida</th><th class="num">Investimento</th><th class="num">CAC</th><th class="num">Resultado</th></tr></thead><tbody>` +
+    m.evolucao.map(e => `<tr${e.mes >= S.de.slice(0, 7) && e.mes <= S.ate.slice(0, 7) ? ' class="sel"' : ''}><td><b>${MESN(e.mes)}</b>${e.parcial ? ' <span class="mut">(parcial)</span>' : ''}</td><td class="num">${fN(e.pagamentos)}</td><td class="num">${fN(e.novas)}</td><td class="num">${fN(e.renovacoes)}</td><td class="num">${fN(e.base_paga)}</td><td class="num">${fRc(e.bruto)}</td><td class="num">${fRc(e.liquido)}</td><td class="num">${fRc(e.investimento)}</td><td class="num">${fRc(e.cac)}</td><td class="num ${e.liquido - e.investimento < 0 ? 'red' : ''}">${fRc(e.liquido - e.investimento)}</td></tr>`).join('') +
+    `</tbody></table></div></div>`;
+  // ---------- churn
+  h += `<div class="mph mt"><span>CHURN</span>Taxa de saída · janela M → M+1 só conta quando o mês seguinte já terminou</div>`;
+  h += '<div class="kpis">' + [
+    kpiCard({label: 'Churn da última janela', cls: 'red', v: fP(ch.ultimo), sub: ch.janelas.length ? (j => `${MESN(j.de)} → ${MESN(j.para)}: ${j.sairam} de ${j.base} não renovaram`)(ch.janelas[ch.janelas.length - 1]) : 'nenhuma janela completa', tip: 'Pagaram no mês e não pagaram no mês seguinte, sobre a base paga do mês'}),
+    kpiCard({label: 'Churn médio mensal', v: fP(ch.medio), sub: `média de ${pl(ch.janelas.length, 'janela completa', 'janelas completas')}`}),
+    kpiCard({label: 'Churn acumulado', v: fP(b.churn_acumulado), sub: `${b.cancelaram} de ${b.compradores} · com reembolso ${fP(b.churn_acumulado_com_reembolso)}`, tip: 'Cancelaram ÷ compradores desde o lançamento'}),
+    kpiCard({label: 'Retenção acumulada', v: fP(pctOf(b.ativos, b.compradores)), sub: `${b.ativos} de ${b.compradores} seguem ativos`}),
+    kpiCard({label: 'LTV projetado', cls: 'w1', v: fRc(ch.ltv_projetado), sub: ch.vida_media_meses ? `estimativa: vida média de ${f1(ch.vida_media_meses)} meses` : 'sem churn medido', tip: 'Estimativa, não valor medido: mantido o churn da última janela, vida média = 1 ÷ churn; LTV = vida × líquido mensal'})
+  ].join('') + '</div>';
+  h += `<div class="card np mt"><div class="ch"><div><h3>Churn mês a mês</h3><p>Com base pequena, cada assinante perdido move o indicador em vários pontos percentuais</p></div></div><div class="tw"><table class="t"><thead><tr><th>Janela</th><th class="num">Base paga</th><th class="num">Renovaram</th><th class="num">Saíram</th><th class="num">Churn</th><th class="num">Retenção</th><th>Quem saiu</th></tr></thead><tbody>` +
+    (ch.janelas.length ? ch.janelas.map(j => `<tr><td><b>${MESN(j.de)} → ${MESN(j.para)}</b></td><td class="num">${j.base}</td><td class="num">${j.renovaram}</td><td class="num red">${j.sairam}</td><td class="num b">${fP(j.churn)}</td><td class="num">${fP(100 - j.churn)}</td><td class="wrap" style="max-width:420px">${ESC(j.quem.join(', ')) || '–'}</td></tr>`).join('')
+      : `<tr><td colspan="7">${emptyBox('Nenhuma janela completa no período', 'A janela de um mês só é medida depois que o mês seguinte termina.')}</td></tr>`) + `</tbody></table></div></div>`;
+  // ---------- compradores
+  const STC = {ativo: 'nov', cancelou: 'ree', reembolsado: 'abe'};
+  h += `<div class="card np mt"><div class="ch"><div><h3>Todos os compradores</h3><p>Desde o lançamento até ${fDay(base)} · ativo = cobrança confirmada nos últimos 40 dias</p></div></div><div class="tw" style="max-height:520px"><table class="t stk"><thead><tr><th>#</th><th>Assinante</th><th>Situação</th><th class="num">Pagamentos</th><th>Entrada</th><th>Último pagamento</th><th class="num">Total pago</th><th>Método</th><th class="num">Recusas</th></tr></thead><tbody>` +
+    m.compradores.map((c, i) => `<tr><td class="mut">${i + 1}</td><td><b>${ESC(c.cliente)}</b></td><td><span class="mpk ${STC[c.status]}">${c.status}</span>${c.reembolso ? `<div class="mut">reembolso em ${fDM(c.reembolso)}</div>` : ''}</td><td class="num">${c.pagamentos || '–'}</td><td>${fDay(c.entrada)}</td><td>${c.ultimo ? fDay(c.ultimo) : '–'}</td><td class="num">${fRc(c.total_pago)}</td><td>${METN[c.metodo] || c.metodo}</td><td class="num">${c.recusas || '–'}</td></tr>`).join('') +
+    `</tbody></table></div></div>`;
+  // ---------- campanhas
+  h += `<div class="card np mt"><div class="ch"><div><h3>Campanhas Perpétuo na Meta</h3><p>Só campanhas "MP PRO ... Perpétuo" · lives, captação de leads e consultores ficam de fora</p></div></div><div class="tw"><table class="t"><thead><tr><th>Campanha</th><th class="num">Investimento</th><th class="num">Impressões</th><th class="num">Cliques</th><th class="num">Visitas</th><th class="num">Checkouts</th><th class="num">CTR</th><th class="num">CPC</th></tr></thead><tbody>` +
+    (md.campanhas.length ? md.campanhas.map(c => `<tr><td><b>${ESC(c.campanha)}</b></td><td class="num">${fRc(c.investimento)}</td><td class="num">${fN(c.impressoes)}</td><td class="num">${fN(c.cliques)}</td><td class="num">${fN(c.visitas)}</td><td class="num">${fN(c.checkouts)}</td><td class="num">${fP(pctOf(c.cliques, c.impressoes))}</td><td class="num">${fRc(c.cliques ? c.investimento / c.cliques : null)}</td></tr>`).join('')
+      : `<tr><td colspan="8">${emptyBox('Nenhuma campanha Perpétuo com gasto no período')}</td></tr>`) + `</tbody></table></div></div>`;
+  h += `<details class="mpd mt"><summary>Como ler esta aba e ressalvas</summary><ul>
+    <li><b>Fontes:</b> vendas e assinantes da API da Kiwify (produto MP PRO); mídia da Meta Ads, só campanhas "MP PRO ... Perpétuo" da conta Meu Patrimônio CA. Atualiza junto com o dashboard, a cada 30 min.</li>
+    <li><b>Só o período vale nesta aba.</b> Os números do período usam a data do pagamento; a base (ativos, cancelados, churn acumulado, LTV) é a posição no último dia do período, ou hoje.</li>
+    <li><b>Assinaturas:</b> a Kiwify não expõe assinaturas na API; cada cobrança é um pedido. A base é reconstruída pelos pedidos de cada cliente (quem tem duas assinaturas paralelas aparece com as duas).</li>
+    <li><b>Usuário ativo</b> = cobrança confirmada nos últimos 40 dias. Não mede consumo das aulas (a API não informa).</li>
+    <li><b>Atraso</b> = dias entre o vencimento (pagamento anterior + 1 mês) e o pagamento. Até 25 dias = em aberto; acima = inadimplente. Quem passa do prazo sem nenhuma tentativa de cobrança cancelou antes da renovação.</li>
+    <li><b>Atribuição:</b> o CAC atribui 100% das novas assinaturas à campanha, porque os pedidos não trazem UTM; parte das vendas pode ser orgânica. O pixel do Meta conta outra coisa e não bate com a Kiwify.</li>
+    <li><b>LTV projetado</b> é estimativa (churn da última janela mantido). O mês atual é parcial: renovações ainda vão entrar, não leia como queda.</li></ul></details>`;
+  return h;
+}
+
 /* ---- Lead a Lead ---- */
 const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['sem', 'Sem contato', d => !d.nk], ['parados', 'Parados > 7d', d => d.parado],
   ['fds', 'Entrada no FDS', d => d.fds], ['agendados', 'Agendados', d => d.agendado]];
@@ -1560,7 +1879,7 @@ function viewB2B() {
   const t = TABS_B2B.find(x => x.id === S.tab);
   return viewHead(ESC(t.nome), 'B2B - Análises') + `<div class="card"><div class="empty"><b>Seção em construção</b>Esta área vai reunir as análises de ${ESC(t.nome)}. Os filtros e dados do B2C Funil Alpha não se aplicam aqui.</div></div>`;
 }
-const VIEWS = {macro: viewMacro, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewB2B, aplicacao: viewB2B};
+const VIEWS = {macro: viewMacro, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewMPPro, aplicacao: viewB2B};
 function renderView(anim) {
   const v = document.getElementById('view');
   document.getElementById('tip').classList.remove('on');
@@ -1569,7 +1888,8 @@ function renderView(anim) {
 }
 function update(o = {}) {
   writeHash(); renderNav(); renderFilterBar(); renderChips(); renderView(o.anim);
-  document.getElementById('fbar').hidden = isB2B(S.tab);
+  document.getElementById('fbar').hidden = isB2B(S.tab) && S.tab !== 'mppro';
+  document.getElementById('fbar').classList.toggle('so-periodo', S.tab === 'mppro');  // MP PRO: só o período vale
   document.querySelector('footer.howto').hidden = isB2B(S.tab);
   if (POP && POP.type === 'dim') renderPopList();
 }

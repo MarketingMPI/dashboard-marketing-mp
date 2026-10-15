@@ -491,12 +491,12 @@ def sync_midia(old):
     if not tok:
         return {**old, "erro": "sem token da Meta"}
     hoje = datetime.now(BRT).date()
-    dias = old.get("dias") or {}
+    dias = old.get("dias") or {} if old.get("v") == 2 else {}
     since = META_DESDE if not dias else (hoje - timedelta(days=35)).isoformat()
     try:
         rows = meta_get(f"{META_ACCOUNT}/insights", tok, level="campaign", time_increment=1, limit=500,
                         time_range=json.dumps({"since": since, "until": hoje.isoformat()}),
-                        fields="campaign_id,campaign_name,spend,impressions,inline_link_clicks")
+                        fields="campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions")
         camps = {c["id"]: c for c in meta_get(f"{META_ACCOUNT}/campaigns", tok, limit=500,
                                                fields="id,name,effective_status")}
     except Exception as e:
@@ -506,12 +506,14 @@ def sync_midia(old):
     nomes = dict(old.get("nomes") or {})
     for r in rows:
         cid = r["campaign_id"]; nomes[cid] = r["campaign_name"]
+        act = {a["action_type"]: int(float(a["value"])) for a in r.get("actions") or []}
         dias[f"{r['date_start']}|{cid}"] = [int(round(float(r.get("spend") or 0) * 100)), int(r.get("impressions") or 0),
-                                            int(r.get("inline_link_clicks") or 0)]
+                                            int(r.get("inline_link_clicks") or 0), act.get("landing_page_view", 0),
+                                            act.get("initiate_checkout", 0), act.get("purchase", 0)]
     for cid, c in camps.items():
         if cid in nomes: nomes[cid] = c["name"]
     status = {cid: c.get("effective_status") for cid, c in camps.items()}
-    return {"dias": dias, "nomes": nomes, "status": status, "erro": None,
+    return {"v": 2, "dias": dias, "nomes": nomes, "status": status, "erro": None,
             "atualizado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")}
 
 
@@ -528,8 +530,127 @@ def midia_payload(m):
         if cid not in idx:
             idx[cid] = len(camps)
             camps.append({"id": cid, "nome": m["nomes"].get(cid, cid), "grupo": g, "status": (m.get("status") or {}).get(cid)})
-        dias.append([day, idx[cid]] + v)
+        dias.append([day, idx[cid]] + v[:3])
     return {"camps": camps, "dias": dias, "atualizado_em": m.get("atualizado_em"), "erro": m.get("erro")}
+
+
+# ---------------------------------------------------------------- MP PRO (Kiwify + Meta Perpétuo, SOMENTE LEITURA)
+KIWIFY_API = "https://public-api.kiwify.com/v1"
+MPPRO_PRODUTO = "5243d100-6347-11f1-9029-d1b5a9444144"   # MP PRO (club, R$ 49/mês, Janela Fundadora)
+MPPRO_DESDE = "2026-07-01"
+KIWIFY_ENV = pathlib.Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / "profiles" / "apine" / ".env"
+
+
+def kiwify_cfg(name):
+    v = env(name)
+    if v: return v
+    if KIWIFY_ENV.exists():
+        for l in KIWIFY_ENV.read_text(encoding="utf-8", errors="replace").splitlines():
+            if l.startswith(name + "="): return l.split("=", 1)[1].strip().strip('"').strip("'")
+
+
+def kiwify_get(path, tok, **q):
+    url = KIWIFY_API + path + "?" + urllib.parse.urlencode(q)
+    for tent in range(4):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "mp-dashboard/1.0", "Authorization": "Bearer " + tok,
+                                                       "x-kiwify-account-id": kiwify_cfg("KIWIFY_ACCOUNT_ID")})
+            return json.loads(urllib.request.urlopen(req, timeout=90).read())
+        except urllib.error.HTTPError as e:
+            if e.code in (400, 401, 403, 404) or tent == 3: raise
+            time.sleep(8 * (tent + 1))
+        except Exception:
+            if tent == 3: raise
+            time.sleep(8 * (tent + 1))
+
+
+def kiwify_sales():
+    """Todos os pedidos do produto MP PRO. Janelas de 90 dias; end_date é EXCLUSIVO (a próxima janela começa nele)."""
+    cid, sec = kiwify_cfg("KIWIFY_CLIENT_ID"), kiwify_cfg("KIWIFY_CLIENT_SECRET")
+    if not (cid and sec and kiwify_cfg("KIWIFY_ACCOUNT_ID")): raise RuntimeError("sem credenciais da Kiwify")
+    body = urllib.parse.urlencode({"client_id": cid, "client_secret": sec}).encode()
+    tok = json.loads(urllib.request.urlopen(urllib.request.Request(KIWIFY_API + "/oauth/token", data=body, method="POST",
+        headers={"User-Agent": "mp-dashboard/1.0", "Content-Type": "application/x-www-form-urlencoded"}), timeout=60).read())["access_token"]
+    ini, fim, out = datetime.fromisoformat(MPPRO_DESDE).date(), datetime.now(BRT).date() + timedelta(days=2), {}
+    while ini < fim:
+        e = min(ini + timedelta(days=90), fim); page = 1
+        while True:
+            d = kiwify_get("/sales", tok, start_date=ini.isoformat(), end_date=e.isoformat(), product_id=MPPRO_PRODUTO,
+                           page_size=100, page_number=page, view_full_sale_details="true").get("data") or []
+            for x in d: out[x["id"]] = x
+            if len(d) < 100: break
+            page += 1; time.sleep(0.7)
+        ini = e
+    return list(out.values())
+
+
+def _brt(ts):
+    return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S") if ts else None
+
+
+def _mes_seguinte(day):
+    y, m, d = int(day[:4]), int(day[5:7]) + 1, int(day[8:10])
+    if m > 12: y, m = y + 1, 1
+    ult = (datetime(y + (m == 12), m % 12 + 1, 1) - timedelta(days=1)).day
+    return f"{y:04d}-{m:02d}-{min(d, ult):02d}"
+
+
+def mppro_pedidos(sales):
+    """Pedidos -> payload. Assinatura reconstruída por cliente (a API não expõe assinaturas): um pagamento novo
+    entra na assinatura cujo último pagamento foi há 20+ dias (a de vencimento mais antigo); senão abre outra
+    assinatura (cliente com duas assinaturas paralelas). E-mail só serve de chave e NÃO vai para o payload."""
+    cli, nomes, pedidos, subs, nsub = {}, [], [], {}, 0
+    rows = []
+    for x in sales:
+        st = x.get("status")
+        if st not in ("paid", "refunded", "refused", "waiting_payment"): continue
+        ts = _brt(x.get("approved_date") if st != "refused" else x.get("created_at")) or _brt(x.get("created_at"))
+        rows.append((ts, x))
+    rows.sort(key=lambda r: (r[0], r[1]["id"]))
+    for ts, x in rows:
+        c = x["customer"]
+        key = (c.get("email") or c.get("id") or "").strip().lower()
+        if key not in cli: cli[key] = len(nomes); nomes.append(None)
+        ci = cli[key]; nomes[ci] = (c.get("name") or "").strip() or "(sem nome)"
+        st, sub = {"waiting_payment": "waiting"}.get(x["status"], x["status"]), -1   # waiting = cobrança em andamento (Pix)
+        if st in ("paid", "refunded"):
+            day = ts[:10]
+            cand = [s for s in subs.setdefault(ci, []) if (datetime.fromisoformat(day) - datetime.fromisoformat(s[1])).days >= 20]
+            if cand:
+                s = min(cand, key=lambda s: (_mes_seguinte(s[1]), s[0])); s[1] = day; sub = s[0]
+            else:
+                sub = nsub; subs[ci].append([nsub, day]); nsub += 1
+        pg = x.get("payment") or {}
+        pedidos.append([ts, ci, sub, st, "pix" if "pix" in (x.get("payment_method") or "") else "cartao",
+                        int(pg.get("charge_amount") or 0), int(pg.get("fee") or 0), int(x.get("net_amount") or pg.get("net_amount") or 0),
+                        x.get("card_rejection_reason") or None, _brt(x.get("refunded_at"))])
+    return {"clientes": nomes, "pedidos": pedidos}
+
+
+def eh_perpetuo(nome):
+    return bool(re.search(r"mp\s*pro", nome or "", re.I) and re.search(r"perp[eé]tuo", nome or "", re.I))
+
+
+def mppro_payload(midia, old):
+    """MP PRO = Kiwify (vendas/assinantes) + Meta só das campanhas 'MP PRO ... Perpétuo'. Falha numa fonte mantém o último dado."""
+    out = dict(old or {})
+    try:
+        out.update(mppro_pedidos(kiwify_sales())); out["erro_kiwify"] = None
+        out["kiwify_em"] = datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")
+    except Exception as e:
+        out["erro_kiwify"] = f"falha ao consultar a Kiwify ({getattr(e, 'code', None) or type(e).__name__})"
+    camps, idx, dias = [], {}, []
+    for key in sorted((midia or {}).get("dias") or {}):
+        day, cid = key.split("|")
+        nome = midia["nomes"].get(cid, "")
+        v = midia["dias"][key]
+        if not eh_perpetuo(nome) or not any(v): continue
+        if cid not in idx:
+            idx[cid] = len(camps); camps.append({"id": cid, "nome": nome, "status": (midia.get("status") or {}).get(cid)})
+        dias.append([day, idx[cid]] + (list(v) + [0, 0, 0])[:6])
+    out["midia"] = {"camps": camps, "dias": dias, "atualizado_em": (midia or {}).get("atualizado_em"), "erro": (midia or {}).get("erro")}
+    out.setdefault("clientes", []); out.setdefault("pedidos", [])
+    return out
 
 
 def collect(full=False):
@@ -537,10 +658,11 @@ def collect(full=False):
     cache, n_changed, was_full = sync(full)
     leads, excl = model(cache)
     cache["midia"] = sync_midia(cache.get("midia"))
+    cache["mppro"] = mppro_payload(cache["midia"], cache.get("mppro"))
     tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]),
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"],
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)"}}
     tmp = SNAP.with_suffix(".tmp"); tmp.write_text(json.dumps(snap, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"); tmp.replace(SNAP)
@@ -635,7 +757,8 @@ def ci():
     CACHE_ENC.write_bytes(crypt("enc", CACHE.read_bytes()))
     build_pages()
     # Logs do Actions são PÚBLICOS: nada de nomes, consultores ou números do negócio aqui.
-    print("ok", s["gerado_em"], s["meta"]["coleta"], "| midia:", "ok" if not s["midia"]["erro"] else s["midia"]["erro"])
+    print("ok", s["gerado_em"], s["meta"]["coleta"], "| midia:", "ok" if not s["midia"]["erro"] else s["midia"]["erro"],
+          "| kiwify:", "ok" if not s["mppro"].get("erro_kiwify") else s["mppro"]["erro_kiwify"])
 
 
 def github_token():
