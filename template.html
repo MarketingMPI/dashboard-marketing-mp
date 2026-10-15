@@ -139,6 +139,7 @@ table.t tr.sel td{background:#f6faf3}
 table.t.mprc th,table.t.mprc td{padding-left:7px;padding-right:7px}table.t.mprc th.num{min-width:0}
 .mpd{background:#fff;border:1px solid var(--linha);border-radius:var(--r);padding:14px 20px;font-size:13px;color:#46534e}.mpd summary{cursor:pointer;font-weight:600;color:var(--prof)}
 .mpd ul{margin:10px 0 0;padding-left:18px;line-height:1.55}.mpd.mt{margin-top:22px}
+@media(min-width:961px){.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .hubwarn{display:flex;gap:12px;align-items:center;background:repeating-linear-gradient(135deg,#fff8e6 0 12px,#fdf1d4 12px 24px);border:1px dashed #d9b45a;color:#6b5a2e;border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:16px}
 .hubwarn b{flex:none;background:#a8701c;color:#fff;font-size:11.5px;letter-spacing:.08em;border-radius:6px;padding:4px 9px}
 .note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
@@ -1596,7 +1597,7 @@ function hubMock() {
     const uso = {}; for (const f of HUB_FERR) uso[f] = 0;
     for (const d of dias) { const n = 1 + Math.floor(rnd() * 3); for (let k = 0; k < n; k++) uso[HUB_FERR[Math.floor(Math.pow(rnd(), 1.5) * HUB_FERR.length)]]++; }
     U.push({id: 1000 + i, nome: `${NOMES[Math.floor(rnd() * NOMES.length)]} ${SOBR[Math.floor(rnd() * SOBR.length)]}`, perfil, origem, plano: HUB_PLANOS[origem], uf: pick(HUB_UF),
-      criado: cr, primeiro: dias[0] || null, dias, minutosSessao: 4 + Math.round(engaj * 22), uso, onboarding: !nunca && rnd() < 0.55 + engaj * 0.4});
+      criado: cr, primeiro: dias[0] || null, dias, minutosSessao: 4 + Math.round(engaj * 22), uso});
   }
   HUB_CACHE = U.filter(u => u.criado <= TODAY);
   return HUB_CACHE;
@@ -1617,23 +1618,20 @@ function hubCompute(de, ate) {
   }
   const sessoes = base.filter(u => u.dias.some(inP));
   return {T, base, novos, ativosP, acessos, cnt, nDias, ativ, uso, st, ult,
-    tempoMedio: sessoes.length ? sessoes.reduce((a, u) => a + u.minutosSessao, 0) / sessoes.length : null,
-    onboarding: novos.filter(u => u.onboarding).length};
+    tempoMedio: sessoes.length ? sessoes.reduce((a, u) => a + u.minutosSessao, 0) / sessoes.length : null};
 }
 function viewMPHub() {
   const c = hubCompute(S.de, S.ate), [pd, pa] = prevRange(), p = hubCompute(pd, pa);
   let h = viewHead('Usuários MP HUB', `B2B - Análises · Central do Consultor (mphub.meupatrimonio.com) · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
   h += `<div class="hubwarn"><b>DADOS FICTÍCIOS</b>Esta aba é um esqueleto para validar com o responsável do MP HUB quais dados vamos receber. Todos os nomes e números abaixo são inventados e não representam usuários reais.</div>`;
   const pct = (a, b) => fP(pctOf(a, b));
-  h += '<div class="kpis">' + [
+  h += '<div class="kpis k4">' + [
     kpiCard({label: 'Novos usuários', cls: 'hero', v: fN(c.novos.length), sub: `cadastros no período · ${f1(c.novos.length / c.nDias)} por dia`, d: delta(c.novos.length, p.novos.length), tip: 'Contas criadas no MP HUB dentro do período (campo: data de cadastro)'}),
     kpiCard({label: 'Total de usuários', v: fN(c.base.length), sub: `base em ${fDay(c.T)}`, d: delta(c.base.length, p.base.length), tip: 'Todas as contas criadas até o fim do período'}),
     kpiCard({label: 'Ativos no período', v: fN(c.ativosP.length), sub: `${pct(c.ativosP.length, c.base.length)} da base acessou`, d: delta(c.ativosP.length, p.ativosP.length), tip: 'Usuários com pelo menos 1 acesso no período (campo: histórico de acessos)'}),
-    kpiCard({label: 'Ativos nos últimos 7 dias', v: fN(c.cnt.ativo7), sub: `${pct(c.cnt.ativo7, c.base.length)} da base`, d: delta(c.cnt.ativo7, p.cnt.ativo7), tip: 'Último acesso há até 7 dias, contado do fim do período'}),
     kpiCard({label: 'Taxa de ativação', v: pct(c.ativ, c.novos.length), sub: `${fN(c.ativ)} dos novos acessaram em até 7 dias`, d: delta(pctOf(c.ativ, c.novos.length), pctOf(p.ativ, p.novos.length), 1, fP), tip: 'Novos usuários que fizeram o 1º acesso em até 7 dias após o cadastro'}),
     kpiCard({label: 'Acessos no período', v: fN(c.acessos), sub: `${f1(c.ativosP.length ? c.acessos / c.ativosP.length : null)} por usuário ativo`, d: delta(c.acessos, p.acessos), tip: 'Dias com acesso, somados de todos os usuários (campo: log de sessões)'}),
     kpiCard({label: 'Tempo médio por sessão', v: c.tempoMedio == null ? '–' : `${f1(c.tempoMedio)}<small>min</small>`, sub: 'entre os ativos do período', d: delta(c.tempoMedio, p.tempoMedio, 1, x => f1(x) + ' min'), tip: 'Duração média das sessões (campo: início e fim de sessão)'}),
-    kpiCard({label: 'Onboarding completo', v: pct(c.onboarding, c.novos.length), sub: `${fN(c.onboarding)} dos novos concluíram`, d: delta(pctOf(c.onboarding, c.novos.length), pctOf(p.onboarding, p.novos.length), 1, fP), tip: 'Novos usuários que completaram o cadastro/onboarding (campo: etapa do onboarding)'}),
     kpiCard({label: 'Nunca acessaram', cls: c.cnt.nunca ? 'red' : '', v: fN(c.cnt.nunca), sub: `${pct(c.cnt.nunca, c.base.length)} da base`, d: delta(c.cnt.nunca, p.cnt.nunca, -1), tip: 'Contas criadas sem nenhum acesso registrado'}),
     kpiCard({label: 'Inativos há +30 dias', cls: 'red', v: fN(c.cnt.inativo), sub: `${pct(c.cnt.inativo, c.base.length)} da base · risco de abandono`, d: delta(c.cnt.inativo, p.cnt.inativo, -1), tip: 'Já acessaram, mas o último acesso foi há mais de 30 dias'})
   ].join('') + '</div>';
@@ -1687,7 +1685,7 @@ function viewMPHub() {
       ['Empresa / escritório', 'texto', 'XYZ Investimentos', 'Agrupar usuários do mesmo escritório', 'não'], ['Cidade / UF', 'texto', 'São Paulo / SP', 'Distribuição geográfica', 'não']]],
     ['Cadastro e acesso', [['Data e hora do cadastro', 'data/hora', '15/10/2026 09:12', '<b>Novos usuários no período</b>', 'sim'], ['Origem do cadastro', 'lista', 'Assinante MP PRO', 'De onde vêm os usuários', 'sim'],
       ['Plano / tipo de acesso', 'lista', 'MP PRO, Formação, Gratuito', 'Separar pagantes de gratuitos', 'sim'], ['Status da conta', 'lista', 'ativa, bloqueada, excluída', 'Base válida', 'sim'],
-      ['Data do 1º acesso', 'data/hora', '15/10/2026 09:30', 'Taxa de ativação', 'sim'], ['Onboarding concluído', 'sim/não + data', 'sim, 16/10', 'Onboarding completo', 'não']]],
+      ['Data do 1º acesso', 'data/hora', '15/10/2026 09:30', 'Taxa de ativação', 'sim']]],
     ['Uso (log de sessões)', [['Sessões: usuário + início + fim', 'data/hora', '15/10 09:30 → 09:52', 'Ativos, acessos, tempo médio, retenção', 'sim'],
       ['Ferramenta acessada em cada sessão', 'lista', 'Tabela Periódica, Mapa de Calor', 'Ferramentas mais usadas', 'sim'], ['Ações-chave', 'evento', 'gerou relatório, baixou material', 'Engajamento real (além de entrar)', 'não'],
       ['Dispositivo', 'lista', 'desktop, celular', 'Prioridade de layout do HUB', 'não']]]
@@ -1700,7 +1698,7 @@ function viewMPHub() {
     <li><b>O HUB registra cada acesso/sessão</b> com data e hora? E qual ferramenta foi aberta? Sem isso não há ativos, retenção nem ferramentas mais usadas.</li>
     <li><b>Qual o critério de "usuário ativo"</b> para o time? (sugestão: acesso nos últimos 7 dias; 8 a 30 dias = em risco; +30 dias = inativo).</li>
     <li><b>O e-mail do cadastro é o mesmo da Kiwify?</b> Assim ligamos o usuário do HUB ao assinante do MP PRO / Formação e medimos uso × renovação.</li>
-    <li><b>Existe onboarding</b> com etapas registradas? E usuários de teste/internos que devemos excluir?</li>
+    <li><b>Existem usuários de teste/internos</b> que devemos excluir da contagem?</li>
     <li><b>LGPD:</b> o dashboard mostra só nome (sem e-mail/telefone) e fica atrás de senha; confirmar se isso atende à política do HUB.</li></ul></details>`;
   return h;
 }
