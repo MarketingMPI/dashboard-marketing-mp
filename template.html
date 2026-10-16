@@ -1818,7 +1818,7 @@ function igInsights(c, p) {
   if (c.engajamento_posts != null) out.push([c.engajamento_posts >= 3 ? 'pos' : 'inf', `Taxa de engajamento dos posts do período: <b>${fP(c.engajamento_posts)}</b> das contas alcançadas interagiram${p.engajamento_posts != null ? ` (anterior: ${fP(p.engajamento_posts)})` : ''}.`]);
   if (c.crescimento != null) out.push([c.crescimento >= 0 ? 'pos' : 'neg', `Seguidores: <b>${c.crescimento >= 0 ? '+' : ''}${fN(c.crescimento)}</b> no período (de ${fN(c.seguidores_inicio)} para ${fN(c.seguidores_fim)}).`]);
   else if (c.novos_seguidores != null) out.push(['inf', `<b>${fN(c.novos_seguidores)} novos seguidores</b> no período${c.novos_cobertura < 99.5 ? ' (a Meta só informa os últimos 30 dias)' : ''}.`]);
-  if (c.cliques_site) out.push(['inf', `${fN(c.cliques_site)} ${c.cliques_site === 1 ? 'clique' : 'cliques'} no link do site do perfil.`]);
+  if (c.cliques_site) out.push(['inf', `${fN(c.cliques_site)} ${c.cliques_site === 1 ? 'clique' : 'cliques'} no link da bio.`]);
   return out.slice(0, 7);
 }
 function viewInstagram() {
@@ -1840,7 +1840,7 @@ function viewInstagram() {
     row('Interações', c => c.interacoes) + row('Contas engajadas por dia', c => c.engajadas_medio_dia == null ? null : Math.round(c.engajadas_medio_dia * 10) / 10, f1) +
     row('Posts publicados', c => c.posts) + row('Visualizações por post', c => c.views_por_post == null ? null : Math.round(c.views_por_post)) +
     row('Taxa de engajamento dos posts', c => c.engajamento_posts, fP) + row('Novos seguidores', c => c.novos_seguidores, fN, 'A Meta só informa novos seguidores dos últimos 30 dias (* = período coberto só em parte; sem comparação quando o período anterior não está completo)', c => c.novos_cobertura >= 99.5 ? c.novos_seguidores : null) +
-    row('Cliques no site', c => c.cliques_site) + `</tbody></table></div></div>`;
+    row('Cliques no link da bio', c => c.cliques_site, fN, 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)') + `</tbody></table></div></div>`;
   // ---- um bloco por perfil
   const vw = document.getElementById('view').clientWidth || 900;
   for (const c of ig.contas) {
@@ -1858,7 +1858,7 @@ function viewInstagram() {
       kpiCard({label: 'Visualizações por post', v: fN(c.views_por_post == null ? null : Math.round(c.views_por_post)), sub: `${f1(c.interacoes_por_post)} interações por post`, d: igDelta(c.views_por_post, p.views_por_post, x => fN(Math.round(x))), tip: 'Média dos posts publicados no período (números de cada post até hoje)'}),
       kpiCard({label: 'Taxa de engajamento', v: fP(c.engajamento_posts), sub: 'interações ÷ alcance dos posts', d: igDelta(c.engajamento_posts, p.engajamento_posts, fP), tip: 'Soma das interações dos posts do período ÷ soma do alcance desses posts'}),
       kpiCard({label: 'Contas engajadas por dia', v: f1(c.engajadas_medio_dia), sub: 'média diária', d: igDelta(c.engajadas_medio_dia, p.engajadas_medio_dia, f1), tip: 'Contas que interagiram com o perfil, média por dia'}),
-      kpiCard({label: 'Cliques no perfil', v: fN(c.cliques_site + c.cliques_link), sub: `${fN(c.cliques_site)} no site · ${fN(c.cliques_link)} em links`, d: igDelta(c.cliques_site + c.cliques_link, (p.cliques_site || 0) + (p.cliques_link || 0)), tip: 'Toques no link do site e nos links do perfil'})
+      kpiCard({label: 'Cliques no link da bio', v: fN(c.cliques_site), sub: 'toques no link do perfil', d: igDelta(c.cliques_site, p.cliques_site), tip: 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)'})
     ].join('') + '</div>';
     const ins = igInsights(c, p);
     h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Visualizações e alcance por dia</h3><p>Barras = visualizações (eixo esquerdo) · linha = alcance do dia (eixo direito)</p></div>
