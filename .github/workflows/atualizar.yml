@@ -4,7 +4,7 @@ name: Atualizar dashboard
 # "Atualizar agora" do dashboard. Logs deste repositório são PÚBLICOS: o script não imprime dados.
 on:
   schedule:
-    - cron: "7,37 * * * *"
+    - cron: "- cron: "7 * * * *"
   workflow_dispatch:
 
 permissions:
