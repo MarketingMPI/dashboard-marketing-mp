@@ -831,6 +831,27 @@ def ig_payload(ig):
     return out
 
 
+PIPEDRIVE_INTERVALO_MIN = 60      # leads do Pipedrive: no máximo 1 leitura por hora (cota diária da API)
+
+
+def pipedrive_pular(full=False):
+    """Separa as atualizações: o agendamento de hora em hora lê o Pipedrive; publicações pedidas à mão
+    (botão "Atualizar agora", mudanças de layout, rodadas locais) só releem Meta, Kiwify e Instagram,
+    a não ser que a última leitura do Pipedrive tenha mais de 1 hora. PIPEDRIVE_FORCAR=1 força a leitura."""
+    if full or os.environ.get("PIPEDRIVE_FORCAR") == "1" or not CACHE.exists(): return False, ""
+    try:
+        cache = json.loads(CACHE.read_text(encoding="utf-8"))
+        idade = (datetime.now(timezone.utc) - parse_utc(cache["last_run"])).total_seconds() / 60
+    except Exception:
+        return False, ""
+    if not cache.get("per_deal"): return False, ""
+    agendado = os.environ.get("GITHUB_EVENT_NAME") == "schedule"
+    limite = 20 if agendado else PIPEDRIVE_INTERVALO_MIN - 5      # agendado: só evita leitura dupla
+    if idade < limite:
+        return True, f"última leitura há {idade:.0f} min (Pipedrive só de hora em hora)"
+    return False, ""
+
+
 def pipedrive_bloqueado():
     """1 chamada leve: se o Pipedrive já responde 429 (limite diário), não vale gastar 15 min em novas tentativas."""
     for tent in range(2):
@@ -849,9 +870,14 @@ def pipedrive_bloqueado():
 def collect(full=False):
     now = datetime.now(timezone.utc)
     erro_pd = None
+    pular, motivo = pipedrive_pular(full)
     try:
-        if CACHE.exists() and pipedrive_bloqueado(): raise RuntimeError("429 (sondagem)")
-        cache, n_changed, was_full = sync(full)
+        if pular:
+            cache = json.loads(CACHE.read_text(encoding="utf-8")); n_changed, was_full = 0, False
+            print("Pipedrive:", motivo, "— mantendo a leitura de", cache.get("last_run"))
+        else:
+            if CACHE.exists() and pipedrive_bloqueado(): raise RuntimeError("429 (sondagem)")
+            cache, n_changed, was_full = sync(full)
     except Exception as e:                     # Pipedrive fora/limite diário: segue com a última leitura boa
         if not CACHE.exists(): raise
         cache = json.loads(CACHE.read_text(encoding="utf-8"))
@@ -869,7 +895,8 @@ def collect(full=False):
             "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
-                     "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run")}}
+                     "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run"),
+                     "pipedrive_intervalo_min": PIPEDRIVE_INTERVALO_MIN}}
     tmp = SNAP.with_suffix(".tmp"); tmp.write_text(json.dumps(snap, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"); tmp.replace(SNAP)
     return snap
 

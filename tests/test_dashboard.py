@@ -95,6 +95,32 @@ class VeracidadeTests(unittest.TestCase):
                          ("2026-10-08T16:40:00", "B2C Base de Relacionamento"))
         self.assertIsNone(painel.moved_into_alpha(deal, [], {}))
 
+class PipedriveHoraEmHoraTests(unittest.TestCase):
+    """Publicações à mão não leem o Pipedrive se a última leitura tem menos de 1 hora; o agendamento lê."""
+    def _pular(self, minutos, evento):
+        import json, os, tempfile
+        from datetime import datetime, timedelta, timezone
+        d = tempfile.mkdtemp(); f = Path(d) / "c.json"
+        f.write_text(json.dumps({"per_deal": {"1": {}}, "last_run": (datetime.now(timezone.utc) - timedelta(minutes=minutos)).strftime("%Y-%m-%dT%H:%M:%SZ")}))
+        old, painel.CACHE = painel.CACHE, f
+        env = os.environ.get("GITHUB_EVENT_NAME")
+        try:
+            if evento: os.environ["GITHUB_EVENT_NAME"] = evento
+            else: os.environ.pop("GITHUB_EVENT_NAME", None)
+            return painel.pipedrive_pular()[0]
+        finally:
+            painel.CACHE = old
+            if env is None: os.environ.pop("GITHUB_EVENT_NAME", None)
+            else: os.environ["GITHUB_EVENT_NAME"] = env
+
+    def test_manual_reaproveita_leitura_recente(self):
+        self.assertTrue(self._pular(30, "workflow_dispatch"))
+        self.assertFalse(self._pular(70, "workflow_dispatch"))
+
+    def test_agendado_le_de_hora_em_hora(self):
+        self.assertFalse(self._pular(50, "schedule"))
+        self.assertTrue(self._pular(10, "schedule"))
+
 
 if __name__ == "__main__":
     unittest.main()
