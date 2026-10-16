@@ -694,7 +694,8 @@ IG_SEM_PERMISSAO = []                          # perfis visíveis no Business se
 IG_DESDE = "2026-01-01"
 IG_DIA = ["reach", "views", "accounts_engaged", "total_interactions", "likes", "comments", "shares", "saves", "reposts",
           "profile_links_taps", "website_clicks"]
-IG_BACKFILL_DIAS = int(os.environ.get("IG_BACKFILL", "120"))
+IG_ORG = ["views", "reach", "total_interactions", "likes", "comments", "shares", "saves"]   # aceitam breakdown=media_product_type
+IG_BACKFILL_DIAS = int(os.environ.get("IG_BACKFILL", "300"))
 IG_POSTS_POR_EXEC = int(os.environ.get("IG_POSTS", "150"))                         # dias novos por conta por execução (o resto entra nas próximas)
 
 
@@ -741,6 +742,7 @@ def sync_instagram(old):
     try:
         for cid, user, nome in IG_CONTAS:
             c = contas.setdefault(cid, {"dias": {}, "seg": {}, "novos": {}, "posts": {}})
+            c.setdefault("org", {})
             c["user"], c["nome"] = user, nome
             pf = ig_get(cid, tok, uso, fields="followers_count,follows_count,media_count")
             c["seguidores"], c["seguindo"], c["midias"] = pf.get("followers_count"), pf.get("follows_count"), pf.get("media_count")
@@ -755,21 +757,32 @@ def sync_instagram(old):
             alvo, d = [], hoje
             while d.isoformat() >= IG_DESDE:
                 k = d.isoformat()
-                if (hoje - d).days <= 2 or k not in c["dias"]: alvo.append(k)
+                if (hoje - d).days <= 2 or k not in c["dias"] or k not in c["org"]: alvo.append(k)
                 d -= timedelta(days=1)
             recentes = [k for k in alvo if (hoje - datetime.fromisoformat(k).date()).days <= 2]
             alvo = recentes + [k for k in alvo if k not in recentes][:IG_BACKFILL_DIAS]
 
             def um_dia(k):
                 fim = min(_meia_noite((datetime.fromisoformat(k) + timedelta(days=1)).date().isoformat()), int(agora.timestamp()))
-                r = ig_get(f"{cid}/insights", tok, uso, metric=",".join(IG_DIA), period="day", metric_type="total_value",
-                           since=_meia_noite(k), until=fim)
-                vals = {x["name"]: (x.get("total_value") or {}).get("value") for x in r.get("data") or []}
-                return k, [vals.get(m) for m in IG_DIA]
+                if k in c["dias"] and (hoje - datetime.fromisoformat(k).date()).days > 2:
+                    vals = dict(zip(IG_DIA, c["dias"][k]))          # totais já lidos; falta só a separação orgânico × anúncio
+                else:
+                    r = ig_get(f"{cid}/insights", tok, uso, metric=",".join(IG_DIA), period="day", metric_type="total_value",
+                               since=_meia_noite(k), until=fim)
+                    vals = {x["name"]: (x.get("total_value") or {}).get("value") for x in r.get("data") or []}
+                # mesma janela quebrada por tipo de conteúdo: o balde "AD" é o que veio de anúncio pago
+                o = ig_get(f"{cid}/insights", tok, uso, metric=",".join(IG_ORG), period="day", metric_type="total_value",
+                           breakdown="media_product_type", since=_meia_noite(k), until=fim)
+                org = {}
+                for x in o.get("data") or []:
+                    tv = x.get("total_value") or {}
+                    org[x["name"]] = {"_total": tv.get("value"), **{y["dimension_values"][0]: y["value"]
+                                      for b in tv.get("breakdowns") or [] for y in b.get("results") or []}}
+                return k, [vals.get(m) for m in IG_DIA], org
             for i0 in range(0, len(alvo), 24):          # lotes de 24 dias, 6 chamadas simultâneas; para se a Meta apertar
                 if uso[0] > 70 and i0: break
                 with ThreadPoolExecutor(6) as ex:
-                    for k, v in ex.map(um_dia, alvo[i0:i0 + 24]): c["dias"][k] = v
+                    for k, v, org in ex.map(um_dia, alvo[i0:i0 + 24]): c["dias"][k] = v; c["org"][k] = org
             # posts (feed e reels) desde IG_DESDE
             after, fim_lista = None, False
             while not fim_lista:
@@ -818,7 +831,21 @@ def ig_payload(ig):
     for cid, user, nome in IG_CONTAS:
         c = ((ig or {}).get("contas") or {}).get(cid)
         if not c: continue
-        dias = [[k] + list(v) + [c["novos"].get(k)] for k, v in sorted(c["dias"].items())]
+        dias = []
+        for k, v in sorted(c["dias"].items()):
+            org = (c.get("org") or {}).get(k)
+            linha = [k] + list(v) + [c["novos"].get(k)]
+            if org is None:
+                linha += [None] * 9
+            else:
+                def organico(m):
+                    b = org.get(m) or {}
+                    if m == "reach":      # alcance não soma: alcance orgânico ≈ soma dos tipos não pagos, limitada ao total
+                        n = sum(val for t, val in b.items() if t not in ("AD", "_total"))
+                        return min(n, b.get("_total") or n)
+                    return (b.get("_total") or 0) - (b.get("AD") or 0)
+                linha += [organico(m) for m in IG_ORG] + [(org.get("views") or {}).get("STORY") or 0, (org.get("views") or {}).get("AD") or 0]
+            dias.append(linha)
         posts = []
         for mid, po in sorted(c["posts"].items(), key=lambda x: x[1]["ts"]):
             i = po.get("ins") or {}

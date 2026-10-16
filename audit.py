@@ -428,7 +428,7 @@ def mppro(MP, f, agora_day):
 
 # ----------------------------------------------------------------------------- Instagram
 IG = None   # D["ig"]
-IGD = dict(reach=1, views=2, engaged=3, inter=4, likes=5, comments=6, shares=7, saves=8, reposts=9, link=10, web=11, novos=12)
+IGD = dict(reach=14, views=13, inter=15, likes=16, comments=17, shares=18, saves=19, story=20, ads_views=21, link=10, web=11, novos=12)
 
 
 def instagram(IGP, f, agora_day):
@@ -439,7 +439,7 @@ def instagram(IGP, f, agora_day):
     n_dias = None if de == "0000-00-00" else (_d(T) - _d(de)).days + 1
     contas = []
     for c in IGP["contas"]:
-        ds = [r for r in c["dias"] if inP(r[0])]
+        ds = [r for r in c["dias"] if inP(r[0]) and r[IGD["views"]] is not None]
         soma = lambda k: sum(r[IGD[k]] or 0 for r in ds)
         def media(k):
             v = [r[IGD[k]] for r in ds if r[IGD[k]] is not None]
@@ -465,8 +465,8 @@ def instagram(IGP, f, agora_day):
             "id": c["id"], "user": c["user"], "nome": c["nome"], "seguidores_hoje": c["seguidores"],
             "dias_com_dados": len(ds), "dias_periodo": n_dias,
             "views": soma("views"), "interacoes": soma("inter"), "curtidas": soma("likes"), "comentarios": soma("comments"),
-            "compartilhamentos": soma("shares"), "salvamentos": soma("saves"), "reposts": soma("reposts"), "cliques_link": soma("link"),
-            "cliques_site": soma("web"), "alcance_medio_dia": media("reach"), "engajadas_medio_dia": media("engaged"),
+            "compartilhamentos": soma("shares"), "salvamentos": soma("saves"), "cliques_link": soma("link"),
+            "cliques_site": soma("web"), "views_stories": soma("story"), "views_anuncios": soma("ads_views"), "alcance_medio_dia": media("reach"),
             "novos_seguidores": sum(r[IGD["novos"]] for r in nv) if nv else None,
             "novos_cobertura": len(nv) / len(ds) * 100 if ds else None,
             "seguidores_inicio": seg_ini, "seguidores_fim": seg_fim,
