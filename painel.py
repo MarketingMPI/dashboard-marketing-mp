@@ -894,6 +894,45 @@ def pipedrive_bloqueado():
     return True
 
 
+# ---------------------------------------------------------------- MP HUB (usuários) — fotografia importada à mão
+# A API do MP HUB exige login com código por e-mail, então a coleta é feita no navegador logado e importada com
+# `python painel.py mphub-import <arquivo.json>`. O arquivo vai CIFRADO (PAINEL_SENHA) para fontes/mphub.enc.json;
+# só entram campos sem dado de contato (nada de e-mail, telefone ou IP).
+MPHUB_ENC = ROOT / "fontes" / "mphub.enc.json"
+MPHUB_CAMPOS = ["id", "nome", "role", "company_nome", "office_nome", "created_at", "last_login_at", "last_login_device",
+                "last_login_browser", "cidade", "uf", "perfil_profissional", "instituicao", "pl_aproximado", "tempo_mercado_anos"]
+
+
+def mphub_import(arq):
+    d = json.loads(pathlib.Path(arq).read_text(encoding="utf-8"))
+    us = [{k: u.get(k) for k in MPHUB_CAMPOS} for u in d["usuarios"]]
+    out = {"extraido_em": d["extraido_em"], "usuarios": us, "acessos_24h": d.get("acessos_24h") or []}
+    MPHUB_ENC.parent.mkdir(exist_ok=True)
+    MPHUB_ENC.write_bytes(crypt("enc", json.dumps(out, ensure_ascii=False).encode("utf-8")))
+    return len(us)
+
+
+def _brt(ts):
+    if not ts: return None
+    return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(BRT).strftime("%Y-%m-%dT%H:%M")
+
+
+def mphub_payload():
+    if not MPHUB_ENC.exists(): return None
+    try:
+        d = json.loads(crypt("dec", MPHUB_ENC.read_bytes()))
+    except Exception:
+        return {"erro": "não foi possível ler a fotografia do MP HUB", "usuarios": []}
+    us = []
+    for u in d["usuarios"]:
+        pl = u.get("pl_aproximado")
+        us.append([u["id"], sem_pii(u.get("nome") or ""), u.get("role"), u.get("company_nome") or u.get("office_nome"),
+                   _brt(u.get("created_at")), _brt(u.get("last_login_at")), u.get("last_login_device"), u.get("cidade"),
+                   (u.get("uf") or "").upper() or None, u.get("perfil_profissional"), float(pl) if pl not in (None, "") else None,
+                   u.get("tempo_mercado_anos"), u.get("office_nome")])
+    return {"extraido_em": _brt(d["extraido_em"]), "usuarios": us, "acessos_24h": d.get("acessos_24h") or []}
+
+
 def collect(full=False):
     now = datetime.now(timezone.utc)
     erro_pd = None
@@ -919,7 +958,7 @@ def collect(full=False):
     tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]),
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]), "mphub": mphub_payload(),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
                      "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run"),
@@ -1084,6 +1123,7 @@ if __name__ == "__main__":
     if cmd == "ci": ci()
     elif cmd == "collect": print(stable_summary(collect(full="--full" in sys.argv)))
     elif cmd == "pages": build_pages(); print("ok", OUT)
+    elif cmd == "mphub-import": print("ok", mphub_import(sys.argv[2]), "usuários")
     elif cmd == "dev": print("ok", build_dev(sys.argv[2] if len(sys.argv) > 2 else None))
     elif cmd in ("refresh", "publish"): refresh()
     else: sys.exit(__doc__)

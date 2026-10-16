@@ -1627,155 +1627,117 @@ function viewMPPro() {
   return h;
 }
 
-/* ---- Usuários MP HUB (B2B) — ESQUELETO COM DADOS FICTÍCIOS ----
-   Nada aqui vem de fonte real: a base é gerada por um sorteador com semente fixa, só para validar o layout
-   e a lista de dados com o responsável do MP HUB. Quando houver a fonte real, troca-se hubMock() pelo payload. */
-const HUB_FERR = ['Tabela Periódica', 'Mapa de Calor', 'Simuladores', 'Biblioteca de conteúdos', 'Relatórios para clientes'];
-const HUB_PERFIS = [['Consultor', 40], ['Assessor', 22], ['Planejador', 16], ['Gestor', 9], ['Estudante', 13]];
-const HUB_ORIG = [['MP PRO', 46], ['Formação', 18], ['Convite', 14], ['Site', 22]];
-const HUB_PLANOS = {'MP PRO': 'MP PRO', 'Formação': 'Formação', 'Convite': 'Gratuito', 'Site': 'Gratuito'};
-const HUB_UF = [['SP', 34], ['MG', 13], ['RJ', 12], ['PR', 9], ['SC', 7], ['RS', 7], ['DF', 5], ['GO', 4], ['BA', 4], ['Outros', 5]];
-let HUB_CACHE = null;
-function hubMock() {
-  if (HUB_CACHE) return HUB_CACHE;
-  let seed = 20261015;
-  const rnd = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
-  const pick = arr => { const t = arr.reduce((a, x) => a + x[1], 0); let r = rnd() * t; for (const [v, w] of arr) { r -= w; if (r <= 0) return v; } return arr[0][0]; };
-  const NOMES = ['Ana', 'Bruno', 'Carla', 'Diego', 'Eduarda', 'Felipe', 'Gabriela', 'Henrique', 'Isabela', 'João', 'Larissa', 'Marcelo', 'Natália', 'Otávio', 'Paula', 'Rafael', 'Sabrina', 'Thiago', 'Vanessa', 'William'];
-  const SOBR = ['Almeida', 'Barbosa', 'Cardoso', 'Duarte', 'Esteves', 'Freitas', 'Gomes', 'Hartmann', 'Lima', 'Moraes', 'Nogueira', 'Pacheco', 'Queiroz', 'Ribeiro', 'Siqueira', 'Teixeira'];
-  const ini = '2026-03-01', hoje = TODAY, span = diffDays(ini, hoje);
-  const U = [];
-  for (let i = 0; i < 168; i++) {
-    const cr = addDays(ini, Math.floor(Math.pow(rnd(), 0.62) * span));   // mais cadastros recentes
-    const perfil = pick(HUB_PERFIS), origem = pick(HUB_ORIG), engaj = rnd();
-    const nunca = rnd() < 0.12;
-    const p1 = nunca ? null : addDays(cr, rnd() < 0.7 ? 0 : Math.floor(rnd() * 12));
-    const dias = [];
-    if (p1 && p1 <= hoje) {
-      const ritmo = 0.03 + engaj * 0.5, aband = rnd() < 0.3 ? addDays(p1, 10 + Math.floor(rnd() * 60)) : '9999-12-31';
-      for (let d = p1; d <= hoje && d <= aband; d = addDays(d, 1)) if (d === p1 || rnd() < ritmo) dias.push(d);
-    }
-    const uso = {}; for (const f of HUB_FERR) uso[f] = 0;
-    for (const d of dias) { const n = 1 + Math.floor(rnd() * 3); for (let k = 0; k < n; k++) uso[HUB_FERR[Math.floor(Math.pow(rnd(), 1.5) * HUB_FERR.length)]]++; }
-    U.push({id: 1000 + i, nome: `${NOMES[Math.floor(rnd() * NOMES.length)]} ${SOBR[Math.floor(rnd() * SOBR.length)]}`, perfil, origem, plano: HUB_PLANOS[origem], uf: pick(HUB_UF),
-      criado: cr, primeiro: dias[0] || null, dias, minutosSessao: 4 + Math.round(engaj * 22), uso});
-  }
-  HUB_CACHE = U.filter(u => u.criado <= TODAY);
-  return HUB_CACHE;
-}
-function hubHora(u, d) {
-  let x = (u.id * 2654435761 + tms(d) / DAY * 40503) % 1000003; x = Math.abs(Math.round(x));
-  let min = 7 * 60 + x % (15 * 60);                       // entre 07:00 e 21:59
-  if (d === TODAY) { const lim = +AGORA_STR.slice(11, 13) * 60 + +AGORA_STR.slice(14, 16); if (min > lim) min = Math.max(0, lim - (x % 90)); }
-  return `${d}T${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-}
-function hubHa(ts) {
-  const m = Math.max(0, Math.round((tms(AGORA_STR) - tms(ts)) / 60000));
+/* ---- Usuários MP HUB (B2B) — DADOS REAIS (fotografia importada do painel admin do MP HUB) ----
+   D.mphub.usuarios[i] = [id, nome, role, empresa, criado(BRT), ultimo_acesso(BRT|null), dispositivo, cidade, uf, perfil, pl, anos_mercado, escritorio]
+   O HUB guarda só o ÚLTIMO acesso de cada usuário (sem histórico nem duração): situação/ativos são medidos na data
+   da fotografia; "acessaram no período" só é exato quando o período termina na data da fotografia ou depois. */
+const HU = {id: 0, nome: 1, role: 2, emp: 3, criado: 4, ult: 5, disp: 6, cid: 7, uf: 8, perfil: 9, pl: 10, anos: 11};
+const HUB_ROLE = {viewer: 'Visualizador', admin: 'Admin', master: 'Master', consultor: 'Consultor', gestor_company: 'Gestor da empresa'};
+const HUB_PERFIL = {consultor: 'Consultor', consultor_investimento: 'Consultor de investimentos', especialista_investimentos: 'Especialista em investimentos',
+  assessor_investimento: 'Assessor de investimentos', assessor: 'Assessor', gerente_banco: 'Gerente de banco', bancario: 'Bancário', back_office: 'Back office',
+  nao_atuo: 'Não atua no mercado', outro: 'Outro'};
+const hubPerfil = v => !v ? 'Não informado' : HUB_PERFIL[v] || v;
+const hubPL = v => v == null || v <= 0 ? 'Não tem carteira / não informou' : v < 1e6 ? 'Abaixo de R$ 1 mi' : v <= 1e7 ? 'R$ 1 mi a R$ 10 mi' : v <= 5e7 ? 'R$ 10 mi a R$ 50 mi' : v <= 1e8 ? 'R$ 50 mi a R$ 100 mi' : 'Acima de R$ 100 mi';
+const HUB_PL_ORD = ['Não tem carteira / não informou', 'Abaixo de R$ 1 mi', 'R$ 1 mi a R$ 10 mi', 'R$ 10 mi a R$ 50 mi', 'R$ 50 mi a R$ 100 mi', 'Acima de R$ 100 mi'];
+const hubAnos = v => v == null || v === '' ? 'Não informado' : +v <= 2 ? 'Até 2 anos' : +v <= 5 ? '3 a 5 anos' : +v <= 10 ? '6 a 10 anos' : +v <= 20 ? '11 a 20 anos' : 'Mais de 20 anos';
+const HUB_ANOS_ORD = ['Até 2 anos', '3 a 5 anos', '6 a 10 anos', '11 a 20 anos', 'Mais de 20 anos', 'Não informado'];
+function hubHa(ts, ref) {
+  const m = Math.max(0, Math.round((tms(ref) - tms(ts)) / 60000));
   return m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} ${Math.round(m / 1440) === 1 ? 'dia' : 'dias'}`;
 }
-function hubCompute(de, ate) {
-  const U = hubMock(), T = ate < TODAY ? ate : TODAY, inP = d => d >= de && d <= ate;
-  const base = U.filter(u => u.criado <= T), novos = U.filter(u => inP(u.criado));
-  const ativosP = base.filter(u => u.dias.some(inP)), acessos = base.reduce((a, u) => a + u.dias.filter(inP).length, 0);
-  const ult = u => { let x = null; for (const d of u.dias) if (d <= T) x = d; return x; };
-  const st = u => { const l = ult(u); if (!l) return 'nunca'; const g = diffDays(l, T); return g <= 7 ? 'ativo7' : g <= 30 ? 'ativo30' : 'inativo'; };
+function hubCompute(H, de, ate) {
+  const U = H.usuarios, SD = H.extraido_em.slice(0, 10), T = ate < TODAY ? ate : TODAY, inP = d => d >= de && d <= ate;
+  const base = U.filter(u => u[HU.criado].slice(0, 10) <= T), novos = U.filter(u => inP(u[HU.criado].slice(0, 10)));
+  const exato = T >= SD;                       // o período alcança a data da fotografia
+  const acessaram = exato ? base.filter(u => u[HU.ult] && u[HU.ult].slice(0, 10) >= de) : null;
+  const st = u => { const l = u[HU.ult]; if (!l) return 'nunca'; const g = diffDays(l.slice(0, 10), SD); return g <= 7 ? 'ativo7' : g <= 30 ? 'ativo30' : 'inativo'; };
   const cnt = {nunca: 0, ativo7: 0, ativo30: 0, inativo: 0}; for (const u of base) cnt[st(u)]++;
-  const nDias = diffDays(de, T) + 1;
-  const ativ = novos.filter(u => u.primeiro && diffDays(u.criado, u.primeiro) <= 7).length;
-  const uso = {}; for (const f of HUB_FERR) uso[f] = {acessos: 0, usuarios: 0};
-  for (const u of base) { /* uso no período ~ proporcional aos acessos no período */
-    const k = u.dias.filter(inP).length, tot = u.dias.length || 1;
-    for (const f of HUB_FERR) { const v = Math.round(u.uso[f] * k / tot); uso[f].acessos += v; if (v) uso[f].usuarios++; }
-  }
-  const sessoes = base.filter(u => u.dias.some(inP));
-  return {T, base, novos, ativosP, acessos, cnt, nDias, ativ, uso, st, ult,
-    tempoMedio: sessoes.length ? sessoes.reduce((a, u) => a + u.minutosSessao, 0) / sessoes.length : null};
+  return {T, SD, base, novos, exato, acessaram, st, cnt, nDias: diffDays(de, T) + 1, novosAcessaram: novos.filter(u => u[HU.ult]).length};
 }
 function viewMPHub() {
-  const c = hubCompute(S.de, S.ate), [pd, pa] = prevRange(), p = hubCompute(pd, pa);
+  const H = D.mphub;
   let h = viewHead('Usuários MP HUB', `B2B - Análises · Central do Consultor (mphub.meupatrimonio.com) · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
-  h += `<div class="hubwarn"><b>DADOS FICTÍCIOS</b>Esta aba é um esqueleto para validar com o responsável do MP HUB quais dados vamos receber. Todos os nomes e números abaixo são inventados e não representam usuários reais.</div>`;
-  const pct = (a, b) => fP(pctOf(a, b));
+  if (!H || !H.usuarios || !H.usuarios.length) return h + `<div class="card">${emptyBox('Dados do MP HUB indisponíveis', H && H.erro ? H.erro : 'Nenhuma fotografia do MP HUB foi importada ainda.')}</div>`;
+  const c = hubCompute(H, S.de, S.ate), [pd, pa] = prevRange(), p = hubCompute(H, pd, pa), pct = (a, b) => fP(pctOf(a, b));
+  const snap = `${fDay(H.extraido_em.slice(0, 10))} às ${H.extraido_em.slice(11, 16)}`;
+  h += `<div class="note">Dados reais do painel administrativo do MP HUB, extraídos em <b>${snap}</b> (atualização manual). O MP HUB registra só o <b>último acesso</b> de cada usuário: situação e ativos são medidos nessa data.</div>`;
+  const log24 = (H.acessos_24h || []).reduce((a, x) => a + (x.total || 0), 0);
   h += '<div class="kpis k4">' + [
-    kpiCard({label: 'Novos usuários', cls: 'hero', v: fN(c.novos.length), sub: `cadastros no período · ${f1(c.novos.length / c.nDias)} por dia`, d: delta(c.novos.length, p.novos.length), tip: 'Contas criadas no MP HUB dentro do período (campo: data de cadastro)'}),
+    kpiCard({label: 'Novos usuários', cls: 'hero', v: fN(c.novos.length), sub: `cadastros no período · ${f1(c.novos.length / c.nDias)} por dia`, d: delta(c.novos.length, p.novos.length), tip: 'Contas criadas no MP HUB dentro do período (data de cadastro)'}),
     kpiCard({label: 'Total de usuários', v: fN(c.base.length), sub: `base em ${fDay(c.T)}`, d: delta(c.base.length, p.base.length), tip: 'Todas as contas criadas até o fim do período'}),
-    kpiCard({label: 'Ativos no período', v: fN(c.ativosP.length), sub: `${pct(c.ativosP.length, c.base.length)} da base acessou`, d: delta(c.ativosP.length, p.ativosP.length), tip: 'Usuários com pelo menos 1 acesso no período (campo: histórico de acessos)'}),
-    kpiCard({label: 'Taxa de ativação', v: pct(c.ativ, c.novos.length), sub: `${fN(c.ativ)} dos novos acessaram em até 7 dias`, d: delta(pctOf(c.ativ, c.novos.length), pctOf(p.ativ, p.novos.length), 1, fP), tip: 'Novos usuários que fizeram o 1º acesso em até 7 dias após o cadastro'}),
-    kpiCard({label: 'Acessos no período', v: fN(c.acessos), sub: `${f1(c.ativosP.length ? c.acessos / c.ativosP.length : null)} por usuário ativo`, d: delta(c.acessos, p.acessos), tip: 'Dias com acesso, somados de todos os usuários (campo: log de sessões)'}),
-    kpiCard({label: 'Tempo médio por sessão', v: c.tempoMedio == null ? '–' : `${f1(c.tempoMedio)}<small>min</small>`, sub: 'entre os ativos do período', d: delta(c.tempoMedio, p.tempoMedio, 1, x => f1(x) + ' min'), tip: 'Duração média das sessões (campo: início e fim de sessão)'}),
-    kpiCard({label: 'Nunca acessaram', cls: c.cnt.nunca ? 'red' : '', v: fN(c.cnt.nunca), sub: `${pct(c.cnt.nunca, c.base.length)} da base`, d: delta(c.cnt.nunca, p.cnt.nunca, -1), tip: 'Contas criadas sem nenhum acesso registrado'}),
-    kpiCard({label: 'Inativos há +30 dias', cls: 'red', v: fN(c.cnt.inativo), sub: `${pct(c.cnt.inativo, c.base.length)} da base · risco de abandono`, d: delta(c.cnt.inativo, p.cnt.inativo, -1), tip: 'Já acessaram, mas o último acesso foi há mais de 30 dias'})
+    kpiCard({label: 'Acessaram no período', v: c.exato ? fN(c.acessaram.length) : '–', sub: c.exato ? `${pct(c.acessaram.length, c.base.length)} da base` : `só para períodos até ${fDay(c.SD)}`, tip: 'Usuários cujo último acesso cai dentro do período. Exato quando o período termina na data da fotografia (o HUB não guarda acessos anteriores ao último).'}),
+    kpiCard({label: 'Ativos nos últimos 7 dias', v: fN(c.cnt.ativo7), sub: `${pct(c.cnt.ativo7, c.base.length)} da base · em ${fDM(c.SD)}`, tip: 'Último acesso até 7 dias antes da fotografia'}),
+    kpiCard({label: 'Logins nas últimas 24h', v: fN(log24), sub: `até ${snap}`, tip: 'Logins por hora informados pelo MP HUB nas 24 horas anteriores à fotografia'}),
+    kpiCard({label: 'Novos que já acessaram', v: c.novos.length ? pct(c.novosAcessaram, c.novos.length) : '–', sub: `${fN(c.novosAcessaram)} de ${fN(c.novos.length)} novos do período`, d: c.novos.length && p.novos.length ? delta(pctOf(c.novosAcessaram, c.novos.length), pctOf(p.novosAcessaram, p.novos.length), 1, fP) : '', tip: 'Novos usuários do período com pelo menos um login registrado'}),
+    kpiCard({label: 'Nunca acessaram', cls: c.cnt.nunca ? 'red' : '', v: fN(c.cnt.nunca), sub: `${pct(c.cnt.nunca, c.base.length)} da base`, tip: 'Contas criadas sem nenhum login registrado'}),
+    kpiCard({label: 'Inativos há +30 dias', cls: 'red', v: fN(c.cnt.inativo), sub: `${pct(c.cnt.inativo, c.base.length)} da base · risco de abandono`, tip: 'Já acessaram, mas o último acesso foi há mais de 30 dias (na data da fotografia)'})
   ].join('') + '</div>';
-  // gráfico: novos por dia/semana/mês
+  // gráfico: novos por dia/semana/mês + base acumulada
   const n = c.nDias, mode = n <= 62 ? 'dia' : n <= 420 ? 'semana' : 'mes', monday = d => addDays(d, -((weekday(d) + 6) % 7));
   const key = d => mode === 'dia' ? d : mode === 'semana' ? monday(d) : d.slice(0, 7);
   const bins = new Map();
-  for (let d = S.de; d <= c.T; d = addDays(d, 1)) { const k = key(d); if (!bins.has(k)) bins.set(k, {k, from: d, to: d, novos: 0, ativos: new Set()}); bins.get(k).to = d; }
-  for (const u of c.novos) { const b = bins.get(key(u.criado)); if (b) b.novos++; }
-  for (const u of c.base) for (const d of u.dias) { if (d < S.de || d > c.T) continue; const b = bins.get(key(d)); if (b) b.ativos.add(u.id); }
-  const bs = [...bins.values()], vw = document.getElementById('view').clientWidth || 900, W = Math.max(300, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44), H = 260, pl = 34, pr = 34, pt = 18, pb = 30, pw = W - pl - pr, ph = H - pt - pb;
-  const mx = niceMax(Math.max(1, ...bs.map(b => b.novos))), ma = niceMax(Math.max(1, ...bs.map(b => b.ativos.size))), bw = pw / Math.max(1, bs.length), w = Math.max(1.5, Math.min(bw * .62, 40));
+  for (let d = S.de; d <= c.T; d = addDays(d, 1)) { const k = key(d); if (!bins.has(k)) bins.set(k, {k, from: d, to: d, novos: 0, base: 0}); bins.get(k).to = d; }
+  for (const u of c.novos) { const b = bins.get(key(u[HU.criado].slice(0, 10))); if (b) b.novos++; }
+  for (const b of bins.values()) b.base = H.usuarios.filter(u => u[HU.criado].slice(0, 10) <= b.to).length;
+  const bs = [...bins.values()], vw = document.getElementById('view').clientWidth || 900, W = Math.max(300, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44), Hh = 260, pl = 34, pr = 34, pt = 18, pb = 30, pw = W - pl - pr, ph = Hh - pt - pb;
+  const mx = niceMax(Math.max(1, ...bs.map(b => b.novos))), ma = niceMax(Math.max(1, ...bs.map(b => b.base))), bw = pw / Math.max(1, bs.length), w = Math.max(1.5, Math.min(bw * .62, 40));
   let g = ''; const y = v => pt + ph - ph * v / mx, ya = v => pt + ph - ph * v / ma;
   for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mx * i / 4)}</text><text class="ax" x="${W - pr + 6}" y="${yy + 3.5}" style="fill:#a8701c">${fN(ma * i / 4)}</text>`; }
   const step = Math.max(1, Math.ceil(bs.length / Math.max(1, Math.floor(pw / 48)))), pts = [];
   bs.forEach((b, i) => {
     const cx = pl + i * bw + bw / 2;
     if (b.novos) g += `<rect class="bar" x="${cx - w / 2}" y="${y(b.novos)}" width="${w}" height="${y(0) - y(b.novos)}" fill="#00503c" rx="${Math.min(3, w / 4)}"/>`;
-    pts.push(`${cx},${ya(b.ativos.size)}`);
-    if (i % step === 0) g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${mode === 'mes' ? MESN(b.k) : fDM(b.from)}</text>`;
-    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)}\nNovos usuários: ${b.novos}\nUsuários ativos: ${b.ativos.size}\n(dados fictícios)`)}" data-range="${b.from}|${b.to}"/>`;
+    pts.push(`${cx},${ya(b.base)}`);
+    if (i % step === 0) g += `<text class="ax" x="${cx}" y="${Hh - pb + 16}" text-anchor="middle">${mode === 'mes' ? MESN(b.k) : fDM(b.from)}</text>`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)}\nNovos usuários: ${b.novos}\nTotal de usuários: ${b.base}`)}" data-range="${b.from}|${b.to}"/>`;
   });
   g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#c98a1b" stroke-width="2" stroke-linejoin="round"/>`;
-  const chart = `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg></div>`;
+  const chart = `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}">${g}</svg></div>`;
   const situ = [['Ativos (até 7 dias)', c.cnt.ativo7, '#00503c'], ['Ativos (8 a 30 dias)', c.cnt.ativo30, '#7db59c'], ['Inativos (+30 dias)', c.cnt.inativo, '#e0b4ad'], ['Nunca acessaram', c.cnt.nunca, '#d5ddd9']];
-  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Novos usuários × usuários ativos</h3><p>Agrupado por ${mode} · barras = novos (eixo esquerdo) · linha = ativos (eixo direito)</p></div>
-      <div class="lg"><span><i style="background:#00503c"></i>Novos</span><span><i style="background:#c98a1b"></i>Ativos</span></div></div>${chart}</div>
-    <div class="card"><div class="ch"><div><h3>Situação da base</h3><p>Pelo último acesso, em ${fDay(c.T)}</p></div></div>${columns(situ.map(([label, v, cc]) => ({label, v, c: cc, tip: `${label}\n${fN(v)} usuários (${pct(v, c.base.length)})`})))}</div></div>`;
-  const dist = (campo, lista) => { const m = new Map(lista.map(([k]) => [k, {v: 0, v2: 0}])); for (const u of c.base) { const x = m.get(u[campo]) || {v: 0, v2: 0}; c.ativosP.includes(u) ? x.v++ : x.v2++; m.set(u[campo], x); }
-    return hbars([...m].filter(([, x]) => x.v + x.v2).sort((a, b) => (b[1].v + b[1].v2) - (a[1].v + a[1].v2)).map(([k, x]) => ({key: k, label: k, v: x.v, v2: x.v2, extra: pct(x.v + x.v2, c.base.length), tip: `${k}\nUsuários: ${x.v + x.v2}\nAtivos no período: ${x.v}`}))); };
-  h += `<div class="g g3 mt"><div class="card"><div class="ch"><div><h3>Por perfil profissional</h3><p>Verde = ativos no período · cinza = sem acesso</p></div></div>${dist('perfil', HUB_PERFIS)}</div>
-    <div class="card"><div class="ch"><div><h3>Por origem do cadastro</h3><p>Assinante MP PRO, aluno da Formação, convite ou cadastro no site</p></div></div>${dist('origem', HUB_ORIG)}</div>
-    <div class="card"><div class="ch"><div><h3>Por estado</h3><p>UF informada no cadastro</p></div></div>${dist('uf', HUB_UF)}</div></div>`;
-  const fer = HUB_FERR.map(f => ({label: f, v: c.uso[f].acessos, extra: `${c.uso[f].usuarios} usuários`, tip: `${f}\nUsos no período: ${fN(c.uso[f].acessos)}\nUsuários diferentes: ${c.uso[f].usuarios}`})).sort((a, b) => b.v - a.v);
-  // coortes de retenção (mês de cadastro → % com acesso nos últimos 30 dias)
-  const coh = new Map(); for (const u of c.base) { const k = u.criado.slice(0, 7); const x = coh.get(k) || {n: 0, a: 0}; x.n++; const l = c.ult(u); if (l && diffDays(l, c.T) <= 30) x.a++; coh.set(k, x); }
+  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Novos usuários × total da base</h3><p>Agrupado por ${mode} · barras = novos (eixo esquerdo) · linha = total de usuários (eixo direito)</p></div>
+      <div class="lg"><span><i style="background:#00503c"></i>Novos</span><span><i style="background:#c98a1b"></i>Total</span></div></div>${chart}</div>
+    <div class="card"><div class="ch"><div><h3>Situação da base</h3><p>Pelo último acesso, em ${fDay(c.SD)}</p></div></div>${columns(situ.map(([label, v, cc]) => ({label, v, c: cc, tip: `${label}\n${fN(v)} usuários (${pct(v, c.base.length)})`})))}</div></div>`;
+  // distribuições: verde = acessou nos últimos 30 dias (na fotografia) · cinza = não
+  const dist = (fn, ordem) => { const m = new Map((ordem || []).map(k => [k, {v: 0, v2: 0}]));
+    for (const u of c.base) { const k = fn(u), x = m.get(k) || {v: 0, v2: 0}; (c.st(u) === 'ativo7' || c.st(u) === 'ativo30') ? x.v++ : x.v2++; m.set(k, x); }
+    let arr = [...m].filter(([, x]) => x.v + x.v2); if (!ordem) arr.sort((a, b) => (b[1].v + b[1].v2) - (a[1].v + a[1].v2) || (a[0] < b[0] ? -1 : 1));
+    return arr.length ? hbars(arr.map(([k, x]) => ({key: k, label: k, v: x.v, v2: x.v2, extra: pct(x.v + x.v2, c.base.length), tip: `${k}\nUsuários: ${x.v + x.v2}\nAcessaram nos últimos 30 dias: ${x.v}`}))) : emptyBox('Sem usuários no período'); };
+  const leg = 'Verde = acessou nos últimos 30 dias · cinza = não acessou';
+  h += `<div class="g g3 mt"><div class="card"><div class="ch"><div><h3>Por tipo de usuário</h3><p>${leg}</p></div></div>${dist(u => HUB_ROLE[u[HU.role]] || u[HU.role] || '–')}</div>
+    <div class="card"><div class="ch"><div><h3>Por perfil profissional</h3><p>Informado no cadastro</p></div></div>${dist(u => hubPerfil(u[HU.perfil]))}</div>
+    <div class="card"><div class="ch"><div><h3>Por estado</h3><p>UF informada no cadastro</p></div></div>${dist(u => u[HU.uf] || 'Não informado')}</div></div>`;
+  h += `<div class="g g3 mt"><div class="card"><div class="ch"><div><h3>Por patrimônio sob gestão (PL)</h3><p>Faixa do PL aproximado informado</p></div></div>${dist(u => hubPL(u[HU.pl]), HUB_PL_ORD)}</div>
+    <div class="card"><div class="ch"><div><h3>Por tempo de mercado</h3><p>Anos de atuação informados</p></div></div>${dist(u => hubAnos(u[HU.anos]), HUB_ANOS_ORD)}</div>
+    <div class="card"><div class="ch"><div><h3>Por dispositivo</h3><p>Do último acesso</p></div></div>${dist(u => u[HU.disp] === 'desktop' ? 'Computador' : u[HU.disp] === 'mobile' ? 'Celular' : u[HU.disp] ? u[HU.disp] : 'Nunca acessou')}</div></div>`;
+  // logins nas últimas 24h (por hora) + retenção por mês de cadastro
+  const a24 = H.acessos_24h || [], m24 = niceMax(Math.max(1, ...a24.map(x => x.total || 0)));
+  const W2 = Math.max(300, window.innerWidth > 1100 ? vw / 2 - 60 : vw - 44), H2 = 200, bw2 = (W2 - 40) / Math.max(1, a24.length);
+  let g2 = '';
+  a24.forEach((x, i) => { const v = x.total || 0, hh = (H2 - 46) * v / m24, cx = 30 + i * bw2;
+    if (v) g2 += `<rect class="bar" x="${cx + bw2 * .15}" y="${H2 - 26 - hh}" width="${bw2 * .7}" height="${hh}" fill="#00503c" rx="2"/><text class="ax" x="${cx + bw2 / 2}" y="${H2 - 30 - hh}" text-anchor="middle">${v}</text>`;
+    if (i % 3 === 0) g2 += `<text class="ax" x="${cx + bw2 / 2}" y="${H2 - 8}" text-anchor="middle">${ESC(x.hora)}</text>`;
+    g2 += `<rect class="hit" x="${cx}" y="0" width="${bw2}" height="${H2}" data-tip="${ESC(`${x.hora}: ${v} ${v === 1 ? 'login' : 'logins'}`)}"/>`; });
+  g2 += `<line x1="30" x2="${W2 - 10}" y1="${H2 - 26}" y2="${H2 - 26}" stroke="#cfd9d4"/>`;
+  const coh = new Map(); for (const u of c.base) { const k = u[HU.criado].slice(0, 7); const x = coh.get(k) || {n: 0, a: 0}; x.n++; if (c.st(u) === 'ativo7' || c.st(u) === 'ativo30') x.a++; coh.set(k, x); }
   const cohH = '<div class="mpco">' + [...coh].sort().map(([k, x]) => `<div data-tip="${ESC(`Cadastrados em ${MESN(k)}: ${x.n}\nCom acesso nos últimos 30 dias: ${x.a}`)}"><span class="mut">${MESN(k)}</span><span class="mpt"><i style="width:100%;background:#e6ece9"></i><i class="ov" style="width:${pctOf(x.a, x.n)}%"></i></span><b>${fP(pctOf(x.a, x.n)).replace(',0%', '%')}</b><small>${x.a} de ${x.n}</small></div>`).join('') + '</div>';
-  h += `<div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Ferramentas mais usadas</h3><p>Usos no período por ferramenta da Central do Consultor</p></div></div>${hbars(fer)}</div>
-    <div class="card"><div class="ch"><div><h3>Retenção por mês de cadastro</h3><p>% com acesso nos últimos 30 dias (até ${fDay(c.T)})</p></div></div>${cohH}</div></div>`;
-  // lista de usuários: ordenada pelo ÚLTIMO ACESSO (mais recente primeiro); quem nunca acessou vai para o fim
+  h += `<div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Logins nas últimas 24 horas</h3><p>Por hora, até ${snap} · total ${fN(log24)}</p></div></div>${a24.length ? `<div class="svgc"><svg width="${W2}" height="${H2}" viewBox="0 0 ${W2} ${H2}">${g2}</svg></div>` : emptyBox('Sem dados')}</div>
+    <div class="card"><div class="ch"><div><h3>Retenção por mês de cadastro</h3><p>% com acesso nos últimos 30 dias (em ${fDay(c.SD)})</p></div></div>${cohH}</div></div>`;
+  // lista de usuários: pelo ÚLTIMO ACESSO, do mais recente; quem nunca acessou vai para o fim
   const STN = {ativo7: ['ativo', 'nov'], ativo30: ['ativo 8–30d', 'abe'], inativo: ['inativo', 'ree'], nunca: ['nunca acessou', 'ren']};
-  const fMin = v => v == null ? '–' : v < 60 ? `${fN(Math.round(v))} min` : `${Math.floor(v / 60)} h ${String(Math.round(v % 60)).padStart(2, '0')} min`;
-  const lin = c.base.map(u => { const l = c.ult(u), n = u.dias.filter(d => d <= c.T).length; return {u, l, ts: l ? hubHora(u, l) : null, n, total: n * u.minutosSessao}; })
-    .sort((a, b) => (b.ts || '') > (a.ts || '') ? 1 : (b.ts || '') < (a.ts || '') ? -1 : (b.u.criado > a.u.criado ? 1 : -1));
-  const lista = lin.slice(0, 60);
-  h += `<div class="card np mt"><div class="ch"><div><h3>Usuários</h3><p>Ordenados pelo último acesso, do mais recente para o mais antigo (60 primeiros) · nomes fictícios</p></div></div><div class="tw" style="max-height:480px"><table class="t stk"><thead><tr><th>Usuário</th><th>Último acesso</th><th>Situação</th><th class="num">Tempo médio no MP HUB</th><th class="num">Tempo total</th><th class="num">Acessos</th><th>Ferramenta favorita</th><th>Perfil</th><th>UF</th><th>Cadastro</th><th>1º acesso</th></tr></thead><tbody>` +
-    lista.map(({u, ts, n, total}) => { const s2 = STN[c.st(u)], fav = HUB_FERR.slice().sort((a, b) => u.uso[b] - u.uso[a])[0];
-      return `<tr><td><b>${ESC(u.nome)}</b><div class="mut">#${u.id}</div></td><td>${ts ? `<b>${fDay(ts.slice(0, 10))} ${ts.slice(11, 16)}</b><div class="mut">${hubHa(ts)}</div>` : '<span class="mut">nunca acessou</span>'}</td>
-        <td><span class="mpk ${s2[1]}">${s2[0]}</span></td><td class="num">${n ? `<b>${fMin(u.minutosSessao)}</b><div class="mut">por acesso</div>` : '–'}</td><td class="num">${n ? fMin(total) : '–'}</td><td class="num">${n || '–'}</td>
-        <td>${n ? ESC(fav) : '–'}</td><td>${ESC(u.perfil)}</td><td>${u.uf}</td><td>${fDay(u.criado)}</td><td>${u.primeiro ? fDay(u.primeiro) : '–'}</td></tr>`; }).join('') +
+  const lin = c.base.slice().sort((a, b) => (b[HU.ult] || '') > (a[HU.ult] || '') ? 1 : (b[HU.ult] || '') < (a[HU.ult] || '') ? -1 : (b[HU.criado] > a[HU.criado] ? 1 : -1));
+  h += `<div class="card np mt"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} usuários, ordenados pelo último acesso (mais recente primeiro) · sem e-mail e telefone</p></div></div><div class="tw" style="max-height:520px"><table class="t stk"><thead><tr><th>Usuário</th><th>Último acesso</th><th>Situação</th><th>Tipo</th><th>Perfil</th><th>Cidade / UF</th><th>Empresa</th><th>PL aproximado</th><th>Dispositivo</th><th>Cadastro</th></tr></thead><tbody>` +
+    lin.map(u => { const s2 = STN[c.st(u)], l = u[HU.ult];
+      return `<tr><td><b>${ESC(u[HU.nome] || '–')}</b><div class="mut">#${u[HU.id]}</div></td><td>${l ? `<b>${fDay(l.slice(0, 10))} ${l.slice(11, 16)}</b><div class="mut">${hubHa(l, H.extraido_em)}</div>` : '<span class="mut">nunca acessou</span>'}</td>
+        <td><span class="mpk ${s2[1]}">${s2[0]}</span></td><td>${ESC(HUB_ROLE[u[HU.role]] || u[HU.role] || '–')}</td><td class="wrap" style="max-width:200px">${ESC(hubPerfil(u[HU.perfil]))}</td>
+        <td>${ESC([u[HU.cid], u[HU.uf]].filter(Boolean).join(' / ') || '–')}</td><td>${ESC(u[HU.emp] || '–')}</td><td>${ESC(u[HU.pl] == null ? '–' : hubPL(u[HU.pl]))}</td>
+        <td>${u[HU.disp] === 'desktop' ? 'Computador' : u[HU.disp] === 'mobile' ? 'Celular' : ESC(u[HU.disp] || '–')}</td><td>${fDay(u[HU.criado].slice(0, 10))}</td></tr>`; }).join('') +
     `</tbody></table></div></div>`;
-  // dicionário de dados
-  const DIC = [
-    ['Identificação', [['ID do usuário', 'texto/número', '#10482', 'Chave única para cruzar com outras bases', 'sim'], ['Nome', 'texto', 'Ana Lima', 'Lista de usuários', 'sim'],
-      ['E-mail', 'texto', 'ana@exemplo.com', 'Cruzar com Kiwify (MP PRO/Formação) e Pipedrive; não é exibido no dashboard', 'sim'], ['Perfil profissional', 'lista', 'Consultor de investimentos', 'Distribuição por perfil', 'sim'],
-      ['Empresa / escritório', 'texto', 'XYZ Investimentos', 'Agrupar usuários do mesmo escritório', 'não'], ['Cidade / UF', 'texto', 'São Paulo / SP', 'Distribuição geográfica', 'não']]],
-    ['Cadastro e acesso', [['Data e hora do cadastro', 'data/hora', '15/10/2026 09:12', '<b>Novos usuários no período</b>', 'sim'], ['Origem do cadastro', 'lista', 'Assinante MP PRO', 'De onde vêm os usuários', 'sim'],
-      ['Plano / tipo de acesso', 'lista', 'MP PRO, Formação, Gratuito', 'Separar pagantes de gratuitos', 'sim'], ['Status da conta', 'lista', 'ativa, bloqueada, excluída', 'Base válida', 'sim'],
-      ['Data do 1º acesso', 'data/hora', '15/10/2026 09:30', 'Taxa de ativação', 'sim']]],
-    ['Uso (log de sessões)', [['Sessões: usuário + início + fim', 'data/hora', '15/10 09:30 → 09:52', 'Último acesso (com horário), tempo médio no MP HUB, ativos, retenção', 'sim'],
-      ['Ferramenta acessada em cada sessão', 'lista', 'Tabela Periódica, Mapa de Calor', 'Ferramentas mais usadas', 'sim'], ['Ações-chave', 'evento', 'gerou relatório, baixou material', 'Engajamento real (além de entrar)', 'não'],
-      ['Dispositivo', 'lista', 'desktop, celular', 'Prioridade de layout do HUB', 'não']]]
-  ];
-  h += `<div class="card np mt"><div class="ch"><div><h3>Dados que precisamos do MP HUB</h3><p>Lista para validar com o responsável · "sim" = obrigatório para os indicadores desta aba</p></div></div><div class="tw"><table class="t"><thead><tr><th>Campo</th><th>Tipo</th><th>Exemplo</th><th>Para que serve</th><th>Obrigatório</th></tr></thead><tbody>` +
-    DIC.map(([grp, rows]) => `<tr class="tot"><td colspan="5">${grp}</td></tr>` + rows.map(([a, b2, c2, d2, e]) => `<tr><td><b>${a}</b></td><td>${b2}</td><td class="mut">${c2}</td><td class="wrap" style="max-width:420px">${d2}</td><td>${e === 'sim' ? '<span class="mpk nov">sim</span>' : '<span class="mpk ren">desejável</span>'}</td></tr>`).join('')).join('') +
-    `</tbody></table></div></div>`;
-  h += `<details class="mpd mt" open><summary>Perguntas para o responsável do MP HUB</summary><ul>
-    <li><b>Como recebemos os dados?</b> API com chave de leitura (ideal: atualiza sozinho a cada 1 hora, como o resto do dashboard), exportação CSV periódica ou acesso de leitura ao banco.</li>
-    <li><b>O HUB registra cada acesso/sessão</b> com data e hora? E qual ferramenta foi aberta? Sem isso não há ativos, retenção nem ferramentas mais usadas.</li>
-    <li><b>Qual o critério de "usuário ativo"</b> para o time? (sugestão: acesso nos últimos 7 dias; 8 a 30 dias = em risco; +30 dias = inativo).</li>
-    <li><b>O e-mail do cadastro é o mesmo da Kiwify?</b> Assim ligamos o usuário do HUB ao assinante do MP PRO / Formação e medimos uso × renovação.</li>
-    <li><b>Existem usuários de teste/internos</b> que devemos excluir da contagem?</li>
-    <li><b>LGPD:</b> o dashboard mostra só nome (sem e-mail/telefone) e fica atrás de senha; confirmar se isso atende à política do HUB.</li></ul></details>`;
+  h += `<details class="mpd mt"><summary>O que o MP HUB ainda não registra (para pedir ao desenvolvedor)</summary><ul>
+    <li><b>Tempo de uso:</b> o HUB não guarda início e fim das sessões, então não há tempo médio no MP HUB.</li>
+    <li><b>Histórico de acessos:</b> só o último acesso fica salvo. Com o histórico, dá para medir ativos em qualquer período passado, frequência e retenção real.</li>
+    <li><b>Ferramentas usadas:</b> quais telas cada usuário abre (Tabelas Periódicas, Mapa de Calor, Carteiras, Meu Plano…), para saber o que mais gera valor.</li>
+    <li><b>Origem/plano:</b> se o usuário veio do MP PRO, da Formação ou do cadastro gratuito, para cruzar uso com assinatura.</li>
+    <li><b>Atualização automática:</b> hoje os dados são extraídos manualmente do painel admin (login com código por e-mail). Uma chave de leitura só com dados agregados permitiria atualizar de hora em hora.</li></ul></details>`;
   return h;
 }
 
