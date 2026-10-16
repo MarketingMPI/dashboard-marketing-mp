@@ -831,10 +831,26 @@ def ig_payload(ig):
     return out
 
 
+def pipedrive_bloqueado():
+    """1 chamada leve: se o Pipedrive já responde 429 (limite diário), não vale gastar 15 min em novas tentativas."""
+    for tent in range(2):
+        try:
+            urllib.request.urlopen(urllib.request.Request("https://api.pipedrive.com/v1/users/me?api_token=" + token(),
+                                                          headers={"User-Agent": "mp-dashboard/1.0"}), timeout=30)
+            return False
+        except urllib.error.HTTPError as e:
+            if e.code != 429: return False
+            if tent == 0: time.sleep(20)
+        except Exception:
+            return False
+    return True
+
+
 def collect(full=False):
     now = datetime.now(timezone.utc)
     erro_pd = None
     try:
+        if CACHE.exists() and pipedrive_bloqueado(): raise RuntimeError("429 (sondagem)")
         cache, n_changed, was_full = sync(full)
     except Exception as e:                     # Pipedrive fora/limite diário: segue com a última leitura boa
         if not CACHE.exists(): raise
