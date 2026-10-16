@@ -153,6 +153,7 @@ ul.igi{margin:0;padding:0;list-style:none}ul.igi li{position:relative;padding:8p
 ul.igi li:before{content:'';position:absolute;left:4px;top:14px;width:8px;height:8px;border-radius:50%;background:#8a958f}ul.igi li.pos:before{background:var(--vivo)}ul.igi li.neg:before{background:var(--verm)}ul.igi li.inf:before{background:#c9a94f}
 .pdinfo{display:block;flex-basis:100%;margin-top:4px;font-size:11.5px;opacity:.8}
 .pdwarn{display:block;flex-basis:100%;margin-top:6px;background:#fff6e5;border:1px solid #f0d49b;color:#7a5306;border-radius:8px;padding:6px 10px;font-size:12px}
+.hsep{margin:0 10px;color:#b9c5bf;font-weight:400}.hsplit{display:block;height:6px;border-radius:99px;background:#e0e7e3;margin:2px 0 6px;overflow:hidden}.hsplit i{display:block;height:100%;background:#00503c;border-radius:99px}
 .hubwarn{display:flex;gap:12px;align-items:center;background:repeating-linear-gradient(135deg,#fff8e6 0 12px,#fdf1d4 12px 24px);border:1px dashed #d9b45a;color:#6b5a2e;border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:16px}
 .hubwarn b{flex:none;background:#a8701c;color:#fff;font-size:11.5px;letter-spacing:.08em;border-radius:6px;padding:4px 9px}
 .note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
@@ -1631,7 +1632,7 @@ function viewMPPro() {
    D.mphub.usuarios[i] = [id, nome, role, empresa, criado(BRT), ultimo_acesso(BRT|null), dispositivo, cidade, uf, perfil, pl, anos_mercado, escritorio]
    O HUB guarda só o ÚLTIMO acesso de cada usuário (sem histórico nem duração): situação/ativos são medidos na data
    da fotografia; "acessaram no período" só é exato quando o período termina na data da fotografia ou depois. */
-const HU = {id: 0, nome: 1, role: 2, emp: 3, criado: 4, ult: 5, disp: 6, cid: 7, uf: 8, perfil: 9, pl: 10, anos: 11};
+const HU = {id: 0, nome: 1, role: 2, emp: 3, criado: 4, ult: 5, disp: 6, cid: 7, uf: 8, perfil: 9, pl: 10, anos: 11, mp: 13};
 const HUB_ROLE = {viewer: 'Visualizador', admin: 'Admin', master: 'Master', consultor: 'Consultor', gestor_company: 'Gestor da empresa'};
 const HUB_PERFIL = {consultor: 'Consultor', consultor_investimento: 'Consultor de investimentos', especialista_investimentos: 'Especialista em investimentos',
   assessor_investimento: 'Assessor de investimentos', assessor: 'Assessor', gerente_banco: 'Gerente de banco', bancario: 'Bancário', back_office: 'Back office',
@@ -1652,7 +1653,8 @@ function hubCompute(H, de, ate) {
   const acessaram = exato ? base.filter(u => u[HU.ult] && u[HU.ult].slice(0, 10) >= de) : null;
   const st = u => { const l = u[HU.ult]; if (!l) return 'nunca'; const g = diffDays(l.slice(0, 10), SD); return g <= 7 ? 'ativo7' : g <= 30 ? 'ativo30' : 'inativo'; };
   const cnt = {nunca: 0, ativo7: 0, ativo30: 0, inativo: 0}; for (const u of base) cnt[st(u)]++;
-  return {T, SD, base, novos, exato, acessaram, st, cnt, nDias: diffDays(de, T) + 1, novosAcessaram: novos.filter(u => u[HU.ult]).length};
+  return {T, SD, base, novos, exato, acessaram, st, cnt, nDias: diffDays(de, T) + 1, novosAcessaram: novos.filter(u => u[HU.ult]).length,
+    mp: base.filter(u => u[HU.mp]).length, mpNovos: novos.filter(u => u[HU.mp]).length};
 }
 function viewMPHub() {
   const H = D.mphub;
@@ -1662,9 +1664,12 @@ function viewMPHub() {
   const snap = `${fDay(H.extraido_em.slice(0, 10))} às ${H.extraido_em.slice(11, 16)}`;
   h += `<div class="note">Dados reais do painel administrativo do MP HUB, extraídos em <b>${snap}</b> (atualização manual). O MP HUB registra só o <b>último acesso</b> de cada usuário: situação e ativos são medidos nessa data.</div>`;
   const log24 = (H.acessos_24h || []).reduce((a, x) => a + (x.total || 0), 0);
-  h += '<div class="kpis k4">' + [
+  h += '<div class="kpis">' + [
     kpiCard({label: 'Novos usuários', cls: 'hero', v: fN(c.novos.length), sub: `cadastros no período · ${f1(c.novos.length / c.nDias)} por dia`, d: delta(c.novos.length, p.novos.length), tip: 'Contas criadas no MP HUB dentro do período (data de cadastro)'}),
     kpiCard({label: 'Total de usuários', v: fN(c.base.length), sub: `base em ${fDay(c.T)}`, d: delta(c.base.length, p.base.length), tip: 'Todas as contas criadas até o fim do período'}),
+    kpiCard({label: 'Meu Patrimônio × outras instituições', cls: 'w2', v: `${fN(c.mp)}<small>Meu Patrimônio</small><span class="hsep">·</span>${fN(c.base.length - c.mp)}<small>outras</small>`,
+      sub: `<span class="hsplit"><i style="width:${pctOf(c.mp, c.base.length) || 0}%"></i></span>${pct(c.mp, c.base.length)} da base é MP · novos no período: ${fN(c.mpNovos)} MP e ${fN(c.novos.length - c.mpNovos)} de outras`,
+      d: delta(c.mp, p.mp), tip: 'Meu Patrimônio = vinculado à empresa Meu Patrimônio no MP HUB ou com Meu Patrimônio/MP como instituição no cadastro. Outras = demais instituições ou não informada. A variação compara o número de usuários MP com o período anterior.'}),
     kpiCard({label: 'Acessaram no período', v: c.exato ? fN(c.acessaram.length) : '–', sub: c.exato ? `${pct(c.acessaram.length, c.base.length)} da base` : `só para períodos até ${fDay(c.SD)}`, tip: 'Usuários cujo último acesso cai dentro do período. Exato quando o período termina na data da fotografia (o HUB não guarda acessos anteriores ao último).'}),
     kpiCard({label: 'Ativos nos últimos 7 dias', v: fN(c.cnt.ativo7), sub: `${pct(c.cnt.ativo7, c.base.length)} da base · em ${fDM(c.SD)}`, tip: 'Último acesso até 7 dias antes da fotografia'}),
     kpiCard({label: 'Logins nas últimas 24h', v: fN(log24), sub: `até ${snap}`, tip: 'Logins por hora informados pelo MP HUB nas 24 horas anteriores à fotografia'}),

@@ -14,7 +14,7 @@ Unidade de medida = LEAD. Contato = atividade de contato CONCLUÍDA; atividades
 pendentes da cadência (5 por lead) não contam.
 Somente stdlib + curl + node. Segredos via variáveis de ambiente (Actions) ou .env local; nunca impressos.
 """
-import base64, hashlib, html as htmllib, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request, pathlib
+import base64, hashlib, html as htmllib, json, os, unicodedata, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request, pathlib
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -912,7 +912,14 @@ def mphub_import(arq):
     return len(us)
 
 
-def _brt(ts):
+def mphub_e_mp(u):
+    """É da Meu Patrimônio: vinculado à empresa MP no HUB OU instituição informada = Meu Patrimônio / MP."""
+    if (u.get("company_nome") or "").strip(): return True
+    n = re.sub(r"[^a-z ]", "", unicodedata.normalize("NFKD", u.get("instituicao") or "").encode("ascii", "ignore").decode().lower()).strip()
+    return n == "mp" or "meu patrimonio" in n
+
+
+def _brt_min(ts):          # MP HUB: data/hora BRT sem segundos (NÃO confundir com _brt da Kiwify)
     if not ts: return None
     return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(BRT).strftime("%Y-%m-%dT%H:%M")
 
@@ -927,10 +934,10 @@ def mphub_payload():
     for u in d["usuarios"]:
         pl = u.get("pl_aproximado")
         us.append([u["id"], sem_pii(u.get("nome") or ""), u.get("role"), u.get("company_nome") or u.get("office_nome"),
-                   _brt(u.get("created_at")), _brt(u.get("last_login_at")), u.get("last_login_device"), u.get("cidade"),
+                   _brt_min(u.get("created_at")), _brt_min(u.get("last_login_at")), u.get("last_login_device"), u.get("cidade"),
                    (u.get("uf") or "").upper() or None, u.get("perfil_profissional"), float(pl) if pl not in (None, "") else None,
-                   u.get("tempo_mercado_anos"), u.get("office_nome")])
-    return {"extraido_em": _brt(d["extraido_em"]), "usuarios": us, "acessos_24h": d.get("acessos_24h") or []}
+                   u.get("tempo_mercado_anos"), u.get("office_nome"), mphub_e_mp(u)])
+    return {"extraido_em": _brt_min(d["extraido_em"]), "usuarios": us, "acessos_24h": d.get("acessos_24h") or []}
 
 
 def collect(full=False):
