@@ -16,6 +16,7 @@ Somente stdlib + curl + node. Segredos via variáveis de ambiente (Actions) ou .
 """
 import base64, hashlib, html as htmllib, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request, pathlib
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -684,16 +685,162 @@ def mppro_payload(midia, old):
     return out
 
 
+# ---------------------------------------------------------------- Instagram (Meta Graph API, SOMENTE LEITURA)
+IG_CONTAS = [("17841444843479536", "meupatrimonio.nacional", "Meu Patrimônio"),
+             ("17841435917222082", "rede.meupatrimonio", "Rede Meu Patrimônio"),
+             ("17841425597508477", "gabriel.meupatrimonio", "Gabriel · Meu Patrimônio")]
+IG_SEM_PERMISSAO = ["renanlimacfp"]          # visível no Business, mas a Meta nega insights (#10)
+IG_DESDE = "2026-01-01"
+IG_DIA = ["reach", "views", "accounts_engaged", "total_interactions", "likes", "comments", "shares", "saves", "reposts",
+          "profile_links_taps", "website_clicks"]
+IG_BACKFILL_DIAS = int(os.environ.get("IG_BACKFILL", "120"))
+IG_POSTS_POR_EXEC = int(os.environ.get("IG_POSTS", "150"))                         # dias novos por conta por execução (o resto entra nas próximas)
+
+
+class _Limite(Exception):
+    pass
+
+
+def ig_get(path, tok, uso, **q):
+    q["access_token"] = tok
+    url = META_API + path + "?" + urllib.parse.urlencode(q)
+    for tent in range(3):
+        try:
+            r = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "mp-dashboard/1.0"}), timeout=60)
+            h = r.headers.get("x-business-use-case-usage")
+            if h:
+                try:
+                    for v in json.loads(h).values():
+                        for x in v: uso[0] = max(uso[0], x.get("call_count", 0), x.get("total_time", 0), x.get("total_cputime", 0))
+                except Exception: pass
+            return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")
+            if '"code":4' in body or '"code":17' in body or '"code":32' in body or '"code":613' in body: raise _Limite()
+            if e.code in (400, 401, 403) or tent == 2: raise
+            time.sleep(4 * (tent + 1))
+        except Exception:
+            if tent == 2: raise
+            time.sleep(4 * (tent + 1))
+
+
+def _meia_noite(day):
+    return int(datetime.fromisoformat(day).replace(tzinfo=BRT).timestamp())
+
+
+def sync_instagram(old):
+    """Totais diários (dia de Brasília), seguidores e posts com insights. Incremental: refaz os 3 últimos dias e
+    completa o histórico aos poucos; posts recentes têm os números atualizados com mais frequência."""
+    old = old or {}
+    tok = meta_token()
+    if not tok: return {**old, "erro": "sem token da Meta"}
+    agora = datetime.now(BRT); hoje = agora.date(); uso = [0]
+    contas = old.get("contas") or {}
+    erro = None
+    try:
+        for cid, user, nome in IG_CONTAS:
+            c = contas.setdefault(cid, {"dias": {}, "seg": {}, "novos": {}, "posts": {}})
+            c["user"], c["nome"] = user, nome
+            pf = ig_get(cid, tok, uso, fields="followers_count,follows_count,media_count")
+            c["seguidores"], c["seguindo"], c["midias"] = pf.get("followers_count"), pf.get("follows_count"), pf.get("media_count")
+            c["seg"][hoje.isoformat()] = c["seguidores"]
+            # novos seguidores por dia (a Meta só guarda os últimos 30 dias)
+            fc = ig_get(f"{cid}/insights", tok, uso, metric="follower_count", period="day",
+                        since=_meia_noite((hoje - timedelta(days=29)).isoformat()), until=_meia_noite(hoje.isoformat()))
+            for v in ((fc.get("data") or [{}])[0].get("values") or []):
+                d = (datetime.fromisoformat(v["end_time"].replace("+0000", "+00:00")) - timedelta(days=1)).date().isoformat()
+                c["novos"][d] = v.get("value")
+            # totais por dia: refaz os 3 últimos e completa o histórico do mais recente para o mais antigo
+            alvo, d = [], hoje
+            while d.isoformat() >= IG_DESDE:
+                k = d.isoformat()
+                if (hoje - d).days <= 2 or k not in c["dias"]: alvo.append(k)
+                d -= timedelta(days=1)
+            recentes = [k for k in alvo if (hoje - datetime.fromisoformat(k).date()).days <= 2]
+            alvo = recentes + [k for k in alvo if k not in recentes][:IG_BACKFILL_DIAS]
+
+            def um_dia(k):
+                fim = min(_meia_noite((datetime.fromisoformat(k) + timedelta(days=1)).date().isoformat()), int(agora.timestamp()))
+                r = ig_get(f"{cid}/insights", tok, uso, metric=",".join(IG_DIA), period="day", metric_type="total_value",
+                           since=_meia_noite(k), until=fim)
+                vals = {x["name"]: (x.get("total_value") or {}).get("value") for x in r.get("data") or []}
+                return k, [vals.get(m) for m in IG_DIA]
+            for i0 in range(0, len(alvo), 24):          # lotes de 24 dias, 6 chamadas simultâneas; para se a Meta apertar
+                if uso[0] > 70 and i0: break
+                with ThreadPoolExecutor(6) as ex:
+                    for k, v in ex.map(um_dia, alvo[i0:i0 + 24]): c["dias"][k] = v
+            # posts (feed e reels) desde IG_DESDE
+            after, fim_lista = None, False
+            while not fim_lista:
+                q = dict(fields="id,timestamp,media_type,media_product_type,permalink,caption,like_count,comments_count", limit=50)
+                if after: q["after"] = after
+                r = ig_get(f"{cid}/media", tok, uso, **q)
+                for m in r.get("data") or []:
+                    ts = datetime.fromisoformat(m["timestamp"].replace("+0000", "+00:00")).astimezone(BRT)
+                    if ts.date().isoformat() < IG_DESDE: fim_lista = True; break
+                    po = c["posts"].setdefault(m["id"], {})
+                    po.update(ts=ts.strftime("%Y-%m-%dT%H:%M:%S"), tipo=m.get("media_product_type") if m.get("media_product_type") == "REELS" else m.get("media_type"),
+                              link=m.get("permalink"), leg=re.sub(r"\s+", " ", (m.get("caption") or "")).strip()[:140],
+                              likes=m.get("like_count"), com=m.get("comments_count"))
+                after = ((r.get("paging") or {}).get("cursors") or {}).get("after") if (r.get("paging") or {}).get("next") else None
+                if not after: fim_lista = True
+            fila = []
+            for mid, po in c["posts"].items():
+                idade = (agora - datetime.fromisoformat(po["ts"]).replace(tzinfo=BRT)).total_seconds() / 3600
+                ult = po.get("upd"); desde_ult = (agora - datetime.fromisoformat(ult)).total_seconds() / 3600 if ult else 1e9
+                if (idade <= 14 * 24 and desde_ult >= 2) or (idade <= 90 * 24 and desde_ult >= 24) or desde_ult >= 24 * 7:
+                    fila.append((desde_ult < 1e9, -idade, mid))
+            fila = [m for *_, m in sorted(fila)][:IG_POSTS_POR_EXEC]   # nunca lidos primeiro, depois os mais recentes
+
+            def um_post(mid):
+                po = c["posts"][mid]
+                met = "reach,views,likes,comments,shares,saved,total_interactions" + (",ig_reels_avg_watch_time" if po["tipo"] == "REELS" else "")
+                try:
+                    r = ig_get(f"{mid}/insights", tok, uso, metric=met)
+                except urllib.error.HTTPError:
+                    try: r = ig_get(f"{mid}/insights", tok, uso, metric="reach,likes,comments,shares,saved,total_interactions")
+                    except urllib.error.HTTPError: return mid, None
+                return mid, {x["name"]: (x.get("values") or [{}])[0].get("value") for x in r.get("data") or []}
+            if uso[0] <= 80:
+                with ThreadPoolExecutor(6) as ex:
+                    for mid, ins in ex.map(um_post, fila):
+                        if ins is not None: c["posts"][mid]["ins"] = ins; c["posts"][mid]["upd"] = agora.strftime("%Y-%m-%dT%H:%M:%S")
+    except _Limite:
+        erro = "limite de chamadas da Meta atingido; completa na próxima atualização"
+    except Exception as e:
+        erro = f"falha ao consultar o Instagram ({getattr(e, 'code', None) or type(e).__name__})"
+    return {"contas": contas, "erro": erro, "atualizado_em": agora.strftime("%Y-%m-%dT%H:%M:%S-03:00")}
+
+
+def ig_payload(ig):
+    out = {"contas": [], "erro": (ig or {}).get("erro"), "atualizado_em": (ig or {}).get("atualizado_em"), "sem_permissao": IG_SEM_PERMISSAO}
+    for cid, user, nome in IG_CONTAS:
+        c = ((ig or {}).get("contas") or {}).get(cid)
+        if not c: continue
+        dias = [[k] + list(v) + [c["novos"].get(k)] for k, v in sorted(c["dias"].items())]
+        posts = []
+        for mid, po in sorted(c["posts"].items(), key=lambda x: x[1]["ts"]):
+            i = po.get("ins") or {}
+            posts.append([po["ts"], po.get("tipo"), po.get("link"), po.get("leg"), i.get("reach"), i.get("views"),
+                          i.get("likes", po.get("likes")), i.get("comments", po.get("com")), i.get("shares"), i.get("saved"),
+                          i.get("total_interactions"), i.get("ig_reels_avg_watch_time")])
+        out["contas"].append({"id": cid, "user": user, "nome": nome, "seguidores": c.get("seguidores"), "seguindo": c.get("seguindo"),
+                              "midias": c.get("midias"), "seg": sorted([k, v] for k, v in c["seg"].items() if v is not None),
+                              "dias": dias, "posts": posts})
+    return out
+
+
 def collect(full=False):
     now = datetime.now(timezone.utc)
     cache, n_changed, was_full = sync(full)
     leads, excl = model(cache)
     cache["midia"] = sync_midia(cache.get("midia"))
     cache["mppro"] = mppro_payload(cache["midia"], cache.get("mppro"))
+    cache["ig"] = sync_instagram(cache.get("ig"))
     tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"],
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)"}}
     tmp = SNAP.with_suffix(".tmp"); tmp.write_text(json.dumps(snap, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"); tmp.replace(SNAP)
@@ -790,7 +937,8 @@ def ci():
     build_pages()
     # Logs do Actions são PÚBLICOS: nada de nomes, consultores ou números do negócio aqui.
     print("ok", s["gerado_em"], s["meta"]["coleta"], "| midia:", "ok" if not s["midia"]["erro"] else s["midia"]["erro"],
-          "| kiwify:", "ok" if not s["mppro"].get("erro_kiwify") else s["mppro"]["erro_kiwify"])
+          "| kiwify:", "ok" if not s["mppro"].get("erro_kiwify") else s["mppro"]["erro_kiwify"],
+          "| instagram:", "ok" if not s["ig"].get("erro") else s["ig"]["erro"])
 
 
 def github_token():

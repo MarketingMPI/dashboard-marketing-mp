@@ -426,6 +426,61 @@ def mppro(MP, f, agora_day):
     }
 
 
+# ----------------------------------------------------------------------------- Instagram
+IG = None   # D["ig"]
+IGD = dict(reach=1, views=2, engaged=3, inter=4, likes=5, comments=6, shares=7, saves=8, reposts=9, link=10, web=11, novos=12)
+
+
+def instagram(IGP, f, agora_day):
+    if not IGP or not IGP.get("contas"):
+        return None
+    de, ate = f.get("de") or "0000-00-00", f.get("ate") or "9999-12-31"
+    T = min(ate, agora_day); inP = lambda d: de <= d <= ate
+    n_dias = None if de == "0000-00-00" else (_d(T) - _d(de)).days + 1
+    contas = []
+    for c in IGP["contas"]:
+        ds = [r for r in c["dias"] if inP(r[0])]
+        soma = lambda k: sum(r[IGD[k]] or 0 for r in ds)
+        def media(k):
+            v = [r[IGD[k]] for r in ds if r[IGD[k]] is not None]
+            return sum(v) / len(v) if v else None
+        nv = [r for r in ds if r[IGD["novos"]] is not None]
+        def seg_ate(d):
+            v = None
+            for k, n in c["seg"]:
+                if k <= d: v = n
+            return v
+        seg_ini = seg_ate((_d(de) - timedelta(days=1)).isoformat()) if de != "0000-00-00" else None
+        seg_fim = seg_ate(T)
+        ps = [x for x in c["posts"] if inP(x[0][:10])]
+        por = {}
+        for x in ps:
+            t = {"REELS": "Reels", "CAROUSEL_ALBUM": "Carrossel", "VIDEO": "Vídeo"}.get(x[1], "Imagem")
+            o = por.setdefault(t, {"formato": t, "posts": 0, "views": 0, "alcance": 0, "interacoes": 0, "salvos": 0, "compart": 0})
+            o["posts"] += 1; o["views"] += x[5] or 0; o["alcance"] += x[4] or 0; o["interacoes"] += x[10] or 0
+            o["salvos"] += x[9] or 0; o["compart"] += x[8] or 0
+        pv = sum(x[5] or 0 for x in ps); pr = sum(x[4] or 0 for x in ps); pi = sum(x[10] or 0 for x in ps)
+        top = sorted(ps, key=lambda x: (-(x[5] or 0), -(x[10] or 0), [-ord(ch) for ch in x[0]]))[:5]
+        contas.append({
+            "id": c["id"], "user": c["user"], "nome": c["nome"], "seguidores_hoje": c["seguidores"],
+            "dias_com_dados": len(ds), "dias_periodo": n_dias,
+            "views": soma("views"), "interacoes": soma("inter"), "curtidas": soma("likes"), "comentarios": soma("comments"),
+            "compartilhamentos": soma("shares"), "salvamentos": soma("saves"), "reposts": soma("reposts"), "cliques_link": soma("link"),
+            "cliques_site": soma("web"), "alcance_medio_dia": media("reach"), "engajadas_medio_dia": media("engaged"),
+            "novos_seguidores": sum(r[IGD["novos"]] for r in nv) if nv else None,
+            "novos_cobertura": len(nv) / len(ds) * 100 if ds else None,
+            "seguidores_inicio": seg_ini, "seguidores_fim": seg_fim,
+            "crescimento": seg_fim - seg_ini if seg_ini is not None and seg_fim is not None else None,
+            "posts": len(ps), "views_por_post": pv / len(ps) if ps else None, "interacoes_por_post": pi / len(ps) if ps else None,
+            "engajamento_posts": pi / pr * 100 if pr else None,
+            "formatos": sorted(por.values(), key=lambda o: (-o["posts"], o["formato"])),
+            "top": [{"data": x[0], "formato": x[1], "link": x[2], "legenda": x[3], "alcance": x[4], "views": x[5], "curtidas": x[6],
+                     "comentarios": x[7], "compart": x[8], "salvos": x[9], "interacoes": x[10],
+                     "engajamento": (x[10] or 0) / x[4] * 100 if x[4] else None} for x in top],
+            "serie": [[r[0], r[IGD["views"]] or 0, r[IGD["reach"]] or 0, r[IGD["inter"]] or 0] for r in ds]})
+    return {"contas": contas, "base_em": T}
+
+
 # ----------------------------------------------------------------------------- função de contrato
 def bloco(P, M):
     """Agregados comuns a kpis e consultores."""
@@ -554,7 +609,8 @@ def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
     return {"kpis": kpis, "etapas": etapas, "consultores": consultores,
             "perdidos": perdidos, "lead_time": lead_time,
             "performance": performance(leads, filtros, agora, midia if midia is not None else MIDIA),
-            "mppro": mppro(MPPRO, filtros, agora_str[:10])}
+            "mppro": mppro(MPPRO, filtros, agora_str[:10]),
+            "instagram": instagram(IG, filtros, agora_str[:10])}
 
 
 # ----------------------------------------------------------------------------- cenários
@@ -598,11 +654,12 @@ def cenarios(D):
 
 
 def load():
-    global MIDIA, MPPRO
+    global MIDIA, MPPRO, IG
     with open(DATA, encoding="utf-8") as fh:
         D = json.load(fh)
     MIDIA = D.get("midia")
     MPPRO = D.get("mppro")
+    IG = D.get("ig")
     return D
 
 

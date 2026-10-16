@@ -142,6 +142,15 @@ table.t.mprc th,table.t.mprc td{padding-left:7px;padding-right:7px}table.t.mprc 
 .mpd{background:#fff;border:1px solid var(--linha);border-radius:var(--r);padding:14px 20px;font-size:13px;color:#46534e}.mpd summary{cursor:pointer;font-weight:600;color:var(--prof)}
 .mpd ul{margin:10px 0 0;padding-left:18px;line-height:1.55}.mpd.mt{margin-top:22px}
 @media(min-width:961px){.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.igh{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-top:6px;border-top:1px solid var(--linha)}.igh.mt{margin-top:30px;padding-top:22px}
+.igh h3{margin:0;font-size:18px;color:var(--prof)}.igh p{margin:2px 0 0;color:var(--cinza);font-size:13px}.igl{margin-left:auto;font-size:12.5px;font-weight:600;text-decoration:none}
+.igdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}.igdot.lg{width:14px;height:14px;margin:0}
+.igv{font-size:11px;font-weight:600;border-radius:99px;padding:1px 6px;margin-left:4px;white-space:nowrap}.igv.pos{background:#e3f3ea;color:#0b6b3a}.igv.neg{background:#fbe9e6;color:#a3362a}
+table.t.igc td,table.t.igc th{white-space:nowrap}
+.igf>div{padding:10px 0;border-bottom:1px solid #edf1ef}.igf>div:last-child{border-bottom:0}.igfh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;font-size:13.5px}
+.igfg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.igfg span{background:#f7faf8;border-radius:8px;padding:6px 9px;font-size:11px;color:var(--cinza)}.igfg b{display:block;font-size:15px;color:var(--txt)}
+ul.igi{margin:0;padding:0;list-style:none}ul.igi li{position:relative;padding:8px 0 8px 22px;border-bottom:1px solid #edf1ef;font-size:13px;line-height:1.45;color:#33413b}ul.igi li:last-child{border-bottom:0}
+ul.igi li:before{content:'';position:absolute;left:4px;top:14px;width:8px;height:8px;border-radius:50%;background:#8a958f}ul.igi li.pos:before{background:var(--vivo)}ul.igi li.neg:before{background:var(--verm)}ul.igi li.inf:before{background:#c9a94f}
 .hubwarn{display:flex;gap:12px;align-items:center;background:repeating-linear-gradient(135deg,#fff8e6 0 12px,#fdf1d4 12px 24px);border:1px dashed #d9b45a;color:#6b5a2e;border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:16px}
 .hubwarn b{flex:none;background:#a8701c;color:#fff;font-size:11.5px;letter-spacing:.08em;border-radius:6px;padding:4px 9px}
 .note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
@@ -675,7 +684,8 @@ function computeFull(leads, f, agoraStr) {
   };
   const performance = computePerf(leads, f, agora);
   const mppro = computeMPPro(D && D.mppro, f, String(agoraStr || (D && D.gerado_em) || '').slice(0, 10));
-  return {res: {kpis, etapas, consultores, perdidos, lead_time, performance, mppro}, rows, agora};
+  const instagram = computeIG(D && D.ig, f, String(agoraStr || (D && D.gerado_em) || '').slice(0, 10));
+  return {res: {kpis, etapas, consultores, perdidos, lead_time, performance, mppro, instagram}, rows, agora};
 }
 
 /* Performance: investimento em mídia (Meta Ads, B2C) × leads que ENTRARAM no Pipedrive no período.
@@ -871,6 +881,47 @@ function computeMPPro(MP, f, agoraDay) {
   };
 }
 
+/* Instagram (Redes Sociais): totais diários por dia de Brasília + posts com insights. Só o período vale.
+   Alcance e contas engajadas não se somam entre dias (a mesma pessoa conta em vários dias): mostramos a MÉDIA DIÁRIA.
+   Espelho em audit.instagram(). */
+const IGD = {reach: 1, views: 2, engaged: 3, inter: 4, likes: 5, comments: 6, shares: 7, saves: 8, reposts: 9, link: 10, web: 11, novos: 12};
+function computeIG(IG, f, agoraDay) {
+  if (!IG || !IG.contas || !IG.contas.length) return null;
+  f = f || {};
+  const de = f.de || '0000-00-00', ate = f.ate || '9999-12-31', T = ate < agoraDay ? ate : agoraDay, inP = d => d >= de && d <= ate;
+  const nDias = de === '0000-00-00' ? null : diffDays(de, T) + 1;
+  const contas = IG.contas.map(c => {
+    const ds = c.dias.filter(r => inP(r[0]));
+    const soma = k => ds.reduce((a, r) => a + (r[IGD[k]] || 0), 0);
+    const media = k => { const v = ds.filter(r => r[IGD[k]] != null).map(r => r[IGD[k]]); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+    const nv = ds.filter(r => r[IGD.novos] != null);
+    const segAte = d => { let v = null; for (const [k, n] of c.seg) if (k <= d) v = n; return v; };
+    const segIni = segAte(addDays(de, -1)), segFim = segAte(T);
+    const ps = c.posts.filter(x => inP(x[0].slice(0, 10)));
+    const por = {};
+    for (const x of ps) {
+      const t = x[1] === 'REELS' ? 'Reels' : x[1] === 'CAROUSEL_ALBUM' ? 'Carrossel' : x[1] === 'VIDEO' ? 'Vídeo' : 'Imagem';
+      const o = por[t] || (por[t] = {formato: t, posts: 0, views: 0, alcance: 0, interacoes: 0, salvos: 0, compart: 0});
+      o.posts++; o.views += x[5] || 0; o.alcance += x[4] || 0; o.interacoes += x[10] || 0; o.salvos += x[9] || 0; o.compart += x[8] || 0;
+    }
+    const pv = ps.reduce((a, x) => a + (x[5] || 0), 0), pr = ps.reduce((a, x) => a + (x[4] || 0), 0), pi = ps.reduce((a, x) => a + (x[10] || 0), 0);
+    const top = ps.slice().sort((a, b) => (b[5] || 0) - (a[5] || 0) || (b[10] || 0) - (a[10] || 0) || (a[0] < b[0] ? 1 : -1)).slice(0, 5)
+      .map(x => ({data: x[0], formato: x[1], link: x[2], legenda: x[3], alcance: x[4], views: x[5], curtidas: x[6], comentarios: x[7], compart: x[8], salvos: x[9], interacoes: x[10],
+        engajamento: x[4] ? (x[10] || 0) / x[4] * 100 : null}));
+    return {id: c.id, user: c.user, nome: c.nome, seguidores_hoje: c.seguidores,
+      dias_com_dados: ds.length, dias_periodo: nDias,
+      views: soma('views'), interacoes: soma('inter'), curtidas: soma('likes'), comentarios: soma('comments'), compartilhamentos: soma('shares'),
+      salvamentos: soma('saves'), reposts: soma('reposts'), cliques_link: soma('link'), cliques_site: soma('web'),
+      alcance_medio_dia: media('reach'), engajadas_medio_dia: media('engaged'),
+      novos_seguidores: nv.length ? nv.reduce((a, r) => a + r[IGD.novos], 0) : null, novos_cobertura: ds.length ? nv.length / ds.length * 100 : null,
+      seguidores_inicio: segIni, seguidores_fim: segFim, crescimento: segIni != null && segFim != null ? segFim - segIni : null,
+      posts: ps.length, views_por_post: ps.length ? pv / ps.length : null, interacoes_por_post: ps.length ? pi / ps.length : null,
+      engajamento_posts: pr ? pi / pr * 100 : null, formatos: Object.values(por).sort((a, b) => b.posts - a.posts || (a.formato < b.formato ? -1 : 1)), top,
+      serie: ds.map(r => [r[0], r[IGD.views] || 0, r[IGD.reach] || 0, r[IGD.inter] || 0])};
+  });
+  return {contas, base_em: T};
+}
+
 window.MP_DASH = {
   compute(leads, filtros, agoraStr) { return computeFull(leads, filtros, agoraStr).res; },
   derive, makePred
@@ -950,6 +1001,7 @@ const ICONS = {
   funil: '<svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg>',
   perdidos: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg>',
   mppro: '<svg viewBox="0 0 24 24"><path d="M2 9.5 12 4.5l10 5-10 5z"/><path d="M6 11.5v4.8c0 1.5 2.7 3.2 6 3.2s6-1.7 6-3.2v-4.8"/><path d="M22 9.5v5.5"/></svg>',
+  instagram: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor"/></svg>',
   mphub: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="9.5" r="2.2"/><path d="M8.3 14.5c.6-1.6 2-2.5 3.7-2.5s3.1.9 3.7 2.5"/></svg>',
   aplicacao: '<svg viewBox="0 0 24 24"><circle cx="12" cy="6.5" r="3.5"/><path d="M4.5 21c.5-4.3 3.5-7 7.5-7s7 2.7 7.5 7"/><path d="M10.9 14.2h2.2l-.5 1.6h-1.2z"/><path d="M11.4 15.8l-.9 3.7 1.5 1.3 1.5-1.3-.9-3.7"/></svg>',
   performance: '<svg viewBox="0 0 24 24"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>',
@@ -965,7 +1017,9 @@ const TABS = [
   {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'perdidos', nome: 'Perdidos'}, {id: 'consultores', nome: 'Consultores'}];
 // B2B: seções em construção (sem dados do Funil Alpha; filtros B2C ficam ocultos)
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
-const isB2B = id => TABS_B2B.some(t => t.id === id);
+const TABS_RS = [{id: 'instagram', nome: 'Instagram'}];
+const isB2B = id => TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id);
+const SO_PERIODO = new Set(['mppro', 'mphub', 'instagram']);
 const PRESETS = [['hoje', 'Hoje'], ['7d', 'Últimos 7 dias'], ['semana', 'Esta semana'], ['semana_ant', 'Semana passada'],
   ['30d', 'Últimos 30 dias'], ['mes', 'Este mês'], ['mes_ant', 'Mês passado'], ['tudo', 'Tudo']];
 const DIMS = [
@@ -1037,7 +1091,7 @@ function writeHash() {
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const ok = /^\d{4}-\d{2}-\d{2}$/;
-  S.tab = TABS.concat(TABS_B2B).some(t => t.id === p.get('aba')) ? p.get('aba') : 'macro';
+  S.tab = TABS.concat(TABS_B2B, TABS_RS).some(t => t.id === p.get('aba')) ? p.get('aba') : 'macro';
   const pr = p.get('p');
   if (p.get('de') && ok.test(p.get('de')) && p.get('ate') && ok.test(p.get('ate'))) {
     S.preset = 'custom'; S.de = p.get('de'); S.ate = p.get('ate');
@@ -1720,6 +1774,111 @@ function viewMPHub() {
   return h;
 }
 
+/* ---- Redes Sociais · Instagram ---- */
+const IG_COR = {'meupatrimonio.nacional': '#00503c', 'rede.meupatrimonio': '#3d9a6f', 'gabriel.meupatrimonio': '#c9a94f'};
+const fmtNome = t => ({REELS: 'Reels', CAROUSEL_ALBUM: 'Carrossel', IMAGE: 'Imagem', VIDEO: 'Vídeo'}[t] || t || '–');
+function igDelta(c, p, fmt = fN, good = 1) { return delta(c, p, good, fmt); }
+function igVar(c, p) {  // variação curta para a tabela comparativa
+  if (c == null || p == null) return '<span class="mut">–</span>';
+  if (p === 0) return c === 0 ? '<span class="mut">=</span>' : '<span class="igv pos">novo</span>';
+  const v = (c - p) / Math.abs(p) * 100; if (Math.abs(v) < 0.05) return '<span class="mut">=</span>';
+  return `<span class="igv ${v > 0 ? 'pos' : 'neg'}">${v > 0 ? '▲' : '▼'} ${nf1.format(Math.abs(v))}%</span>`;
+}
+function igChart(serie, width, cor) {
+  if (!serie.length) return emptyBox('Sem dados diários no período');
+  const W = Math.max(300, width), H = 220, pl = 44, pr = 40, pt = 16, pb = 28, pw = W - pl - pr, ph = H - pt - pb;
+  const mx = niceMax(Math.max(1, ...serie.map(x => x[1]))), mr = niceMax(Math.max(1, ...serie.map(x => x[2]))), bw = pw / serie.length, w = Math.max(1.5, Math.min(bw * .62, 30));
+  const y = v => pt + ph - ph * v / mx, yr = v => pt + ph - ph * v / mr;
+  let g = '';
+  for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mx * i / 4)}</text><text class="ax" x="${W - pr + 6}" y="${yy + 3.5}" style="fill:#a8701c">${fN(mr * i / 4)}</text>`; }
+  const step = Math.max(1, Math.ceil(serie.length / Math.max(1, Math.floor(pw / 48)))), pts = [];
+  serie.forEach(([d, v, r, it], i) => {
+    const cx = pl + i * bw + bw / 2;
+    if (v) g += `<rect class="bar" x="${cx - w / 2}" y="${y(v)}" width="${w}" height="${y(0) - y(v)}" fill="${cor}" opacity=".85" rx="${Math.min(3, w / 4)}"/>`;
+    pts.push(`${cx},${yr(r)}`);
+    if (i % step === 0) g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${fDM(d)}</text>`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${WD[weekday(d)]}, ${fDay(d)}\nVisualizações: ${fN(v)}\nAlcance do dia: ${fN(r)}\nInterações: ${fN(it)}`)}" data-range="${d}|${d}"/>`;
+  });
+  g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#c98a1b" stroke-width="2" stroke-linejoin="round"/>`;
+  return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Visualizações e alcance por dia">${g}</svg></div>`;
+}
+function igInsights(c, p) {
+  const out = [], pc = (a, b) => b ? (a - b) / Math.abs(b) * 100 : null, sgn = v => (v > 0 ? 'subiram' : 'caíram'), abs = v => nf1.format(Math.abs(v)) + '%';
+  const vv = pc(c.views, p.views); if (vv != null && Math.abs(vv) >= 5) out.push([vv > 0 ? 'pos' : 'neg', `Visualizações ${sgn(vv)} <b>${abs(vv)}</b> (${fN(c.views)} contra ${fN(p.views)} no período anterior).`]);
+  const ar = pc(c.alcance_medio_dia, p.alcance_medio_dia); if (ar != null && Math.abs(ar) >= 5) out.push([ar > 0 ? 'pos' : 'neg', `Alcance médio por dia ${ar > 0 ? 'cresceu' : 'diminuiu'} <b>${abs(ar)}</b> (${fN(Math.round(c.alcance_medio_dia))} contas/dia).`]);
+  const it = pc(c.interacoes, p.interacoes); if (it != null && Math.abs(it) >= 5) out.push([it > 0 ? 'pos' : 'neg', `Interações ${sgn(it)} <b>${abs(it)}</b>: ${fN(c.curtidas)} curtidas, ${fN(c.comentarios)} comentários, ${fN(c.compartilhamentos)} compartilhamentos e ${fN(c.salvamentos)} salvamentos.`]);
+  if (c.posts !== p.posts) out.push([c.posts > p.posts ? 'pos' : 'neg', `Frequência: <b>${fN(c.posts)} ${c.posts === 1 ? 'post' : 'posts'}</b> no período, contra ${fN(p.posts)} no anterior.`]);
+  else if (!c.posts) out.push(['neg', 'Nenhum post publicado no período: os números vêm de conteúdos antigos.']);
+  if (c.formatos.length > 1) {
+    const fs = c.formatos.filter(x => x.posts).map(x => ({...x, m: x.views / x.posts})).sort((a, b) => b.m - a.m);
+    if (fs.length > 1 && fs[1].m > 0) out.push(['inf', `<b>${fs[0].formato}</b> rende ${nf1.format(fs[0].m / fs[1].m)}x mais visualizações por post que ${fs[1].formato} (${fN(Math.round(fs[0].m))} contra ${fN(Math.round(fs[1].m))}).`]);
+  }
+  if (c.top.length) { const t = c.top[0]; out.push(['inf', `Melhor post: ${fmtNome(t.formato)} de ${fDM(t.data.slice(0, 10))}, com <b>${fN(t.views)} visualizações</b> e ${fN(t.interacoes)} interações${t.legenda ? ` (“${ESC(t.legenda.slice(0, 60))}${t.legenda.length > 60 ? '…' : ''}”)` : ''}.`]); }
+  if (c.engajamento_posts != null) out.push([c.engajamento_posts >= 3 ? 'pos' : 'inf', `Taxa de engajamento dos posts do período: <b>${fP(c.engajamento_posts)}</b> das contas alcançadas interagiram${p.engajamento_posts != null ? ` (anterior: ${fP(p.engajamento_posts)})` : ''}.`]);
+  if (c.crescimento != null) out.push([c.crescimento >= 0 ? 'pos' : 'neg', `Seguidores: <b>${c.crescimento >= 0 ? '+' : ''}${fN(c.crescimento)}</b> no período (de ${fN(c.seguidores_inicio)} para ${fN(c.seguidores_fim)}).`]);
+  else if (c.novos_seguidores != null) out.push(['inf', `<b>${fN(c.novos_seguidores)} novos seguidores</b> no período${c.novos_cobertura < 99.5 ? ' (a Meta só informa os últimos 30 dias)' : ''}.`]);
+  if (c.cliques_site) out.push(['inf', `${fN(c.cliques_site)} ${c.cliques_site === 1 ? 'clique' : 'cliques'} no link do site do perfil.`]);
+  return out.slice(0, 7);
+}
+function viewInstagram() {
+  const C = cur(), P = prev(), ig = C.res.instagram, pg = P.res.instagram, IGP = D.ig || {};
+  let h = viewHead('Instagram', `Redes Sociais · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
+  if (IGP.erro) h += `<div class="note">Última leitura do Instagram: ${ESC(IGP.erro)}. Os números abaixo são os da leitura anterior.</div>`;
+  if (!ig) return h + `<div class="card">${emptyBox('Dados do Instagram indisponíveis', 'Não foi possível ler as contas nesta atualização.')}</div>`;
+  const pmap = new Map((pg ? pg.contas : []).map(c => [c.id, c]));
+  const incompleto = ig.contas.some(c => c.dias_periodo && c.dias_com_dados < c.dias_periodo);
+  if (incompleto) h += `<div class="note">Parte do período ainda não tem dados diários carregados (o histórico é completado aos poucos a cada atualização, desde 01/01/2026).</div>`;
+  // ---- comparativo
+  const row = (lab, f, fmt = fN, tip = '', fv = f) => `<tr${tip ? ` data-tip="${ESC(tip)}"` : ''}><td><b>${lab}</b></td>` + ig.contas.map(c => { const p = pmap.get(c.id) || {}; const v = f(c);
+    const parcial = lab === 'Novos seguidores' && v != null && c.novos_cobertura < 99.5;
+    return `<td class="num"><b>${v == null ? '–' : fmt(v)}</b>${parcial ? '<sup class="mut" title="só os últimos 30 dias">*</sup>' : ''} ${igVar(fv(c), fv(p))}</td>`; }).join('') + '</tr>';
+  h += `<div class="card np"><div class="ch"><div><h3>Comparativo dos perfis</h3><p>Valor no período e variação em relação ao período anterior</p></div></div><div class="tw"><table class="t igc"><thead><tr><th></th>` +
+    ig.contas.map(c => `<th class="num"><span class="igdot" style="background:${IG_COR[c.user] || '#00503c'}"></span>@${ESC(c.user)}</th>`).join('') + `</tr></thead><tbody>` +
+    row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no fim do período. A variação só aparece quando há registro no fim dos dois períodos (o registro diário começou em 15/10/2026).', c => c.seguidores_fim) +
+    row('Visualizações', c => c.views) + row('Alcance médio por dia', c => c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia)) +
+    row('Interações', c => c.interacoes) + row('Contas engajadas por dia', c => c.engajadas_medio_dia == null ? null : Math.round(c.engajadas_medio_dia * 10) / 10, f1) +
+    row('Posts publicados', c => c.posts) + row('Visualizações por post', c => c.views_por_post == null ? null : Math.round(c.views_por_post)) +
+    row('Taxa de engajamento dos posts', c => c.engajamento_posts, fP) + row('Novos seguidores', c => c.novos_seguidores, fN, 'A Meta só informa novos seguidores dos últimos 30 dias (* = período coberto só em parte)') +
+    row('Cliques no site', c => c.cliques_site) + `</tbody></table></div></div>`;
+  // ---- um bloco por perfil
+  const vw = document.getElementById('view').clientWidth || 900;
+  for (const c of ig.contas) {
+    const p = pmap.get(c.id) || {}, cor = IG_COR[c.user] || '#00503c';
+    h += `<div class="igh mt" id="ig-${ESC(c.user)}"><span class="igdot lg" style="background:${cor}"></span><div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
+      <a class="igl" href="https://www.instagram.com/${encodeURIComponent(c.user)}/" target="_blank" rel="noopener noreferrer">abrir perfil ↗</a></div>`;
+    h += '<div class="kpis">' + [
+      kpiCard({label: 'Visualizações', cls: 'hero', v: fN(c.views), sub: `${f1(c.dias_com_dados ? c.views / c.dias_com_dados : null)} por dia`, d: igDelta(c.views, p.views), tip: 'Vezes que posts, reels e stories do perfil foram vistos no período'}),
+      kpiCard({label: 'Alcance médio por dia', v: fN(c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia)), sub: 'contas diferentes por dia', d: igDelta(c.alcance_medio_dia, p.alcance_medio_dia, x => fN(Math.round(x))), tip: 'Média do alcance diário. O alcance não se soma entre dias (a mesma pessoa conta em vários dias).'}),
+      kpiCard({label: 'Interações', v: fN(c.interacoes), sub: `${fN(c.curtidas)} curtidas · ${fN(c.comentarios)} coment.`, d: igDelta(c.interacoes, p.interacoes), tip: 'Curtidas, comentários, compartilhamentos, salvamentos e reposts no período'}),
+      kpiCard({label: 'Compart. e salvamentos', v: fN(c.compartilhamentos + c.salvamentos), sub: `${fN(c.compartilhamentos)} compart. · ${fN(c.salvamentos)} salvos`, d: igDelta(c.compartilhamentos + c.salvamentos, (p.compartilhamentos || 0) + (p.salvamentos || 0)), tip: 'Os sinais mais fortes de conteúdo relevante'}),
+      kpiCard({label: 'Seguidores', v: fN(c.seguidores_fim ?? c.seguidores_hoje), sub: c.crescimento != null ? `${c.crescimento >= 0 ? '+' : ''}${fN(c.crescimento)} no período` : c.novos_seguidores != null ? `${fN(c.novos_seguidores)} novos no período` : 'histórico começa agora',
+        d: c.crescimento != null ? igDelta(c.crescimento, p.crescimento) : igDelta(c.novos_seguidores, p.novos_seguidores), tip: 'Total no fim do período. Variação: crescimento líquido (quando há registro no início e no fim) ou novos seguidores (últimos 30 dias)'}),
+      kpiCard({label: 'Posts publicados', v: fN(c.posts), sub: `${f1(c.dias_periodo ? c.posts / c.dias_periodo * 7 : null)} por semana`, d: igDelta(c.posts, p.posts), tip: 'Posts e reels publicados no período (stories não entram)'}),
+      kpiCard({label: 'Visualizações por post', v: fN(c.views_por_post == null ? null : Math.round(c.views_por_post)), sub: `${f1(c.interacoes_por_post)} interações por post`, d: igDelta(c.views_por_post, p.views_por_post, x => fN(Math.round(x))), tip: 'Média dos posts publicados no período (números de cada post até hoje)'}),
+      kpiCard({label: 'Taxa de engajamento', v: fP(c.engajamento_posts), sub: 'interações ÷ alcance dos posts', d: igDelta(c.engajamento_posts, p.engajamento_posts, fP), tip: 'Soma das interações dos posts do período ÷ soma do alcance desses posts'}),
+      kpiCard({label: 'Contas engajadas por dia', v: f1(c.engajadas_medio_dia), sub: 'média diária', d: igDelta(c.engajadas_medio_dia, p.engajadas_medio_dia, f1), tip: 'Contas que interagiram com o perfil, média por dia'}),
+      kpiCard({label: 'Cliques no perfil', v: fN(c.cliques_site + c.cliques_link), sub: `${fN(c.cliques_site)} no site · ${fN(c.cliques_link)} em links`, d: igDelta(c.cliques_site + c.cliques_link, (p.cliques_site || 0) + (p.cliques_link || 0)), tip: 'Toques no link do site e nos links do perfil'})
+    ].join('') + '</div>';
+    const ins = igInsights(c, p);
+    h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Visualizações e alcance por dia</h3><p>Barras = visualizações (eixo esquerdo) · linha = alcance do dia (eixo direito)</p></div>
+        <div class="lg"><span><i style="background:${cor}"></i>Visualizações</span><span><i style="background:#c98a1b"></i>Alcance</span></div></div>${igChart(c.serie, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44, cor)}</div>
+      <div class="card"><div class="ch"><div><h3>Principais insights</h3><p>Em relação ao período anterior</p></div></div>${ins.length ? '<ul class="igi">' + ins.map(([t, x]) => `<li class="${t}">${x}</li>`).join('') + '</ul>' : emptyBox('Sem variações relevantes')}</div></div>`;
+    const fm = c.formatos.length ? '<div class="igf">' + c.formatos.map(x => `<div><div class="igfh"><b>${x.formato}</b><span class="mut">${x.posts} ${x.posts === 1 ? 'post' : 'posts'}</span></div>
+      <div class="igfg"><span><b>${fN(Math.round(x.views / x.posts))}</b>visualizações/post</span><span><b>${fN(Math.round(x.alcance / x.posts))}</b>alcance/post</span><span><b>${f1(x.interacoes / x.posts)}</b>interações/post</span><span><b>${fP(pctOf(x.interacoes, x.alcance))}</b>engajamento</span></div></div>`).join('') + '</div>' : emptyBox('Nenhum post no período');
+    const tp = c.top.length ? `<table class="t"><thead><tr><th>Post</th><th>Formato</th><th class="num">Visualizações</th><th class="num">Alcance</th><th class="num">Interações</th><th class="num">Compart.</th><th class="num">Salvos</th><th class="num">Engaj.</th></tr></thead><tbody>` +
+      c.top.map(x => `<tr><td class="wrap" style="min-width:260px;max-width:420px"><a href="${ESC(x.link || '#')}" target="_blank" rel="noopener noreferrer"><b>${fDM(x.data.slice(0, 10))}</b></a> <span class="mut">${ESC((x.legenda || '').slice(0, 70))}${(x.legenda || '').length > 70 ? '…' : ''}</span></td><td>${fmtNome(x.formato)}</td><td class="num b">${fN(x.views)}</td><td class="num">${fN(x.alcance)}</td><td class="num">${fN(x.interacoes)}</td><td class="num">${fN(x.compart)}</td><td class="num">${fN(x.salvos)}</td><td class="num">${fP(x.engajamento)}</td></tr>`).join('') + '</tbody></table>' : emptyBox('Nenhum post no período');
+    h += `<div class="g g32 mt"><div class="card np"><div class="ch"><div><h3>Melhores posts do período</h3><p>Top 5 por visualizações · clique na data para abrir no Instagram</p></div></div><div class="tw">${tp}</div></div>
+      <div class="card"><div class="ch"><div><h3>Desempenho por formato</h3><p>Posts publicados no período</p></div></div>${fm}</div></div>`;
+  }
+  h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
+    <li><b>Fonte:</b> API oficial da Meta (Instagram), contas ${ig.contas.map(c => '@' + ESC(c.user)).join(', ')}. Atualiza junto com o dashboard. ${(IGP.sem_permissao || []).length ? `@${IGP.sem_permissao.map(ESC).join(', @')} aparece no Business, mas a Meta não libera os insights para o app (precisa conceder acesso).` : ''}</li>
+    <li><b>Variação:</b> sempre contra o período anterior de mesmo tamanho.</li>
+    <li><b>Alcance e contas engajadas</b> mostram a média por dia, porque a mesma pessoa contaria em vários dias se somássemos.</li>
+    <li><b>Posts:</b> feed e reels publicados no período, com os números acumulados de cada post até hoje. Stories não entram.</li>
+    <li><b>Novos seguidores:</b> a Meta só informa os últimos 30 dias. O crescimento líquido usa o registro diário de seguidores, que começou em 15/10/2026.</li></ul></details>`;
+  return h;
+}
+
 /* ---- Lead a Lead ---- */
 const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['sem', 'Sem contato', d => !d.nk], ['parados', 'Parados > 7d', d => d.parado],
   ['fds', 'Entrada no FDS', d => d.fds], ['agendados', 'Agendados', d => d.agendado]];
@@ -2053,13 +2212,14 @@ function renderNav() {
   const btn = t => `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}">${ICONS[t.id]}<span>${t.nome}</span></button>`;
   document.getElementById('nav').innerHTML = '<div class="nh">B2C - Análises</div>' + TABS.map(t => `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}">${ICONS[t.id]}<span>${t.nome}</span>${badge[t.id] != null ? `<span class="bd">${fN(badge[t.id])}</span>` : ''}</button>`).join('') +
     '<div class="nh nb">B2B - Análises</div>' + TABS_B2B.map(btn).join('') +
+    '<div class="nh nb">Redes Sociais</div>' + TABS_RS.map(btn).join('') +
     `<div class="nf">B2C Funil Alpha<br>${fN(LEADS.length)} leads na base</div>`;
 }
 function viewB2B() {
   const t = TABS_B2B.find(x => x.id === S.tab);
   return viewHead(ESC(t.nome), 'B2B - Análises') + `<div class="card"><div class="empty"><b>Seção em construção</b>Esta área vai reunir as análises de ${ESC(t.nome)}. Os filtros e dados do B2C Funil Alpha não se aplicam aqui.</div></div>`;
 }
-const VIEWS = {macro: viewMacro, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewMPPro, mphub: viewMPHub, aplicacao: viewB2B};
+const VIEWS = {macro: viewMacro, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewMPPro, mphub: viewMPHub, instagram: viewInstagram, aplicacao: viewB2B};
 function renderView(anim) {
   const v = document.getElementById('view');
   document.getElementById('tip').classList.remove('on');
@@ -2068,8 +2228,8 @@ function renderView(anim) {
 }
 function update(o = {}) {
   writeHash(); renderNav(); renderFilterBar(); renderChips(); renderView(o.anim);
-  document.getElementById('fbar').hidden = isB2B(S.tab) && S.tab !== 'mppro' && S.tab !== 'mphub';
-  document.getElementById('fbar').classList.toggle('so-periodo', S.tab === 'mppro' || S.tab === 'mphub');  // MP PRO: só o período vale
+  document.getElementById('fbar').hidden = isB2B(S.tab) && !SO_PERIODO.has(S.tab);
+  document.getElementById('fbar').classList.toggle('so-periodo', SO_PERIODO.has(S.tab));  // MP PRO: só o período vale
   document.querySelector('footer.howto').hidden = isB2B(S.tab);
   if (POP && POP.type === 'dim') renderPopList();
 }
