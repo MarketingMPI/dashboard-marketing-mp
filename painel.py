@@ -967,6 +967,59 @@ def mphub_payload():
     return {"extraido_em": _brt_min(d["extraido_em"]), "usuarios": us, "acessos_24h": d.get("acessos_24h") or []}
 
 
+# ---------------------------------------------------------------- YouTube (exportação do YouTube Studio, importada à mão)
+# `python painel.py youtube-import <zip>`: lê "Dados da tabela.csv" (um vídeo por linha + linha Total) e "Total.csv"
+# (duração média por dia) e grava CIFRADO em fontes/youtube.enc.json. Os números são do período do arquivo.
+YT_ENC = ROOT / "fontes" / "youtube.enc.json"
+YT_CANAL = "Gabriel Liberato · Meu Patrimônio"
+
+
+def _seg(t):
+    if not t: return None
+    p = [int(x) for x in str(t).split(":")]
+    return sum(v * 60 ** i for i, v in enumerate(reversed(p)))
+
+
+def youtube_import(arq):
+    import csv, io, zipfile
+    z = zipfile.ZipFile(arq)
+    nomes = {n.lower(): n for n in z.namelist()}
+    def ler(chave):
+        n = next(v for k, v in nomes.items() if chave in k)
+        return list(csv.DictReader(io.StringIO(z.read(n).decode("utf-8-sig"))))
+    tab = ler("tabela"); tot = ler("total.csv")
+    num = lambda v, f=float: f(v) if v not in (None, "") else None
+    def linha(x):
+        pub = x.get("Horário de publicação do vídeo") or ""
+        try: pub = datetime.strptime(pub, "%b %d, %Y").date().isoformat()
+        except ValueError: pub = None
+        return {"id": x["Conteúdo"], "titulo": x.get("Título do vídeo") or "", "publicado": pub, "duracao": num(x.get("Duração"), int),
+                "dur_media": _seg(x.get("Duração média da visualização")), "pct_visto": num(x.get("Porcentagem visualizada média (%)")),
+                "continuaram": num(x.get("Continuaram assistindo (%)")), "espectadores": num(x.get("Espectadores únicos"), int),
+                "alcance": num(x.get("Alcance único"), int), "novos": num(x.get("Novos espectadores"), int),
+                "recorrentes": num(x.get("Espectadores recorrentes"), int), "views": num(x.get("Visualizações"), int) or 0,
+                "horas": num(x.get("Tempo de exibição (horas)")) or 0, "inscritos": num(x.get("Inscritos"), int) or 0,
+                "receita": num(x.get("Receita estimada (USD)")), "impressoes": num(x.get("Impressões de miniaturas"), int) or 0,
+                "ctr": num(x.get("Taxa de cliques na miniatura (%)"))}
+    total = linha(next(x for x in tab if x["Conteúdo"] == "Total"))
+    videos = [linha(x) for x in tab if x["Conteúdo"] != "Total"]
+    dias = [[x["Data"], _seg(x.get("Duração média da visualização"))] for x in tot if x.get("Data")]
+    de, ate = dias[0][0], dias[-1][0]          # o nome do arquivo traz o dia da exportação; os dados vão até a véspera
+    out = {"canal": YT_CANAL, "de": de, "ate": ate, "importado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M"),
+           "total": total, "videos": videos, "dias": dias}
+    YT_ENC.parent.mkdir(exist_ok=True)
+    YT_ENC.write_bytes(crypt("enc", json.dumps(out, ensure_ascii=False).encode("utf-8")))
+    return len(videos), total["views"], de, ate
+
+
+def youtube_payload():
+    if not YT_ENC.exists(): return None
+    try:
+        return json.loads(crypt("dec", YT_ENC.read_bytes()))
+    except Exception:
+        return {"erro": "não foi possível ler os dados do YouTube"}
+
+
 def collect(full=False):
     now = datetime.now(timezone.utc)
     erro_pd = None
@@ -992,7 +1045,7 @@ def collect(full=False):
     tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]), "mphub": mphub_payload(),
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]), "mphub": mphub_payload(), "youtube": youtube_payload(),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
                      "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run"),
@@ -1158,6 +1211,7 @@ if __name__ == "__main__":
     elif cmd == "collect": print(stable_summary(collect(full="--full" in sys.argv)))
     elif cmd == "pages": build_pages(); print("ok", OUT)
     elif cmd == "mphub-import": print("ok", mphub_import(sys.argv[2]), "usuários")
+    elif cmd == "youtube-import": print("ok", youtube_import(sys.argv[2]))
     elif cmd == "dev": print("ok", build_dev(sys.argv[2] if len(sys.argv) > 2 else None))
     elif cmd in ("refresh", "publish"): refresh()
     else: sys.exit(__doc__)
