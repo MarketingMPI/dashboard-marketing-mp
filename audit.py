@@ -429,6 +429,16 @@ def mppro(MP, f, agora_day):
 # ----------------------------------------------------------------------------- Instagram
 IG = None   # D["ig"]
 IGD = dict(reach=14, views=13, inter=15, likes=16, comments=17, shares=18, saves=19, story=20, ads_views=21, link=10, web=11, novos=12)
+IG_ADS = dict(reach=22, views=21, inter=23, likes=24, comments=25, shares=26, saves=27)
+IG_TOT = dict(reach=1, views=2, inter=4, likes=5, comments=6, shares=7, saves=8)
+
+
+def ig_bloco(ds, M):
+    soma = lambda k: sum(max(0, r[M[k]] or 0) for r in ds)
+    v = [r[M["reach"]] for r in ds if r[M["reach"]] is not None]
+    return {"views": soma("views"), "interacoes": soma("inter"), "curtidas": soma("likes"), "comentarios": soma("comments"),
+            "compartilhamentos": soma("shares"), "salvamentos": soma("saves"), "alcance_medio_dia": sum(v) / len(v) if v else None,
+            "serie": [[r[0], r[M["views"]] or 0, r[M["reach"]] or 0, r[M["inter"]] or 0] for r in ds]}
 
 
 def instagram(IGP, f, agora_day):
@@ -477,7 +487,8 @@ def instagram(IGP, f, agora_day):
             "top": [{"data": x[0], "formato": x[1], "link": x[2], "legenda": x[3], "alcance": x[4], "views": x[5], "curtidas": x[6],
                      "comentarios": x[7], "compart": x[8], "salvos": x[9], "interacoes": x[10],
                      "engajamento": (x[10] or 0) / x[4] * 100 if x[4] else None} for x in top],
-            "serie": [[r[0], r[IGD["views"]] or 0, r[IGD["reach"]] or 0, r[IGD["inter"]] or 0] for r in ds]})
+            "serie": [[r[0], r[IGD["views"]] or 0, r[IGD["reach"]] or 0, r[IGD["inter"]] or 0] for r in ds],
+            "anuncios": ig_bloco(ds, IG_ADS), "total": ig_bloco(ds, IG_TOT)})
     return {"contas": contas, "base_em": T}
 
 

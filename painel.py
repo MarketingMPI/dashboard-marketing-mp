@@ -836,7 +836,7 @@ def ig_payload(ig):
             org = (c.get("org") or {}).get(k)
             linha = [k] + list(v) + [c["novos"].get(k)]
             if org is None:
-                linha += [None] * 9
+                linha += [None] * 15
             else:
                 def organico(m):
                     b = org.get(m) or {}
@@ -845,6 +845,7 @@ def ig_payload(ig):
                         return min(n, b.get("_total") or n)
                     return (b.get("_total") or 0) - (b.get("AD") or 0)
                 linha += [organico(m) for m in IG_ORG] + [(org.get("views") or {}).get("STORY") or 0, (org.get("views") or {}).get("AD") or 0]
+                linha += [(org.get(m) or {}).get("AD") or 0 for m in IG_ORG if m != "views"]   # 22-27: reach, inter, likes, comments, shares, saves de anúncio
             dias.append(linha)
         posts = []
         for mid, po in sorted(c["posts"].items(), key=lambda x: x[1]["ts"]):
