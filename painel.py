@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Dashboard do Marketing (B2C Funil Alpha, Pipedrive) - Meu Patrimônio.
 
-Roda na nuvem (GitHub Actions, .github/workflows/atualizar.yml): a cada 30 min e pelo botão "Atualizar agora".
+Roda na nuvem (GitHub Actions, .github/workflows/atualizar.yml): a cada 1 hora e pelo botão "Atualizar agora".
 Uso:
   python painel.py ci          # (Actions) restaura cache cifrado, coleta, cifra cache, gera _site/ para o Pages
   python painel.py collect     # busca Pipedrive (incremental), grava data/dashboard.json, imprime resumo

@@ -432,7 +432,7 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
 <div id="app">
 <header class="top">
   <div class="brand"><img src="assets/coruja-branca.png" alt="Meu Patrimônio"><div><h1>Dashboard do Marketing</h1></div></div>
-  <div class="upd"><span>Última atualização em <b id="upd">–</b></span><div class="rf"><span class="live"><i></i>atualização automática a cada 30 min</span><button type="button" class="rfb" id="rfbtn" hidden title="Busca os dados no Pipedrive agora e republica o dashboard (cerca de 2 a 3 minutos)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Atualizar agora</span></button></div><span class="rfst" id="rfst" aria-live="polite"></span></div>
+  <div class="upd"><span>Última atualização em <b id="upd">–</b></span><div class="rf"><span class="live"><i></i>atualização automática a cada 1 hora</span><button type="button" class="rfb" id="rfbtn" hidden title="Busca os dados no Pipedrive agora e republica o dashboard (cerca de 2 a 3 minutos)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Atualizar agora</span></button></div><span class="rfst" id="rfst" aria-live="polite"></span></div>
 </header>
 <div class="shell">
   <nav class="side" id="nav" aria-label="Abas do dashboard"></nav>
@@ -1613,7 +1613,7 @@ function viewMPPro() {
     (md.campanhas.length ? md.campanhas.map(c => `<tr><td><b>${ESC(c.campanha)}</b></td><td class="num">${fRc(c.investimento)}</td><td class="num">${fN(c.impressoes)}</td><td class="num">${fN(c.cliques)}</td><td class="num">${fN(c.visitas)}</td><td class="num">${fN(c.checkouts)}</td><td class="num">${fP(pctOf(c.cliques, c.impressoes))}</td><td class="num">${fRc(c.cliques ? c.investimento / c.cliques : null)}</td></tr>`).join('')
       : `<tr><td colspan="8">${emptyBox('Nenhuma campanha Perpétuo com gasto no período')}</td></tr>`) + `</tbody></table></div></div>`;
   h += `<details class="mpd mt"><summary>Como ler esta aba e ressalvas</summary><ul>
-    <li><b>Fontes:</b> vendas e assinantes da API da Kiwify (produto MP PRO); a receita soma também o produto <b>MP PRO - Formação de Consultores de Investimentos</b> (venda avulsa, não entra na base de assinantes nem no CAC); mídia da Meta Ads, só campanhas "MP PRO ... Perpétuo" da conta Meu Patrimônio CA. Atualiza junto com o dashboard, a cada 30 min.</li>
+    <li><b>Fontes:</b> vendas e assinantes da API da Kiwify (produto MP PRO); a receita soma também o produto <b>MP PRO - Formação de Consultores de Investimentos</b> (venda avulsa, não entra na base de assinantes nem no CAC); mídia da Meta Ads, só campanhas "MP PRO ... Perpétuo" da conta Meu Patrimônio CA. Atualiza junto com o dashboard, a cada 1 hora.</li>
     <li><b>Só o período vale nesta aba.</b> Os números do período usam a data do pagamento; a base (ativos, cancelados, churn acumulado, LTV) é a posição no último dia do período, ou hoje.</li>
     <li><b>Assinaturas:</b> a Kiwify não expõe assinaturas na API; cada cobrança é um pedido. A base é reconstruída pelos pedidos de cada cliente (quem tem duas assinaturas paralelas aparece com as duas).</li>
     <li><b>Usuário ativo</b> = cobrança confirmada nos últimos 40 dias. Não mede consumo das aulas (a API não informa).</li>
@@ -1766,7 +1766,7 @@ function viewMPHub() {
     DIC.map(([grp, rows]) => `<tr class="tot"><td colspan="5">${grp}</td></tr>` + rows.map(([a, b2, c2, d2, e]) => `<tr><td><b>${a}</b></td><td>${b2}</td><td class="mut">${c2}</td><td class="wrap" style="max-width:420px">${d2}</td><td>${e === 'sim' ? '<span class="mpk nov">sim</span>' : '<span class="mpk ren">desejável</span>'}</td></tr>`).join('')).join('') +
     `</tbody></table></div></div>`;
   h += `<details class="mpd mt" open><summary>Perguntas para o responsável do MP HUB</summary><ul>
-    <li><b>Como recebemos os dados?</b> API com chave de leitura (ideal: atualiza sozinho a cada 30 min, como o resto do dashboard), exportação CSV periódica ou acesso de leitura ao banco.</li>
+    <li><b>Como recebemos os dados?</b> API com chave de leitura (ideal: atualiza sozinho a cada 1 hora, como o resto do dashboard), exportação CSV periódica ou acesso de leitura ao banco.</li>
     <li><b>O HUB registra cada acesso/sessão</b> com data e hora? E qual ferramenta foi aberta? Sem isso não há ativos, retenção nem ferramentas mais usadas.</li>
     <li><b>Qual o critério de "usuário ativo"</b> para o time? (sugestão: acesso nos últimos 7 dias; 8 a 30 dias = em risco; +30 dias = inativo).</li>
     <li><b>O e-mail do cadastro é o mesmo da Kiwify?</b> Assim ligamos o usuário do HUB ao assinante do MP PRO / Formação e medimos uso × renovação.</li>
@@ -2407,7 +2407,7 @@ async function runRefresh() {
     }
     throw new Error('demorou mais de 10 minutos');
   } catch (e) {
-    say('Não foi possível atualizar agora: ' + e.message + '. A atualização automática continua a cada 30 min.', true);
+    say('Não foi possível atualizar agora: ' + e.message + '. A atualização automática continua a cada 1 hora.', true);
     btn.disabled = false; btn.classList.remove('spin'); lbl.textContent = 'Tentar de novo'; RF.busy = false;
   }
 }
