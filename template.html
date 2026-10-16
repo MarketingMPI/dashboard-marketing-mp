@@ -1809,13 +1809,13 @@ function igInsights(c, p) {
   return out.slice(0, 7);
 }
 function viewInstagram() {
-  const C = cur(), P = prev(), ig = C.res.instagram, pg = P.res.instagram, IGP = D.ig || {};
+  const C = cur(), P = prev(), igRaw = C.res.instagram, pg = P.res.instagram, IGP = D.ig || {};
   let h = viewHead('Instagram', `Redes Sociais · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
   if (IGP.erro) h += `<div class="note">Última leitura do Instagram: ${ESC(IGP.erro)}. Os números abaixo são os da leitura anterior.</div>`;
-  if (!ig) return h + `<div class="card">${emptyBox('Dados do Instagram indisponíveis', 'Não foi possível ler as contas nesta atualização.')}</div>`;
+  if (!igRaw) return h + `<div class="card">${emptyBox('Dados do Instagram indisponíveis', 'Não foi possível ler as contas nesta atualização.')}</div>`;
   const modo = IG_MODOS[S.igModo] ? S.igModo : 'org', MN = IG_MODOS[modo].nome, org = modo === 'org';
   const aplica = c => !c || !c.id || org ? c : {...c, ...(modo === 'ads' ? c.anuncios : c.total)};
-  ig.contas = ig.contas.map(aplica);
+  const ig = {...igRaw, contas: igRaw.contas.map(aplica)};   // cópia: cur()/prev() ficam em cache e não podem ser alterados
   const pmap = new Map((pg ? pg.contas : []).map(c => [c.id, aplica(c)]));
   const incompleto = ig.contas.some(c => c.dias_periodo && c.dias_com_dados < c.dias_periodo);
   if (incompleto) h += `<div class="note">Parte do período ainda não tem dados diários carregados (o histórico é completado aos poucos a cada atualização, desde 01/01/2026).</div>`;
