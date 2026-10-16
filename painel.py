@@ -787,7 +787,7 @@ def sync_instagram(old):
             fila = []
             for mid, po in c["posts"].items():
                 idade = (agora - datetime.fromisoformat(po["ts"]).replace(tzinfo=BRT)).total_seconds() / 3600
-                ult = po.get("upd"); desde_ult = (agora - datetime.fromisoformat(ult)).total_seconds() / 3600 if ult else 1e9
+                ult = po.get("upd"); desde_ult = (agora - datetime.fromisoformat(ult).replace(tzinfo=BRT)).total_seconds() / 3600 if ult else 1e9
                 if (idade <= 14 * 24 and desde_ult >= 2) or (idade <= 90 * 24 and desde_ult >= 24) or desde_ult >= 24 * 7:
                     fila.append((desde_ult < 1e9, -idade, mid))
             fila = [m for *_, m in sorted(fila)][:IG_POSTS_POR_EXEC]   # nunca lidos primeiro, depois os mais recentes
@@ -832,7 +832,16 @@ def ig_payload(ig):
 
 def collect(full=False):
     now = datetime.now(timezone.utc)
-    cache, n_changed, was_full = sync(full)
+    erro_pd = None
+    try:
+        cache, n_changed, was_full = sync(full)
+    except Exception as e:                     # Pipedrive fora/limite diário: segue com a última leitura boa
+        if not CACHE.exists(): raise
+        cache = json.loads(CACHE.read_text(encoding="utf-8"))
+        if not cache.get("per_deal"): raise
+        n_changed, was_full = 0, False
+        erro_pd = "limite diário de consultas do Pipedrive atingido" if "429" in str(e) else "falha de conexão com o Pipedrive"
+        print("AVISO Pipedrive:", erro_pd, "— usando a leitura anterior")
     leads, excl = model(cache)
     cache["midia"] = sync_midia(cache.get("midia"))
     cache["mppro"] = mppro_payload(cache["midia"], cache.get("mppro"))
@@ -842,7 +851,8 @@ def collect(full=False):
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
             "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
-                     "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)"}}
+                     "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
+                     "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run")}}
     tmp = SNAP.with_suffix(".tmp"); tmp.write_text(json.dumps(snap, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"); tmp.replace(SNAP)
     return snap
 
