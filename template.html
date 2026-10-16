@@ -1832,7 +1832,7 @@ function viewInstagram() {
   h += `<div class="card np"><div class="ch"><div><h3>Comparativo dos perfis</h3><p>${MN} · valores no período e variação em relação ao período anterior</p></div></div><div class="tw"><table class="t igc"><thead><tr><th></th>` +
     ig.contas.map(c => `<th class="num"><span class="igdot" style="background:${IG_COR[c.user] || '#00503c'}"></span>@${ESC(c.user)}</th>`).join('') + `</tr></thead><tbody>` +
     row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no fim do período. A variação só aparece quando há registro no fim dos dois períodos (o registro diário começou em 15/10/2026).', c => c.seguidores_fim) +
-    row('Visualizações', c => c.views) + row('Alcance médio por dia', c => c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia)) +
+    row('Visualizações', c => c.views) + row('Alcance médio por dia', c => c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia), fN, 'Média diária de contas alcançadas. A variação usa o valor sem arredondar.', c => c.alcance_medio_dia) +
     row('Interações', c => c.interacoes) + row(org ? 'Visualizações de stories' : 'Visualizações de stories (orgânico)', c => c.views_stories) +
     row('Posts publicados', c => c.posts) + row('Visualizações por post', c => c.views_por_post == null ? null : Math.round(c.views_por_post)) +
     row('Taxa de engajamento dos posts', c => c.engajamento_posts, fP) + row('Novos seguidores', c => c.novos_seguidores, fN, 'A Meta só informa novos seguidores dos últimos 30 dias (* = período coberto só em parte; sem comparação quando o período anterior não está completo)', c => c.novos_cobertura >= 99.5 ? c.novos_seguidores : null) +
