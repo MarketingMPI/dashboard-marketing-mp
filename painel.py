@@ -688,8 +688,9 @@ def mppro_payload(midia, old):
 # ---------------------------------------------------------------- Instagram (Meta Graph API, SOMENTE LEITURA)
 IG_CONTAS = [("17841444843479536", "meupatrimonio.nacional", "Meu Patrimônio"),
              ("17841435917222082", "rede.meupatrimonio", "Rede Meu Patrimônio"),
-             ("17841425597508477", "gabriel.meupatrimonio", "Gabriel · Meu Patrimônio")]
-IG_SEM_PERMISSAO = ["renanlimacfp"]          # visível no Business, mas a Meta nega insights (#10)
+             ("17841425597508477", "gabriel.meupatrimonio", "Gabriel · Meu Patrimônio"),
+             ("17841407560835140", "renanlimacfp", "Renan Lima")]
+IG_SEM_PERMISSAO = []                          # perfis visíveis no Business sem insights liberados
 IG_DESDE = "2026-01-01"
 IG_DIA = ["reach", "views", "accounts_engaged", "total_interactions", "likes", "comments", "shares", "saves", "reposts",
           "profile_links_taps", "website_clicks"]
