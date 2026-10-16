@@ -155,6 +155,7 @@ ul.igi li:before{content:'';position:absolute;left:4px;top:14px;width:8px;height
 .pdwarn{display:block;flex-basis:100%;margin-top:6px;background:#fff6e5;border:1px solid #f0d49b;color:#7a5306;border-radius:8px;padding:6px 10px;font-size:12px}
 .hsep{margin:0 10px;color:#b9c5bf;font-weight:400}.hsplit{display:block;height:6px;border-radius:99px;background:#e0e7e3;margin:2px 0 6px;overflow:hidden}.hsplit i{display:block;height:100%;background:#00503c;border-radius:99px}
 .igmodo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}.igmodo .mut{font-size:12.5px;max-width:720px}
+.igd{font-size:11px;color:var(--cinza);font-weight:500;margin-top:2px}
 .hubwarn{display:flex;gap:12px;align-items:center;background:repeating-linear-gradient(135deg,#fff8e6 0 12px,#fdf1d4 12px 24px);border:1px dashed #d9b45a;color:#6b5a2e;border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:16px}
 .hubwarn b{flex:none;background:#a8701c;color:#fff;font-size:11.5px;letter-spacing:.08em;border-radius:6px;padding:4px 9px}
 .note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
@@ -890,7 +891,7 @@ function computeMPPro(MP, f, agoraDay) {
    Alcance e contas engajadas não se somam entre dias (a mesma pessoa conta em vários dias): mostramos a MÉDIA DIÁRIA.
    Espelho em audit.instagram(). */
 /* Só ORGÂNICO: views/alcance/interações vêm das colunas 13-19 (total − balde "AD" da Meta). 1-8 = totais com anúncio, não usados. */
-const IGD = {reach: 14, views: 13, inter: 15, likes: 16, comments: 17, shares: 18, saves: 19, story: 20, ads_views: 21, link: 10, web: 11, novos: 12};
+const IGD = {reach: 14, views: 13, inter: 15, likes: 16, comments: 17, shares: 18, saves: 19, story: 20, ads_views: 21, link: 10, web: 11, novos: 12, saiu: 28};
 /* Três leituras das métricas de alcance: orgânico (13-19), anúncios = balde AD da Meta (21-27) e total do perfil (1-8). */
 const IG_MODOS = {
   org: {nome: 'Orgânico', reach: 14, views: 13, inter: 15, likes: 16, comments: 17, shares: 18, saves: 19},
@@ -932,6 +933,7 @@ function computeIG(IG, f, agoraDay) {
       salvamentos: soma('saves'), cliques_link: soma('link'), cliques_site: soma('web'),
       views_stories: soma('story'), views_anuncios: soma('ads_views'), alcance_medio_dia: media('reach'),
       novos_seguidores: nv.length ? nv.reduce((a, r) => a + r[IGD.novos], 0) : null, novos_cobertura: ds.length ? nv.length / ds.length * 100 : null,
+      deixaram_de_seguir: ds.some(r => r[IGD.saiu] != null) ? ds.reduce((a, r) => a + (r[IGD.saiu] || 0), 0) : null,
       seguidores_inicio: segIni, seguidores_fim: segFim, crescimento: segIni != null && segFim != null ? segFim - segIni : null,
       posts: ps.length, views_por_post: ps.length ? pv / ps.length : null, interacoes_por_post: ps.length ? pi / ps.length : null,
       engajamento_posts: pr ? pi / pr * 100 : null, formatos: Object.values(por).sort((a, b) => b.posts - a.posts || (a.formato < b.formato ? -1 : 1)), top,
@@ -1819,20 +1821,23 @@ function viewInstagram() {
   const incompleto = ig.contas.some(c => c.dias_periodo && c.dias_com_dados < c.dias_periodo);
   if (incompleto) h += `<div class="note">Parte do período ainda não tem dados diários carregados (o histórico é completado aos poucos a cada atualização, desde 01/01/2026).</div>`;
   // ---- comparativo
-  const row = (lab, f, fmt = fN, tip = '', fv = f) => `<tr${tip ? ` data-tip="${ESC(tip)}"` : ''}><td><b>${lab}</b></td>` + ig.contas.map(c => { const p = pmap.get(c.id) || {}; const v = f(c);
+  const sinal = (x, fmt) => x == null ? '' : `${x > 0 ? '+' : x < 0 ? '−' : ''}${fmt(Math.abs(x))}`;
+  const row = (lab, f, fmt = fN, tip = '', fv = f, abs = false) => `<tr${tip ? ` data-tip="${ESC(tip)}"` : ''}><td><b>${lab}</b></td>` + ig.contas.map(c => { const p = pmap.get(c.id) || {}; const v = f(c);
     const parcial = lab === 'Novos seguidores' && v != null && c.novos_cobertura < 99.5;
-    return `<td class="num"><b>${v == null ? '–' : fmt(v)}</b>${parcial ? '<sup class="mut" title="só os últimos 30 dias">*</sup>' : ''} ${igVar(fv(c), fv(p))}</td>`; }).join('') + '</tr>';
+    const dif = abs && fv(c) != null && fv(p) != null ? `<div class="igd">${sinal(fv(c) - fv(p), fmt)} vs ${fmt(fv(p))}</div>` : '';
+    return `<td class="num"><b>${v == null ? '–' : fmt(v)}</b>${parcial ? '<sup class="mut" title="só os últimos 30 dias">*</sup>' : ''} ${igVar(fv(c), fv(p))}${dif}</td>`; }).join('') + '</tr>';
   const AVISO = {org: 'Somente resultados <b>orgânicos</b>: visualizações, alcance e interações vindas de anúncios pagos ficam de fora.',
     ads: 'Somente o que veio de <b>anúncios pagos</b> (impulsionamentos e anúncios exibidos com o perfil). Seguidores, cliques na bio e os números dos posts não mudam.',
     tot: '<b>Orgânico + anúncios</b>: totais do perfil, como aparecem no Instagram. Seguidores, cliques na bio e os números dos posts não mudam.'};
   h += `<div class="note">${AVISO.org}</div>`;
   h += `<div class="card np"><div class="ch"><div><h3>Comparativo dos perfis</h3><p>${MN} · valores no período e variação em relação ao período anterior</p></div></div><div class="tw"><table class="t igc"><thead><tr><th></th>` +
     ig.contas.map(c => `<th class="num"><span class="igdot" style="background:${IG_COR[c.user] || '#00503c'}"></span>@${ESC(c.user)}</th>`).join('') + `</tr></thead><tbody>` +
-    row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no fim do período. A variação só aparece quando há registro no fim dos dois períodos (o registro diário começou em 15/10/2026).', c => c.seguidores_fim) +
+    row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no último dia do período, comparados com o último dia do período anterior. Reconstruído dia a dia pelo saldo informado pela Meta (começaram a seguir − deixaram de seguir).', c => c.seguidores_fim, true) +
     row('Visualizações', c => c.views) + row('Alcance médio por dia', c => c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia), fN, 'Média diária de contas alcançadas. A variação usa o valor sem arredondar.', c => c.alcance_medio_dia) +
     row('Interações', c => c.interacoes) + row(org ? 'Visualizações de stories' : 'Visualizações de stories (orgânico)', c => c.views_stories) +
     row('Posts publicados', c => c.posts) + row('Visualizações por post', c => c.views_por_post == null ? null : Math.round(c.views_por_post)) +
-    row('Taxa de engajamento dos posts', c => c.engajamento_posts, fP) + row('Novos seguidores', c => c.novos_seguidores, fN, 'A Meta só informa novos seguidores dos últimos 30 dias (* = período coberto só em parte; sem comparação quando o período anterior não está completo)', c => c.novos_cobertura >= 99.5 ? c.novos_seguidores : null) +
+    row('Taxa de engajamento dos posts', c => c.engajamento_posts, fP) + row('Novos seguidores', c => c.novos_seguidores, fN, 'Contas que começaram a seguir o perfil no período', c => c.novos_cobertura >= 99.5 ? c.novos_seguidores : null, true) +
+    row('Deixaram de seguir', c => c.deixaram_de_seguir, fN, 'Contas que deixaram de seguir (ou saíram do Instagram) no período', c => c.deixaram_de_seguir, true) +
     row('Cliques no link da bio', c => c.cliques_site, fN, 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)') + `</tbody></table></div></div>`;
   // ---- um bloco por perfil
   const vw = document.getElementById('view').clientWidth || 900;
@@ -1841,8 +1846,9 @@ function viewInstagram() {
     h += `<div class="igh mt" id="ig-${ESC(c.user)}"><span class="igdot lg" style="background:${cor}"></span><div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
       <a class="igl" href="https://www.instagram.com/${encodeURIComponent(c.user)}/" target="_blank" rel="noopener noreferrer">abrir perfil ↗</a></div>`;
     h += '<div class="kpis">' + [
-      kpiCard({label: 'Seguidores', cls: 'hero', v: fN(c.seguidores_fim ?? c.seguidores_hoje), sub: c.crescimento != null ? `${c.crescimento >= 0 ? '+' : ''}${fN(c.crescimento)} no período` : c.novos_seguidores != null ? `${fN(c.novos_seguidores)} novos no período` : 'histórico começa agora',
-        d: c.crescimento != null ? igDelta(c.crescimento, p.crescimento) : (c.novos_cobertura >= 99.5 && p.novos_cobertura >= 99.5 ? igDelta(c.novos_seguidores, p.novos_seguidores) : ''), tip: 'Total no fim do período. Variação: crescimento líquido (quando há registro no início e no fim) ou novos seguidores (últimos 30 dias)'}),
+      kpiCard({label: 'Seguidores', cls: 'hero', v: fN(c.seguidores_fim ?? c.seguidores_hoje),
+        sub: c.crescimento != null ? `<b>${c.crescimento >= 0 ? '+' : '−'}${fN(Math.abs(c.crescimento))}</b> no período · ${fN(c.novos_seguidores)} novos, ${fN(c.deixaram_de_seguir)} saíram` : 'sem histórico para o período',
+        d: igDelta(c.seguidores_fim, p.seguidores_fim), tip: 'Seguidores no último dia do período. A variação compara com o último dia do período anterior; o saldo mostra quem começou a seguir menos quem deixou de seguir.'}),
       kpiCard({label: 'Visualizações', v: fN(c.views), sub: `${f1(c.dias_com_dados ? c.views / c.dias_com_dados : null)} por dia`, d: igDelta(c.views, p.views), tip: org ? 'Vezes que posts, reels e stories do perfil foram vistos no período, SEM as visualizações de anúncios pagos' : modo === 'ads' ? 'Visualizações vindas de anúncios pagos no período' : 'Total de visualizações do perfil (orgânico + anúncios)'}),
       kpiCard({label: 'Alcance médio por dia', v: fN(c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia)), sub: 'contas diferentes por dia', d: igDelta(c.alcance_medio_dia, p.alcance_medio_dia, x => fN(Math.round(x))), tip: `Média do alcance diário (${MN.toLowerCase()}). O alcance não se soma entre dias (a mesma pessoa conta em vários dias).`}),
       kpiCard({label: 'Interações', v: fN(c.interacoes), sub: `${fN(c.curtidas)} curtidas · ${fN(c.comentarios)} coment.`, d: igDelta(c.interacoes, p.interacoes), tip: `Curtidas, comentários, compartilhamentos e salvamentos no período (${MN.toLowerCase()})`}),
@@ -1870,7 +1876,7 @@ function viewInstagram() {
     <li><b>Orgânico:</b> a Meta informa quanto das visualizações, do alcance e das interações veio de anúncios pagos; esses números são descontados. Seguidores, novos seguidores e cliques no link da bio são do perfil e podem incluir quem chegou por um anúncio.</li>
     <li><b>Alcance</b> mostra a média por dia, porque a mesma pessoa contaria em vários dias se somássemos.</li>
     <li><b>Posts:</b> feed e reels publicados no período, com os números acumulados de cada post até hoje. Stories não entram.</li>
-    <li><b>Novos seguidores:</b> a Meta só informa os últimos 30 dias. O crescimento líquido usa o registro diário de seguidores, que começou em 15/10/2026.</li></ul></details>`;
+    <li><b>Seguidores:</b> o total de cada dia é reconstruído a partir do total atual, descontando o saldo diário informado pela Meta (começaram a seguir − deixaram de seguir). Assim o filtro de período mostra o número exato daquela data e a variação.</li></ul></details>`;
   return h;
 }
 

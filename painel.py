@@ -742,7 +742,7 @@ def sync_instagram(old):
     try:
         for cid, user, nome in IG_CONTAS:
             c = contas.setdefault(cid, {"dias": {}, "seg": {}, "novos": {}, "posts": {}})
-            c.setdefault("org", {})
+            c.setdefault("org", {}); c.setdefault("fu", {})
             c["user"], c["nome"] = user, nome
             pf = ig_get(cid, tok, uso, fields="followers_count,follows_count,media_count")
             c["seguidores"], c["seguindo"], c["midias"] = pf.get("followers_count"), pf.get("follows_count"), pf.get("media_count")
@@ -757,14 +757,26 @@ def sync_instagram(old):
             alvo, d = [], hoje
             while d.isoformat() >= IG_DESDE:
                 k = d.isoformat()
-                if (hoje - d).days <= 2 or k not in c["dias"] or k not in c["org"]: alvo.append(k)
+                if (hoje - d).days <= 2 or k not in c["dias"] or k not in c["org"] or k not in c["fu"]: alvo.append(k)
                 d -= timedelta(days=1)
             recentes = [k for k in alvo if (hoje - datetime.fromisoformat(k).date()).days <= 2]
             alvo = recentes + [k for k in alvo if k not in recentes][:IG_BACKFILL_DIAS]
 
             def um_dia(k):
                 fim = min(_meia_noite((datetime.fromisoformat(k) + timedelta(days=1)).date().isoformat()), int(agora.timestamp()))
-                if k in c["dias"] and (hoje - datetime.fromisoformat(k).date()).days > 2:
+                velho = (hoje - datetime.fromisoformat(k).date()).days > 2
+                # seguiram × deixaram de seguir no dia (permite reconstruir o total de seguidores em qualquer data)
+                if velho and k in c["fu"]:
+                    fu = c["fu"][k]
+                else:
+                    r = ig_get(f"{cid}/insights", tok, uso, metric="follows_and_unfollows", period="day", metric_type="total_value",
+                               breakdown="follow_type", since=_meia_noite(k), until=fim)
+                    b = {y["dimension_values"][0]: y["value"] for x in r.get("data") or [] for bb in (x.get("total_value") or {}).get("breakdowns") or []
+                         for y in bb.get("results") or []}
+                    fu = [b.get("FOLLOWER", 0), b.get("NON_FOLLOWER", 0)]
+                if velho and k in c["dias"] and k in c["org"]:
+                    return k, c["dias"][k], c["org"][k], fu
+                if k in c["dias"] and velho:
                     vals = dict(zip(IG_DIA, c["dias"][k]))          # totais já lidos; falta só a separação orgânico × anúncio
                 else:
                     r = ig_get(f"{cid}/insights", tok, uso, metric=",".join(IG_DIA), period="day", metric_type="total_value",
@@ -778,11 +790,11 @@ def sync_instagram(old):
                     tv = x.get("total_value") or {}
                     org[x["name"]] = {"_total": tv.get("value"), **{y["dimension_values"][0]: y["value"]
                                       for b in tv.get("breakdowns") or [] for y in b.get("results") or []}}
-                return k, [vals.get(m) for m in IG_DIA], org
+                return k, [vals.get(m) for m in IG_DIA], org, fu
             for i0 in range(0, len(alvo), 24):          # lotes de 24 dias, 6 chamadas simultâneas; para se a Meta apertar
                 if uso[0] > 70 and i0: break
                 with ThreadPoolExecutor(6) as ex:
-                    for k, v, org in ex.map(um_dia, alvo[i0:i0 + 24]): c["dias"][k] = v; c["org"][k] = org
+                    for k, v, org, fu in ex.map(um_dia, alvo[i0:i0 + 24]): c["dias"][k] = v; c["org"][k] = org; c["fu"][k] = fu
             # posts (feed e reels) desde IG_DESDE
             after, fim_lista = None, False
             while not fim_lista:
@@ -826,6 +838,18 @@ def sync_instagram(old):
     return {"contas": contas, "erro": erro, "atualizado_em": agora.strftime("%Y-%m-%dT%H:%M:%S-03:00")}
 
 
+def ig_seguidores_por_dia(c):
+    """Seguidores no FIM de cada dia: parte do total atual e volta no tempo descontando o saldo diário
+    (seguiram − deixaram de seguir). Para onde faltar o saldo de algum dia, para (não inventa)."""
+    fu, v, out = c.get("fu") or {}, c.get("seguidores"), []
+    for k in sorted(c["dias"], reverse=True):
+        if v is None: break
+        out.append([k, v])
+        f = fu.get(k)
+        v = None if f is None else v - (f[0] - f[1])
+    return sorted(out)
+
+
 def ig_payload(ig):
     out = {"contas": [], "erro": (ig or {}).get("erro"), "atualizado_em": (ig or {}).get("atualizado_em"), "sem_permissao": IG_SEM_PERMISSAO}
     for cid, user, nome in IG_CONTAS:
@@ -834,7 +858,8 @@ def ig_payload(ig):
         dias = []
         for k, v in sorted(c["dias"].items()):
             org = (c.get("org") or {}).get(k)
-            linha = [k] + list(v) + [c["novos"].get(k)]
+            f = (c.get("fu") or {}).get(k)
+            linha = [k] + list(v) + [f[0] if f else c["novos"].get(k)]          # 12 = começaram a seguir no dia
             if org is None:
                 linha += [None] * 15
             else:
@@ -846,6 +871,7 @@ def ig_payload(ig):
                     return (b.get("_total") or 0) - (b.get("AD") or 0)
                 linha += [organico(m) for m in IG_ORG] + [(org.get("views") or {}).get("STORY") or 0, (org.get("views") or {}).get("AD") or 0]
                 linha += [(org.get(m) or {}).get("AD") or 0 for m in IG_ORG if m != "views"]   # 22-27: reach, inter, likes, comments, shares, saves de anúncio
+            linha.append(f[1] if f else None)                                                    # 28 = deixaram de seguir no dia
             dias.append(linha)
         posts = []
         for mid, po in sorted(c["posts"].items(), key=lambda x: x[1]["ts"]):
@@ -854,7 +880,7 @@ def ig_payload(ig):
                           i.get("likes", po.get("likes")), i.get("comments", po.get("com")), i.get("shares"), i.get("saved"),
                           i.get("total_interactions"), i.get("ig_reels_avg_watch_time")])
         out["contas"].append({"id": cid, "user": user, "nome": nome, "seguidores": c.get("seguidores"), "seguindo": c.get("seguindo"),
-                              "midias": c.get("midias"), "seg": sorted([k, v] for k, v in c["seg"].items() if v is not None),
+                              "midias": c.get("midias"), "seg": ig_seguidores_por_dia(c),
                               "dias": dias, "posts": posts})
     return out
 

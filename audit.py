@@ -428,7 +428,7 @@ def mppro(MP, f, agora_day):
 
 # ----------------------------------------------------------------------------- Instagram
 IG = None   # D["ig"]
-IGD = dict(reach=14, views=13, inter=15, likes=16, comments=17, shares=18, saves=19, story=20, ads_views=21, link=10, web=11, novos=12)
+IGD = dict(reach=14, views=13, inter=15, likes=16, comments=17, shares=18, saves=19, story=20, ads_views=21, link=10, web=11, novos=12, saiu=28)
 IG_ADS = dict(reach=22, views=21, inter=23, likes=24, comments=25, shares=26, saves=27)
 IG_TOT = dict(reach=1, views=2, inter=4, likes=5, comments=6, shares=7, saves=8)
 
@@ -479,6 +479,7 @@ def instagram(IGP, f, agora_day):
             "cliques_site": soma("web"), "views_stories": soma("story"), "views_anuncios": soma("ads_views"), "alcance_medio_dia": media("reach"),
             "novos_seguidores": sum(r[IGD["novos"]] for r in nv) if nv else None,
             "novos_cobertura": len(nv) / len(ds) * 100 if ds else None,
+            "deixaram_de_seguir": sum(r[IGD["saiu"]] or 0 for r in ds) if any(r[IGD["saiu"]] is not None for r in ds) else None,
             "seguidores_inicio": seg_ini, "seguidores_fim": seg_fim,
             "crescimento": seg_fim - seg_ini if seg_ini is not None and seg_fim is not None else None,
             "posts": len(ps), "views_por_post": pv / len(ps) if ps else None, "interacoes_por_post": pi / len(ps) if ps else None,
