@@ -550,6 +550,7 @@ def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
         "perdidos": b["perdidos"],
         "abertos": b["abertos"],
         "parados_7d": b["parados_7d"],
+        "taxa_conversao": b["ganhos"] / b["leads"] * 100 if b["leads"] else 0,
     }
 
     etapas = []

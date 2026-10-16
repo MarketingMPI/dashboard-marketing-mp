@@ -615,7 +615,8 @@ function computeFull(leads, f, agoraStr) {
   const kpis = {
     leads: g.n, contatados: g.cont, sem_contato: g.n - g.cont, pct_contatados: g.pct, fim_de_semana: g.fds,
     media_dias_1o_contato: g.m1, mediana_dias_1o_contato: g.md1, contatos_por_lead: g.cpl,
-    agendados: g.ag, reunioes: g.reu, ganhos: g.won, perdidos: g.lost, abertos: g.open, parados_7d: g.par
+    agendados: g.ag, reunioes: g.reu, ganhos: g.won, perdidos: g.lost, abertos: g.open, parados_7d: g.par,
+    taxa_conversao: g.n ? g.won / g.n * 100 : 0   // leads gerados no período → ganhos (0% quando não há leads)
   };
   const etapas = STAGES.map(st => {
     const id = Number(st.id);
@@ -1319,7 +1320,7 @@ function viewMacro() {
     kpiCard({label: 'Entraram no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k.abertos)} abertos · ${fN(k.ganhos)} ganhos · ${fN(k.perdidos)} perdidos`,
       extra: nBase > 0 ? `<div class="kx">inclui ${fN(nBase)} ex-clientes e contatos antigos reativados</div>` : '',
       d: delta(k.leads, pk.leads, 0), tip: 'Todos os leads que entraram no período (abertos, ganhos e perdidos), com os filtros aplicados'}),
-    kpiCard({label: 'Com contato', cls: 'w2', v: `${fN(k.contatados)}<small>${fP(k.pct_contatados)}</small>`, sub: `${f1(k.contatos_por_lead)} contatos por lead contatado`,
+    kpiCard({label: 'Com contato', v: `${fN(k.contatados)}<small>${fP(k.pct_contatados)}</small>`, sub: `${f1(k.contatos_por_lead)} contatos por lead contatado`,
       extra: `<div class="prog"><i style="width:${k.pct_contatados || 0}%"></i></div>`, d: delta(k.pct_contatados, pk.pct_contatados, 1, fP), tip: 'Leads com ao menos uma atividade de contato concluída.\nVariação do % de contatados.'}),
     kpiCard({label: 'Sem contato', v: fN(k.sem_contato), sub: pctK(k.sem_contato, k.leads), d: delta(k.sem_contato, pk.sem_contato, -1), tip: 'Leads sem nenhum contato concluído'}),
     kpiCard({label: 'Entraram no FDS', v: fN(k.fim_de_semana), sub: pctK(k.fim_de_semana, k.leads), d: delta(k.fim_de_semana, pk.fim_de_semana, 0), tip: 'Leads que entraram no sábado ou domingo'}),
@@ -1327,6 +1328,7 @@ function viewMacro() {
     kpiCard({label: 'Agendados', v: fN(k.agendados), sub: pctK(k.agendados, k.leads), d: delta(k.agendados, pk.agendados), tip: 'Chegaram à etapa Reunião ou além (ou ganhos)'}),
     kpiCard({label: 'Reuniões', v: fN(k.reunioes), sub: pctK(k.reunioes, k.leads), d: delta(k.reunioes, pk.reunioes), tip: 'Leads com reunião concluída'}),
     kpiCard({label: 'Ganhos', v: fN(k.ganhos), sub: pctK(k.ganhos, k.leads), d: delta(k.ganhos, pk.ganhos), tip: 'Leads do período já ganhos'}),
+    kpiCard({label: 'Taxa de conversão', v: fP(k.taxa_conversao), sub: `${fN(k.ganhos)} ${k.ganhos === 1 ? 'ganho' : 'ganhos'} de ${fN(k.leads)} leads gerados`, d: delta(k.taxa_conversao, pk.taxa_conversao, 1, fP), tip: 'Leads gerados no período que já foram fechados como ganho ÷ total de leads gerados no período. Mostra 0% quando ainda não há ganho.'}),
     kpiCard({label: 'Perdidos', cls: 'red', v: fN(k.perdidos), sub: pctK(k.perdidos, k.leads), d: delta(k.perdidos, pk.perdidos, -1), tip: 'Leads do período já perdidos'})
   ].join('') + '</div>';
   const vw = document.getElementById('view').clientWidth || 900;
