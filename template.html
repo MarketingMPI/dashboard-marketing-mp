@@ -1103,7 +1103,6 @@ function writeHash() {
   if (S.busca.trim()) p.set('q', S.busca.trim());
   if (S.perdaData) p.set('pd', '1');
   if (S.camp) p.set('camp', S.camp);
-  if (S.igModo && S.igModo !== 'org') p.set('ig', S.igModo);
   const h = p.toString(), want = h ? '#' + h : '';
   if (want === location.hash || (!want && !location.hash)) return;
   try { history.replaceState(null, '', location.pathname + location.search + (want || '#')); } catch (e) { location.hash = h; }
@@ -1813,7 +1812,7 @@ function viewInstagram() {
   let h = viewHead('Instagram', `Redes Sociais · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
   if (IGP.erro) h += `<div class="note">Última leitura do Instagram: ${ESC(IGP.erro)}. Os números abaixo são os da leitura anterior.</div>`;
   if (!igRaw) return h + `<div class="card">${emptyBox('Dados do Instagram indisponíveis', 'Não foi possível ler as contas nesta atualização.')}</div>`;
-  const modo = IG_MODOS[S.igModo] ? S.igModo : 'org', MN = IG_MODOS[modo].nome, org = modo === 'org';
+  const modo = 'org', MN = IG_MODOS[modo].nome, org = true;   // painel só orgânico (decisão do usuário, 16/10/2026)
   const aplica = c => !c || !c.id || org ? c : {...c, ...(modo === 'ads' ? c.anuncios : c.total)};
   const ig = {...igRaw, contas: igRaw.contas.map(aplica)};   // cópia: cur()/prev() ficam em cache e não podem ser alterados
   const pmap = new Map((pg ? pg.contas : []).map(c => [c.id, aplica(c)]));
@@ -1826,9 +1825,7 @@ function viewInstagram() {
   const AVISO = {org: 'Somente resultados <b>orgânicos</b>: visualizações, alcance e interações vindas de anúncios pagos ficam de fora.',
     ads: 'Somente o que veio de <b>anúncios pagos</b> (impulsionamentos e anúncios exibidos com o perfil). Seguidores, cliques na bio e os números dos posts não mudam.',
     tot: '<b>Orgânico + anúncios</b>: totais do perfil, como aparecem no Instagram. Seguidores, cliques na bio e os números dos posts não mudam.'};
-  h += `<div class="igmodo"><span class="cps" role="radiogroup" aria-label="Origem dos resultados">` +
-    Object.entries(IG_MODOS).map(([id, m]) => `<button type="button" class="cp${modo === id ? ' on' : ''}" data-act="igmodo" data-v="${id}" role="radio" aria-checked="${modo === id}">${m.nome}</button>`).join('') +
-    `</span><span class="mut">${AVISO[modo]}</span></div>`;
+  h += `<div class="note">${AVISO.org}</div>`;
   h += `<div class="card np"><div class="ch"><div><h3>Comparativo dos perfis</h3><p>${MN} · valores no período e variação em relação ao período anterior</p></div></div><div class="tw"><table class="t igc"><thead><tr><th></th>` +
     ig.contas.map(c => `<th class="num"><span class="igdot" style="background:${IG_COR[c.user] || '#00503c'}"></span>@${ESC(c.user)}</th>`).join('') + `</tr></thead><tbody>` +
     row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no fim do período. A variação só aparece quando há registro no fim dos dois períodos (o registro diário começou em 15/10/2026).', c => c.seguidores_fim) +
@@ -1870,7 +1867,6 @@ function viewInstagram() {
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Fonte:</b> API oficial da Meta (Instagram), contas ${ig.contas.map(c => '@' + ESC(c.user)).join(', ')}. Atualiza junto com o dashboard. ${(IGP.sem_permissao || []).length ? `@${IGP.sem_permissao.map(ESC).join(', @')} aparece no Business, mas a Meta não libera os insights para o app (precisa conceder acesso).` : ''}</li>
     <li><b>Variação:</b> sempre contra o período anterior de mesmo tamanho.</li>
-    <li><b>Orgânico / Anúncios / Orgânico + anúncios:</b> o seletor no topo troca visualizações, alcance e interações (cards, comparativo, gráfico e insights). A Meta separa o que veio de anúncio; posts, seguidores e cliques na bio não mudam.</li>
     <li><b>Orgânico:</b> a Meta informa quanto das visualizações, do alcance e das interações veio de anúncios pagos; esses números são descontados. Seguidores, novos seguidores e cliques no link da bio são do perfil e podem incluir quem chegou por um anúncio.</li>
     <li><b>Alcance</b> mostra a média por dia, porque a mesma pessoa contaria em vários dias se somássemos.</li>
     <li><b>Posts:</b> feed e reels publicados no período, com os números acumulados de cada post até hoje. Stories não entram.</li>
@@ -2268,7 +2264,6 @@ function bindEvents() {
       else if (a === 'csv-lista') exportCsv(listaRows(), 'leads');
       else if (a === 'csv-lost') exportCsv(lostList(), 'perdidos');
       else if (a === 'camp') { S.camp = act.dataset.v || ''; resetPages(); update(); }
-      else if (a === 'igmodo') { S.igModo = act.dataset.v || 'org'; update(); }
       else if (a === 'perda-data') { S.perdaData = !S.perdaData; S.lost.page = 0; update(); }
       else if (a === 'close') closeDrawer();
       else if (a === 'tl-all') { S.tlAll = true; openDrawer(act.dataset.id); }
