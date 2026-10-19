@@ -781,6 +781,19 @@ def sync_instagram(old):
             pf = ig_get(cid, tok, uso, fields="followers_count,follows_count,media_count")
             c["seguidores"], c["seguindo"], c["midias"] = pf.get("followers_count"), pf.get("follows_count"), pf.get("media_count")
             c["seg"][hoje.isoformat()] = c["seguidores"]
+            # stories: a Meta só lista os que estão no ar (24 h). Cada leitura guarda os que encontrar e atualiza
+            # os números enquanto estão ativos; o histórico começa no 1º dia em que o painel passou a ler stories.
+            c.setdefault("stories", {}); c.setdefault("stories_desde", hoje.isoformat())
+            st = ig_get(f"{cid}/stories", tok, uso, fields="id,timestamp,media_type", limit=100)
+            for m in st.get("data") or []:
+                ts = datetime.fromisoformat(m["timestamp"].replace("+0000", "+00:00")).astimezone(BRT)
+                so = c["stories"].setdefault(m["id"], {})
+                so.update(ts=ts.strftime("%Y-%m-%dT%H:%M:%S"), tipo=m.get("media_type"))
+                try:
+                    r = ig_get(f"{m['id']}/insights", tok, uso, metric="reach,views,replies,shares,total_interactions,navigation")
+                    so["ins"] = {x["name"]: (x.get("values") or [{}])[0].get("value") for x in r.get("data") or []}
+                except urllib.error.HTTPError:
+                    pass
             # novos seguidores por dia (a Meta só guarda os últimos 30 dias)
             fc = ig_get(f"{cid}/insights", tok, uso, metric="follower_count", period="day",
                         since=_meia_noite((hoje - timedelta(days=29)).isoformat()), until=_meia_noite(hoje.isoformat()))
@@ -915,7 +928,10 @@ def ig_payload(ig):
                           i.get("total_interactions"), i.get("ig_reels_avg_watch_time")])
         out["contas"].append({"id": cid, "user": user, "nome": nome, "seguidores": c.get("seguidores"), "seguindo": c.get("seguindo"),
                               "midias": c.get("midias"), "seg": ig_seguidores_por_dia(c),
-                              "dias": dias, "posts": posts})
+                              "dias": dias, "posts": posts, "stories_desde": c.get("stories_desde"),
+                              "stories": [[so["ts"], so.get("tipo"), (so.get("ins") or {}).get("reach"), (so.get("ins") or {}).get("views"),
+                                           (so.get("ins") or {}).get("replies"), (so.get("ins") or {}).get("total_interactions")]
+                                          for so in sorted((c.get("stories") or {}).values(), key=lambda x: x["ts"])]})
     return out
 
 

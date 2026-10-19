@@ -463,6 +463,9 @@ def instagram(IGP, f, agora_day):
         seg_ini = seg_ate((_d(de) - timedelta(days=1)).isoformat()) if de != "0000-00-00" else None
         seg_fim = seg_ate(T)
         ps = [x for x in c["posts"] if inP(x[0][:10])]
+        sts = [x for x in c.get("stories") or [] if inP(x[0][:10])]
+        st_desde = c.get("stories_desde")
+        st_views = [x[3] for x in sts if x[3] is not None]
         por = {}
         for x in ps:
             t = {"REELS": "Reels", "CAROUSEL_ALBUM": "Carrossel", "VIDEO": "Vídeo"}.get(x[1], "Imagem")
@@ -484,6 +487,9 @@ def instagram(IGP, f, agora_day):
             "crescimento": seg_fim - seg_ini if seg_ini is not None and seg_fim is not None else None,
             "posts": len(ps), "views_por_post": pv / len(ps) if ps else None, "interacoes_por_post": pi / len(ps) if ps else None,
             "engajamento_posts": pi / pr * 100 if pr else None,
+            "stories": len(sts) if st_desde else None, "stories_desde": st_desde,
+            "stories_completo": bool(st_desde) and de >= st_desde,
+            "views_por_story": sum(st_views) / len(st_views) if st_views else None,
             "formatos": sorted(por.values(), key=lambda o: (-o["posts"], o["formato"])),
             "top": [{"data": x[0], "formato": x[1], "link": x[2], "legenda": x[3], "alcance": x[4], "views": x[5], "curtidas": x[6],
                      "comentarios": x[7], "compart": x[8], "salvos": x[9], "interacoes": x[10],

@@ -180,6 +180,7 @@ table.t tr.tot td{background:#f7faf8;font-weight:700;border-top:1px solid var(--
 .empty b{display:block;color:var(--txt);font-size:14.5px;margin-bottom:3px;font-weight:600}
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+@media(min-width:1281px){.kpis.k6{grid-template-columns:repeat(6,minmax(0,1fr))}}
 .kpi{background:#fff;border:1px solid var(--linha);border-radius:var(--r);box-shadow:var(--sh);padding:15px 16px 14px;position:relative;min-width:0;cursor:default}
 .kpi.w2{grid-column:span 2}
 .kpi .kl{font-size:12px;color:var(--cinza);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:6px}
@@ -919,6 +920,8 @@ function computeIG(IG, f, agoraDay) {
     const segAte = d => { let v = null; for (const [k, n] of c.seg) if (k <= d) v = n; return v; };
     const segIni = segAte(addDays(de, -1)), segFim = segAte(T);
     const ps = c.posts.filter(x => inP(x[0].slice(0, 10)));
+    const sts = (c.stories || []).filter(x => inP(x[0].slice(0, 10))), stDesde = c.stories_desde || null;
+    const stViews = sts.filter(x => x[3] != null).map(x => x[3]);
     const por = {};
     for (const x of ps) {
       const t = x[1] === 'REELS' ? 'Reels' : x[1] === 'CAROUSEL_ALBUM' ? 'Carrossel' : x[1] === 'VIDEO' ? 'Vídeo' : 'Imagem';
@@ -938,7 +941,9 @@ function computeIG(IG, f, agoraDay) {
       deixaram_de_seguir: ds.some(r => r[IGD.saiu] != null) ? ds.reduce((a, r) => a + (r[IGD.saiu] || 0), 0) : null,
       seguidores_inicio: segIni, seguidores_fim: segFim, crescimento: segIni != null && segFim != null ? segFim - segIni : null,
       posts: ps.length, views_por_post: ps.length ? pv / ps.length : null, interacoes_por_post: ps.length ? pi / ps.length : null,
-      engajamento_posts: pr ? pi / pr * 100 : null, formatos: Object.values(por).sort((a, b) => b.posts - a.posts || (a.formato < b.formato ? -1 : 1)), top,
+      engajamento_posts: pr ? pi / pr * 100 : null,
+      stories: stDesde ? sts.length : null, stories_desde: stDesde, stories_completo: !!stDesde && de >= stDesde,
+      views_por_story: stViews.length ? stViews.reduce((a, b) => a + b, 0) / stViews.length : null, formatos: Object.values(por).sort((a, b) => b.posts - a.posts || (a.formato < b.formato ? -1 : 1)), top,
       serie: ds.map(r => [r[0], r[IGD.views] || 0, r[IGD.reach] || 0, r[IGD.inter] || 0]),
       anuncios: igBloco(ds, IG_MODOS.ads), total: igBloco(ds, IG_MODOS.tot)};
   });
@@ -1801,11 +1806,12 @@ function igInsights(c, p) {
   const ar = pc(c.alcance_medio_dia, p.alcance_medio_dia); if (ar != null && Math.abs(ar) >= 5) out.push([ar > 0 ? 'pos' : 'neg', `Alcance médio por dia ${ar > 0 ? 'cresceu' : 'diminuiu'} <b>${abs(ar)}</b> (${fN(Math.round(c.alcance_medio_dia))} contas/dia).`]);
   const it = pc(c.interacoes, p.interacoes); if (it != null && Math.abs(it) >= 5) out.push([it > 0 ? 'pos' : 'neg', `Interações ${sgn(it)} <b>${abs(it)}</b>: ${fN(c.curtidas)} curtidas, ${fN(c.comentarios)} comentários, ${fN(c.compartilhamentos)} compartilhamentos e ${fN(c.salvamentos)} salvamentos.`]);
   if (c.posts !== p.posts) out.push([c.posts > p.posts ? 'pos' : 'neg', `Frequência: <b>${fN(c.posts)} ${c.posts === 1 ? 'post' : 'posts'}</b> no período, contra ${fN(p.posts)} no anterior.`]);
-  else if (!c.posts) out.push(['neg', 'Nenhum post publicado no período: os números vêm de conteúdos antigos.']);
+  else if (!c.posts) out.push(['neg', c.stories ? 'Nenhum post de feed ou reels no período: as visualizações vêm principalmente dos stories.' : 'Nenhum post publicado no período: os números vêm de conteúdos antigos.']);
   if (c.formatos.length > 1) {
     const fs = c.formatos.filter(x => x.posts).map(x => ({...x, m: x.views / x.posts})).sort((a, b) => b.m - a.m);
     if (fs.length > 1 && fs[1].m > 0) out.push(['inf', `<b>${fs[0].formato}</b> rende ${nf1.format(fs[0].m / fs[1].m)}x mais visualizações por post que ${fs[1].formato} (${fN(Math.round(fs[0].m))} contra ${fN(Math.round(fs[1].m))}).`]);
   }
+  if (c.stories) out.push(['inf', `<b>${fN(c.stories)} ${c.stories === 1 ? 'story publicado' : 'stories publicados'}</b> no período${c.views_por_story != null ? `, com média de ${fN(Math.round(c.views_por_story))} visualizações por story` : ''}.`]);
   if (c.top.length) { const t = c.top[0]; out.push(['inf', `Melhor post: ${fmtNome(t.formato)} de ${fDM(t.data.slice(0, 10))}, com <b>${fN(t.views)} visualizações</b> e ${fN(t.interacoes)} interações${t.legenda ? ` (“${ESC(t.legenda.slice(0, 60))}${t.legenda.length > 60 ? '…' : ''}”)` : ''}.`]); }
   if (c.engajamento_posts != null) out.push([c.engajamento_posts >= 3 ? 'pos' : 'inf', `Taxa de engajamento dos posts do período: <b>${fP(c.engajamento_posts)}</b> das contas alcançadas interagiram${p.engajamento_posts != null ? ` (anterior: ${fP(p.engajamento_posts)})` : ''}.`]);
   if (c.crescimento != null) out.push([c.crescimento >= 0 ? 'pos' : 'neg', `Seguidores: <b>${c.crescimento >= 0 ? '+' : ''}${fN(c.crescimento)}</b> no período (de ${fN(c.seguidores_inicio)} para ${fN(c.seguidores_fim)}).`]);
@@ -1839,7 +1845,8 @@ function viewInstagram() {
     row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no último dia do período, comparados com o último dia do período anterior. Reconstruído dia a dia pelo saldo informado pela Meta (começaram a seguir − deixaram de seguir).', c => c.seguidores_fim, true) +
     row('Visualizações', c => c.views) + row('Alcance médio por dia', c => c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia), fN, 'Média diária de contas alcançadas. A variação usa o valor sem arredondar.', c => c.alcance_medio_dia) +
     row('Interações', c => c.interacoes) + row(org ? 'Visualizações de stories' : 'Visualizações de stories (orgânico)', c => c.views_stories) +
-    row('Posts publicados', c => c.posts) + row('Visualizações por post', c => c.views_por_post == null ? null : Math.round(c.views_por_post)) +
+    row('Posts publicados', c => c.posts) + row('Stories publicados', c => c.stories, fN, 'Stories publicados no período. O painel registra stories desde ' + fDay((ig.contas[0] || {}).stories_desde || TODAY) + ' (a Meta só mostra os que estão no ar).', c => c.stories_completo ? c.stories : null) +
+    row('Visualizações por post', c => c.views_por_post == null ? null : Math.round(c.views_por_post)) +
     row('Taxa de engajamento dos posts', c => c.engajamento_posts, fP) + row('Novos seguidores', c => c.novos_seguidores, fN, 'Contas que começaram a seguir o perfil no período', c => c.novos_cobertura >= 99.5 ? c.novos_seguidores : null, true) +
     row('Deixaram de seguir', c => c.deixaram_de_seguir, fN, 'Contas que deixaram de seguir (ou saíram do Instagram) no período', c => c.deixaram_de_seguir, true) +
     row('Cliques no link da bio', c => c.cliques_site, fN, 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)') + `</tbody></table></div></div>`;
@@ -1849,7 +1856,7 @@ function viewInstagram() {
     const p = pmap.get(c.id) || {}, cor = IG_COR[c.user] || '#00503c';
     h += `<div class="igh mt" id="ig-${ESC(c.user)}"><span class="igdot lg" style="background:${cor}"></span><div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
       <a class="igl" href="https://www.instagram.com/${encodeURIComponent(c.user)}/" target="_blank" rel="noopener noreferrer">abrir perfil ↗</a></div>`;
-    h += '<div class="kpis">' + [
+    h += '<div class="kpis k6">' + [
       kpiCard({label: 'Seguidores', cls: 'hero', v: fN(c.seguidores_fim ?? c.seguidores_hoje),
         sub: c.crescimento != null ? `<b>${c.crescimento >= 0 ? '+' : '−'}${fN(Math.abs(c.crescimento))}</b> no período · ${fN(c.novos_seguidores)} novos, ${fN(c.deixaram_de_seguir)} saíram` : 'sem histórico para o período',
         d: igDelta(c.seguidores_fim, p.seguidores_fim), tip: 'Seguidores no último dia do período. A variação compara com o último dia do período anterior; o saldo mostra quem começou a seguir menos quem deixou de seguir.'}),
@@ -1861,7 +1868,14 @@ function viewInstagram() {
       kpiCard({label: 'Visualizações por post', v: fN(c.views_por_post == null ? null : Math.round(c.views_por_post)), sub: `${f1(c.interacoes_por_post)} interações por post`, d: igDelta(c.views_por_post, p.views_por_post, x => fN(Math.round(x))), tip: 'Média dos posts publicados no período (números de cada post até hoje)'}),
       kpiCard({label: 'Taxa de engajamento', v: fP(c.engajamento_posts), sub: 'interações ÷ alcance dos posts', d: igDelta(c.engajamento_posts, p.engajamento_posts, fP), tip: 'Soma das interações dos posts do período ÷ soma do alcance desses posts'}),
       kpiCard({label: org ? 'Visualizações de stories' : 'Stories (orgânico)', v: fN(c.views_stories), sub: org ? `${fP(pctOf(c.views_stories, c.views))} das visualizações orgânicas` : 'stories não entram em anúncios', d: igDelta(c.views_stories, p.views_stories), tip: 'Visualizações orgânicas de stories no período'}),
-      kpiCard({label: 'Cliques no link da bio', v: fN(c.cliques_site), sub: 'toques no link do perfil', d: igDelta(c.cliques_site, p.cliques_site), tip: 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)'})
+      kpiCard({label: 'Cliques no link da bio', v: fN(c.cliques_site), sub: 'toques no link do perfil', d: igDelta(c.cliques_site, p.cliques_site), tip: 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)'}),
+      kpiCard({label: 'Stories publicados', v: c.stories == null ? '–' : fN(c.stories),
+        sub: c.stories == null ? 'ainda sem leitura de stories' : c.stories_completo ? `${f1(c.dias_periodo ? c.stories / c.dias_periodo * 7 : null)} por semana` : `contados desde ${fDM(c.stories_desde)}`,
+        d: c.stories_completo && p.stories_completo ? igDelta(c.stories, p.stories) : '<span class="dl na">sem comparação</span>',
+        tip: `Stories publicados no período. A Meta só mostra os stories enquanto estão no ar (24 h); o painel registra cada um desde ${c.stories_desde ? fDay(c.stories_desde) : 'a próxima atualização'}.`}),
+      kpiCard({label: 'Visualizações por story', v: c.views_por_story == null ? '–' : fN(Math.round(c.views_por_story)), sub: 'média dos stories do período',
+        d: c.stories_completo && p.stories_completo ? igDelta(c.views_por_story, p.views_por_story, x => fN(Math.round(x))) : '<span class="dl na">sem comparação</span>',
+        tip: 'Média de visualizações de cada story publicado no período (números lidos enquanto o story estava no ar)'})
     ].join('') + '</div>';
     const ins = igInsights(c, p);
     h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Visualizações e alcance por dia · ${MN}</h3><p>${org ? `Sem anúncios pagos${c.views_anuncios ? ` (${fN(c.views_anuncios)} visualizações de anúncios ficaram de fora)` : ''}` : modo === 'ads' ? 'Só o que veio de anúncios pagos' : 'Totais do perfil'} · barras = visualizações · linha = alcance do dia</p></div>
