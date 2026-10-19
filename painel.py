@@ -77,18 +77,28 @@ def url_for(path, **p):
     return BASE + path + ("&" if "?" in path else "?") + urllib.parse.urlencode(p)
 
 
+PD_PRAZO = [None]   # horário-limite da leitura do Pipedrive (em limite diário o curl esperava o Retry-After e a rodada estourava 20 min)
+
+
+def _pd_prazo():
+    if PD_PRAZO[0] and time.time() > PD_PRAZO[0]:
+        raise RuntimeError("429 (tempo máximo da leitura do Pipedrive esgotado)")
+
+
 def get(path, **p):
     # curl é mais estável que o SSL da stdlib neste Windows. A URL (com token) vai por stdin.
     config = f'url = "{url_for(path, **p)}"\n'
     last = "falha desconhecida"
     for i in range(5):
+        _pd_prazo()
         try:
-            r = subprocess.run(["curl", "--config", "-", "-fsS", "--retry", "4", "--retry-all-errors", "--retry-delay", "3",
+            r = subprocess.run(["curl", "--config", "-", "-fsS", "--retry", "4", "--retry-all-errors", "--retry-delay", "3", "--retry-max-time", "45",
                                 "--connect-timeout", "10", "--max-time", "40"],
                                input=config, capture_output=True, text=True, timeout=60)
             if r.returncode == 0:
                 return json.loads(r.stdout)
             last = (r.stderr or f"curl código {r.returncode}")[-300:]
+            if "429" in last and i >= 1: break           # limite do Pipedrive: insistir só queima tempo
         except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
             last = str(e)
         time.sleep((15 if "429" in last else 3) * (i + 1))  # 429 = limite de requisições do Pipedrive
@@ -100,6 +110,7 @@ def get_many(paths):
     out, todo = {}, dict(paths)
     for attempt in range(3):
         if not todo: break
+        _pd_prazo()
         with tempfile.TemporaryDirectory() as tmp:
             cfg, files = [], {}
             for i, (k, (path, params)) in enumerate(todo.items()):
@@ -107,7 +118,7 @@ def get_many(paths):
                 cfg += [f'url = "{url_for(path, **params)}"', f'output = "{f}"']
             try:
                 subprocess.run(["curl", "--config", "-", "-fsS", "--parallel", "--parallel-max", "3", "--rate", "6/s",
-                                "--retry", "5", "--retry-all-errors", "--connect-timeout", "10", "--max-time", "40"],
+                                "--retry", "5", "--retry-all-errors", "--retry-max-time", "60", "--connect-timeout", "10", "--max-time", "40"],
                                input="\n".join(cfg) + "\n", capture_output=True, text=True, timeout=900)
             except subprocess.TimeoutExpired:
                 pass
@@ -1068,7 +1079,9 @@ def collect(full=False):
             print("Pipedrive:", motivo, "— mantendo a leitura de", cache.get("last_run"))
         else:
             if CACHE.exists() and pipedrive_bloqueado(): raise RuntimeError("429 (sondagem)")
-            cache, n_changed, was_full = sync(full)
+            if CACHE.exists(): PD_PRAZO[0] = time.time() + int(os.environ.get("PIPEDRIVE_MAX_S", "360"))
+            try: cache, n_changed, was_full = sync(full)
+            finally: PD_PRAZO[0] = None
     except Exception as e:                     # Pipedrive fora/limite diário: segue com a última leitura boa
         if not CACHE.exists(): raise
         cache = json.loads(CACHE.read_text(encoding="utf-8"))
