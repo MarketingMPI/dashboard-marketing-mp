@@ -1279,7 +1279,7 @@ def publish_legacy():
                                           "-c", "user.name=MarketingMPI", "-c", "user.email=MarketingMPI@users.noreply.github.com", *a],
                                          capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=t, env=e)
     g("pull", "--rebase", "--autostash", "origin", "main")
-    g("add", "index.html"); g("commit", "-m", f"Atualiza Dashboard do Marketing {s['gerado_em'][:16]}")
+    g("add", "index.html"); g("commit", "-m", f"Atualiza Painel Operacional {s['gerado_em'][:16]}")
     p = g("push", "origin", "HEAD:main", t=240)
     if p.returncode: print("ERRO_PUSH:", (p.stderr or p.stdout)[-300:]); sys.exit(1)
     print("PUBLICADO", s["gerado_em"])

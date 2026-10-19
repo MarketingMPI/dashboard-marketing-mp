@@ -1,4 +1,4 @@
-# Dashboard do Marketing — Meu Patrimônio
+# Painel Operacional — Meu Patrimônio (antigo Dashboard do Marketing)
 
 Painel de BI do marketing da Meu Patrimônio: leads do **B2C Funil Alpha** (Pipedrive), investimento em mídia (Meta Ads), vendas do **MP PRO** (Kiwify), usuários do **MP HUB** e redes sociais (Instagram e YouTube) — tudo numa página só, atualizada sozinha de hora em hora.
 

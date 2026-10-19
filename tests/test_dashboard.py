@@ -14,7 +14,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(t.count("/*__DATA__*/null"), 1)
         self.assertEqual(t.count("/*__RAW__*/null"), 1)
         self.assertNotIn('"leads"', t)
-        self.assertIn("Dashboard do Marketing", t)
+        self.assertIn("Painel Operacional", t)
         self.assertIn("MP_DASH", t)
 
     def test_origem(self):
