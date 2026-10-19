@@ -988,6 +988,7 @@ def youtube_import(arq):
         n = next(v for k, v in nomes.items() if chave in k)
         return list(csv.DictReader(io.StringIO(z.read(n).decode("utf-8-sig"))))
     tab = ler("tabela"); tot = ler("total.csv")
+    antigo = json.loads(crypt("dec", YT_ENC.read_bytes())) if YT_ENC.exists() else {}
     num = lambda v, f=float: f(v) if v not in (None, "") else None
     def linha(x):
         pub = x.get("Horário de publicação do vídeo") or ""
@@ -1006,10 +1007,47 @@ def youtube_import(arq):
     dias = [[x["Data"], _seg(x.get("Duração média da visualização"))] for x in tot if x.get("Data")]
     de, ate = dias[0][0], dias[-1][0]          # o nome do arquivo traz o dia da exportação; os dados vão até a véspera
     out = {"canal": YT_CANAL, "de": de, "ate": ate, "importado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M"),
-           "total": total, "videos": videos, "dias": dias}
+           "total": total, "videos": videos, "dias": dias, "diario": antigo.get("diario") or []}
     YT_ENC.parent.mkdir(exist_ok=True)
     YT_ENC.write_bytes(crypt("enc", json.dumps(out, ensure_ascii=False).encode("utf-8")))
     return len(videos), total["views"], de, ate
+
+
+def youtube_dias_import(arq):
+    """Tabela do YouTube Studio agrupada por DATA (Modo avançado › Data), .csv ou .xlsx: 1 linha por dia.
+    Mescla com a série já importada (o arquivo novo prevalece nos dias em comum: tem mais colunas e números revisados).
+    diario[i] = [data, views, horas, duração média (s), receita, inscritos (saldo), impressões, taxa de cliques (%),
+                 inscrições obtidas, inscrições perdidas, novos espectadores, recorrentes, vídeos publicados]"""
+    if str(arq).lower().endswith(".csv"):
+        import csv
+        rd = csv.reader(open(arq, encoding="utf-8-sig")); cab = next(rd); rows = list(rd)
+    else:
+        import openpyxl
+        todas = list(openpyxl.load_workbook(arq, data_only=True).worksheets[0].iter_rows(values_only=True))
+        cab = [str(c) for c in todas[0]]; rows = [list(r) for r in todas[1:]]
+    def g(r, nome):
+        i = next((i for i, n in enumerate(cab) if str(n).strip() == nome), None)
+        if i is None: i = next((i for i, n in enumerate(cab) if str(n).startswith(nome)), None)
+        v = r[i] if i is not None and i < len(r) else None
+        return None if v in (None, "") else v
+    tem = lambda nome: any(str(c).strip() == nome or str(c).startswith(nome) for c in cab)
+    f = lambda v: float(v) if v is not None else None
+    n = lambda v: int(float(v)) if v is not None else None
+    z = lambda nome, conv: (conv(g(r, nome)) if g(r, nome) is not None else 0) if tem(nome) else None   # célula vazia = 0 no Studio
+    novos = {}
+    for r in rows:
+        d = str(g(r, "Data") or "")[:10]
+        if not re.match(r"\d{4}-\d{2}-\d{2}$", d): continue
+        novos[d] = [d, z("Visualizações", n) or 0, z("Tempo de exibição", f) or 0.0, _seg(g(r, "Duração média")), z("Receita", f),
+                    z("Inscritos", n), z("Impressões", n), f(g(r, "Taxa de cliques")), z("Inscrições obtidas", n),
+                    z("Inscrições perdidas", n), n(g(r, "Novos espectadores")), n(g(r, "Espectadores recorrentes")), z("Vídeos publicados", n)]
+    Y = json.loads(crypt("dec", YT_ENC.read_bytes()))
+    base = {x[0]: (list(x) + [None] * 13)[:13] for x in Y.get("diario") or []}
+    base.update(novos)
+    Y["diario"] = [base[k] for k in sorted(base)]
+    YT_ENC.write_bytes(crypt("enc", json.dumps(Y, ensure_ascii=False).encode("utf-8")))
+    ks = sorted(novos)
+    return len(novos), ks[0], ks[-1], len(Y["diario"])
 
 
 def youtube_payload():
@@ -1212,6 +1250,7 @@ if __name__ == "__main__":
     elif cmd == "pages": build_pages(); print("ok", OUT)
     elif cmd == "mphub-import": print("ok", mphub_import(sys.argv[2]), "usuários")
     elif cmd == "youtube-import": print("ok", youtube_import(sys.argv[2]))
+    elif cmd == "youtube-dias": print("ok", youtube_dias_import(sys.argv[2]))
     elif cmd == "dev": print("ok", build_dev(sys.argv[2] if len(sys.argv) > 2 else None))
     elif cmd in ("refresh", "publish"): refresh()
     else: sys.exit(__doc__)

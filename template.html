@@ -1041,9 +1041,9 @@ const TABS = [
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
 const TABS_RS = [{id: 'instagram', nome: 'Instagram'}, {id: 'youtube', nome: 'YouTube'}];
 const isB2B = id => TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id);
-const SO_PERIODO = new Set(['mppro', 'mphub', 'instagram']);
+const SO_PERIODO = new Set(['mppro', 'mphub', 'instagram', 'youtube']);
 const PRESETS = [['hoje', 'Hoje'], ['7d', 'Últimos 7 dias'], ['semana', 'Esta semana'], ['semana_ant', 'Semana passada'],
-  ['30d', 'Últimos 30 dias'], ['mes', 'Este mês'], ['mes_ant', 'Mês passado'], ['tudo', 'Tudo']];
+  ['28d', 'Últimos 28 dias'], ['30d', 'Últimos 30 dias'], ['mes', 'Este mês'], ['mes_ant', 'Mês passado'], ['tudo', 'Tudo']];
 const DIMS = [
   {k: 'consultores', nome: 'Consultor', h: 'c'}, {k: 'origens', nome: 'Origem', h: 'o'}, {k: 'status', nome: 'Status', h: 's'},
   {k: 'etapas', nome: 'Etapa', h: 'et'}, {k: 'etiquetas', nome: 'Etiqueta', h: 'lb'}, {k: 'motivos', nome: 'Motivo da perda', h: 'mt', hidden: true}];
@@ -1062,6 +1062,7 @@ function presetRange(p) {
     case '7d': return [addDays(t, -6), t];
     case 'semana': return [addDays(t, -((weekday(t) + 6) % 7)), t];
     case 'semana_ant': { const mon = addDays(t, -((weekday(t) + 6) % 7)); return [addDays(mon, -7), addDays(mon, -1)]; }
+    case '28d': return [addDays(t, -28), addDays(t, -1)];      // como o YouTube Studio: 28 dias fechados, até ontem
     case '30d': return [addDays(t, -29), t];
     case 'mes': return [t.slice(0, 8) + '01', t];
     case 'mes_ant': { const lp = addDays(t.slice(0, 8) + '01', -1); return [lp.slice(0, 8) + '01', lp]; }
@@ -1896,53 +1897,81 @@ function ytCompute(Y) {
     origem: [grp('Novos no período', novos.filter(v => v.views > 0)), grp('Catálogo (antes)', comViews.filter(v => !novos.includes(v)))],
     anos: [...anos].sort((a, b) => a[0] < b[0] ? 1 : -1), soma: grp('soma', comViews)};
 }
+/* série diária (tabela do Studio agrupada por Data): [data, views, horas, duração média (s), receita, inscritos, impressões,
+   taxa de cliques %, inscrições obtidas, perdidas, novos espectadores, recorrentes, vídeos publicados] */
+const YD = {views: 1, horas: 2, avd: 3, receita: 4, insc: 5, impr: 6, ctr: 7, ganhos: 8, perdas: 9, pub: 12};
+function ytPeriodo(Y, de, ate) {
+  const dd = Y.diario || []; if (!dd.length) return null;
+  const ini = dd[0][0], fim = dd[dd.length - 1][0], ds = dd.filter(r => r[0] >= de && r[0] <= ate), n = diffDays(de, ate) + 1;
+  const todos = i => ds.length && ds.every(r => r[i] != null);                // métrica só vale se todos os dias do período a têm
+  const sum = i => todos(i) ? ds.reduce((x, r) => x + r[i], 0) : null;
+  const views = sum(YD.views) || 0, impr = sum(YD.impr);
+  return {ds, ini, fim, completo: ds.length === n, cobertos: ds.length, n, views, horas: sum(YD.horas), receita: sum(YD.receita),
+    // duração média e taxa de cliques: médias ponderadas (por visualização e por impressão) — batem com o total do YouTube Studio
+    dur_media: views && todos(YD.avd) ? ds.reduce((x, r) => x + r[YD.views] * r[YD.avd], 0) / views : null,
+    inscritos: sum(YD.insc), ganhos: sum(YD.ganhos), perdas: sum(YD.perdas), impressoes: impr, publicados: sum(YD.pub),
+    ctr: impr && todos(YD.ctr) ? ds.reduce((x, r) => x + r[YD.impr] * r[YD.ctr], 0) / impr : null};
+}
 function viewYouTube() {
   const Y = D.youtube;
-  let h = viewHead('YouTube', `Redes Sociais · ${Y && Y.canal ? ESC(Y.canal) : 'canal'}${Y && Y.de ? ` · de ${fDay(Y.de)} a ${fDay(Y.ate)} (${diffDays(Y.de, Y.ate) + 1} dias)` : ''}`);
+  let h = viewHead('YouTube', `Redes Sociais · ${Y && Y.canal ? ESC(Y.canal) : 'canal'} · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
   if (!Y || !Y.total) return h + `<div class="card">${emptyBox('Dados do YouTube indisponíveis', Y && Y.erro ? Y.erro : 'Nenhuma exportação do YouTube Studio foi importada ainda.')}</div>`;
-  const T = Y.total, c = ytCompute(Y), n = diffDays(Y.de, Y.ate) + 1;
-  h += `<div class="note">Dados da exportação do YouTube Studio para o período <b>${fDay(Y.de)} a ${fDay(Y.ate)}</b> (importada em ${fDay(Y.importado_em.slice(0, 10))}). O arquivo traz o total do período por vídeo, por isso o filtro de datas não se aplica a esta aba.</div>`;
+  const T = Y.total, c = ytCompute(Y), n = diffDays(Y.de, Y.ate) + 1, [pd, pa] = prevRange();
+  const P = ytPeriodo(Y, S.de, S.ate), PP = ytPeriodo(Y, pd, pa), arq = `${fDM(Y.de)} a ${fDM(Y.ate)}`;
+  const ok = P && P.cobertos > 0;
+  const dv = (a, b, fmt = fN, good = 1) => a == null ? '' : (PP && PP.completo && b != null) ? delta(a, b, good, fmt) + `<span class="vs">${dif(a, b, fmt)}</span>` : '<span class="dl na">sem comparação</span>';
+  const dif = (a, b, fmt) => { const x = a - b; return `${x > 0 ? '+' : x < 0 ? '−' : ''}${fmt(Math.abs(x))}`; };
+  const cmp = PP && PP.completo;
+  h += `<div class="note">Fonte: exportações do YouTube Studio, com dados de <b>${fDay(P ? P.ini : Y.de)} a ${fDay(P ? P.fim : Y.ate)}</b>. ` +
+    `Os cards seguem o filtro de datas e comparam com o período anterior de mesmo tamanho. Os blocos marcados com <i>${arq}</i> e as tabelas de vídeos são da exportação por vídeo.` +
+    (P && !P.completo ? ` <b>Atenção:</b> só ${P.cobertos} de ${P.n} dias do período têm dados${P.ate > P.fim ? ' (o YouTube fecha o dia com 1 dia de atraso; use "Últimos 28 dias")' : ''}.` : '') +
+    (ok && !cmp ? ' Sem comparação: o período anterior não está todo nos dados importados.' : '') + `</div>`;
   h += '<div class="kpis">' + [
-    kpiCard({label: 'Visualizações', cls: 'hero', v: fN(T.views), sub: `${f1(T.views / n)} por dia · ${fN(c.comViews.length)} vídeos assistidos`, tip: 'Visualizações de todos os vídeos do canal no período'}),
-    kpiCard({label: 'Inscritos ganhos', v: `${T.inscritos >= 0 ? '+' : ''}${fN(T.inscritos)}`, sub: `${f1(T.inscritos / n * 30)} por mês`, tip: 'Saldo de inscritos no período (ganhos − perdidos), como mostra o YouTube Studio'}),
-    kpiCard({label: 'Tempo de exibição', v: `${fN(Math.round(T.horas))}<small>horas</small>`, sub: `${f1(T.horas / n)} h por dia`, tip: 'Horas assistidas no período'}),
-    kpiCard({label: 'Espectadores únicos', v: fN(T.espectadores), sub: `${fN(T.novos)} novos · ${fN(T.recorrentes)} recorrentes`, tip: 'Pessoas diferentes que assistiram. Recorrentes = já tinham assistido o canal antes'}),
-    kpiCard({label: 'Duração média', v: fHMS(T.dur_media), sub: `${fP(T.pct_visto)} do vídeo, em média`, tip: 'Quanto tempo cada visualização durou, em média, e a % do vídeo que foi assistida'}),
-    kpiCard({label: 'Impressões', v: fN(T.impressoes), sub: `miniatura exibida · ${fN(T.alcance)} contas alcançadas`, tip: 'Vezes que a miniatura apareceu para alguém no YouTube'}),
-    kpiCard({label: 'Taxa de cliques', v: fP(T.ctr), sub: 'cliques ÷ impressões da miniatura', tip: 'De cada 100 vezes que a miniatura apareceu, quantas viraram clique'}),
-    kpiCard({label: 'Continuaram assistindo', v: fP(T.continuaram), sub: 'após os primeiros segundos', tip: 'Métrica do YouTube: % de quem começou o vídeo e continuou assistindo depois do início'}),
-    kpiCard({label: 'Vídeos publicados', v: fN(c.novos.length), sub: `${fN(c.origem[0].views)} visualizações (${fP(pctOf(c.origem[0].views, c.soma.views))})`, tip: 'Vídeos publicados dentro do período e as visualizações que eles tiveram'}),
-    kpiCard({label: 'Receita estimada', v: `US$ ${(T.receita || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, sub: 'monetização do YouTube', tip: 'Receita estimada informada pelo YouTube Studio, em dólar'})
+    kpiCard({label: 'Visualizações', cls: 'hero', v: ok ? fN(P.views) : '–', sub: ok ? `${f1(P.views / P.cobertos)} por dia` : 'sem dados no período', d: ok ? dv(P.views, PP && PP.views) : '', tip: 'Visualizações de todos os vídeos do canal no período'}),
+    kpiCard({label: 'Inscritos', v: ok && P.inscritos != null ? `${P.inscritos >= 0 ? '+' : '−'}${fN(Math.abs(P.inscritos))}` : '–', sub: ok && P.ganhos != null ? `${fN(P.ganhos)} ganhos · ${fN(P.perdas)} perdidos` : 'sem dados de inscritos no período', d: ok ? dv(P.inscritos, PP && PP.inscritos) : '', tip: 'Saldo de inscritos no período (ganhos − perdidos)'}),
+    kpiCard({label: 'Tempo de exibição', v: ok && P.horas != null ? `${fN(Math.round(P.horas))}<small>horas</small>` : '–', sub: ok && P.horas != null ? `${f1(P.horas / P.cobertos)} h por dia` : '', d: ok ? dv(P.horas, PP && PP.horas, x => fN(Math.round(x)) + ' h') : '', tip: 'Horas assistidas no período'}),
+    kpiCard({label: 'Duração média', v: ok ? fHMS(P.dur_media) : '–', sub: 'por visualização', d: ok ? dv(P.dur_media, PP && PP.dur_media, fHMS) : '', tip: 'Duração média da visualização no período (média dos dias ponderada pelas visualizações, como o YouTube Studio)'}),
+    kpiCard({label: 'Impressões', v: ok && P.impressoes != null ? fN(P.impressoes) : '–', sub: 'miniatura exibida', d: ok ? dv(P.impressoes, PP && PP.impressoes) : '', tip: 'Vezes que a miniatura apareceu para alguém no YouTube'}),
+    kpiCard({label: 'Taxa de cliques', v: ok ? fP(P.ctr) : '–', sub: 'cliques ÷ impressões', d: ok ? dv(P.ctr, PP && PP.ctr, x => nf1.format(x) + ' p.p.') : '', tip: 'De cada 100 vezes que a miniatura apareceu, quantas viraram clique (média ponderada pelas impressões)'}),
+    kpiCard({label: 'Vídeos publicados', v: ok && P.publicados != null ? fN(P.publicados) : '–', sub: 'no período', d: ok ? dv(P.publicados, PP && PP.publicados) : '', tip: 'Vídeos publicados no período'}),
+    kpiCard({label: 'Receita estimada', v: ok && P.receita != null ? `US$ ${P.receita.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '–', sub: 'monetização do YouTube', d: ok ? dv(P.receita, PP && PP.receita, x => 'US$ ' + x.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})) : '', tip: 'Receita estimada no período, em dólar'}),
+    kpiCard({label: 'Visualizações por dia', v: ok ? f1(P.views / P.cobertos) : '–', sub: ok ? `pico: ${fN(Math.max(...P.ds.map(r => r[1])))} em ${fDM(P.ds.reduce((a, r) => r[1] > a[1] ? r : a)[0])}` : '', d: ok ? dv(P.views / P.cobertos, PP && PP.cobertos ? PP.views / PP.cobertos : null, f1) : '', tip: 'Média diária de visualizações e o dia de maior audiência'}),
+    kpiCard({label: 'Espectadores únicos', v: fN(T.espectadores), sub: `<i>${arq}</i> · ${fN(T.novos)} novos · ${fN(T.recorrentes)} recorrentes`, tip: 'Pessoas diferentes que assistiram, no período da exportação por vídeo (o YouTube não soma espectadores únicos entre dias)'})
   ].join('') + '</div>';
-  // duração média por dia
-  const ds = Y.dias || [], vw = document.getElementById('view').clientWidth || 900, W = Math.max(300, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44), H = 220, pl = 44, pr = 10, pt = 16, pb = 28, pw = W - pl - pr, ph = H - pt - pb;
-  const mx = Math.max(240, Math.ceil(Math.max(...ds.map(d => d[1] || 0)) / 240) * 240), y = v => pt + ph - ph * v / mx, bw = pw / Math.max(1, ds.length);
-  let g = ''; for (let i = 0; i <= 4; i++) { const v = mx * i / 4, yy = y(v); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fHMS(v)}</text>`; }
+  // visualizações por dia (barras) + duração média (linha) no período filtrado
+  const ds = ok ? P.ds : [], vw = document.getElementById('view').clientWidth || 900, W = Math.max(300, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44), H = 230, pl = 44, pr = 44, pt = 16, pb = 28, pw = W - pl - pr, ph = H - pt - pb;
+  const mv = niceMax(Math.max(1, ...ds.map(d => d[1]))), md = Math.max(240, Math.ceil(Math.max(0, ...ds.map(d => d[3] || 0)) / 240) * 240);
+  const y = v => pt + ph - ph * v / mv, yd = v => pt + ph - ph * v / md, bw = pw / Math.max(1, ds.length), w = Math.max(1.5, Math.min(bw * .62, 30));
+  let g = ''; for (let i = 0; i <= 4; i++) { const yy = y(mv * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mv * i / 4)}</text><text class="ax" x="${W - pr + 6}" y="${yy + 3.5}" style="fill:#a8701c">${fHMS(md * i / 4)}</text>`; }
   const step = Math.max(1, Math.ceil(ds.length / Math.max(1, Math.floor(pw / 52)))), pts = [];
-  ds.forEach(([d, v], i) => { const cx = pl + i * bw + bw / 2; pts.push(`${cx},${y(v || 0)}`);
+  ds.forEach(([d, v, hr, dm], i) => { const cx = pl + i * bw + bw / 2;
+    if (v) g += `<rect class="bar" x="${cx - w / 2}" y="${y(v)}" width="${w}" height="${y(0) - y(v)}" fill="#c4302b" opacity=".85" rx="${Math.min(3, w / 4)}"/>`;
+    pts.push(`${cx},${yd(dm || 0)}`);
     if (i % step === 0) g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${fDM(d)}</text>`;
-    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${WD[weekday(d)]}, ${fDay(d)}\nDuração média: ${fHMS(v)}`)}"/>`; });
-  g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#c4302b" stroke-width="2" stroke-linejoin="round"/>`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${WD[weekday(d)]}, ${fDay(d)}\nVisualizações: ${fN(v)}\nTempo de exibição: ${f1(hr)} h\nDuração média: ${fHMS(dm)}`)}" data-range="${d}|${d}"/>`; });
+  g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#c98a1b" stroke-width="2" stroke-linejoin="round"/>`;
   const fmt = c.formato.map(x => ({label: x.nome, v: x.views, extra: `${x.videos} vídeos · ${fN(Math.round(x.horas))} h`, tip: `${x.nome}\nVídeos com visualização: ${x.videos}\nVisualizações: ${fN(x.views)}\nHoras: ${fN(Math.round(x.horas))}\nInscritos: ${fN(x.inscritos)}\nTaxa de cliques: ${fP(x.ctr)}`}));
   const ori = c.origem.map(x => ({label: x.nome, v: x.views, extra: `${x.videos} vídeos · ${fP(pctOf(x.views, c.soma.views))}`, tip: `${x.nome}\nVídeos: ${x.videos}\nVisualizações: ${fN(x.views)}\nInscritos: ${fN(x.inscritos)}`}));
   const ano = c.anos.map(([k, v]) => ({label: k === 'Sem data' ? k : `Publicados em ${k}`, v, extra: fP(pctOf(v, c.soma.views)), tip: `${k}: ${fN(v)} visualizações`}));
-  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Duração média da visualização por dia</h3><p>Quanto tempo, em média, cada visualização durou</p></div></div><div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg></div></div>
-    <div class="card"><div class="ch"><div><h3>Visualizações por formato</h3><p>Pela duração do vídeo</p></div></div>${hbars(fmt)}
-      <div class="ch mt"><div><h3>Conteúdo novo × catálogo</h3><p>Visualizações no período pela data de publicação</p></div></div>${hbars(ori)}
-      <div class="ch mt"><div><h3>Ano de publicação</h3><p>De quando são os vídeos assistidos</p></div></div>${hbars(ano)}</div></div>`;
+  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Visualizações por dia</h3><p>Barras = visualizações (eixo esquerdo) · linha = duração média (eixo direito)</p></div>
+      <div class="lg"><span><i style="background:#c4302b"></i>Visualizações</span><span><i style="background:#c98a1b"></i>Duração média</span></div></div>${ds.length ? `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg></div>` : emptyBox('Sem dados diários no período', `Os dados vão de ${fDay(P ? P.ini : Y.de)} a ${fDay(P ? P.fim : Y.ate)}.`)}</div>
+    <div class="card"><div class="ch"><div><h3>Visualizações por formato</h3><p>Pela duração do vídeo · ${arq}</p></div></div>${hbars(fmt)}
+      <div class="ch mt"><div><h3>Conteúdo novo × catálogo</h3><p>Pela data de publicação · ${arq}</p></div></div>${hbars(ori)}
+      <div class="ch mt"><div><h3>Ano de publicação</h3><p>De quando são os vídeos assistidos · ${arq}</p></div></div>${hbars(ano)}</div></div>`;
   // tabelas
   const lnk = v => `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(v.id)}" target="_blank" rel="noopener noreferrer"><b>${ESC(v.titulo || v.id)}</b></a>`;
   const tr = v => `<tr><td class="wrap" style="min-width:280px;max-width:460px">${lnk(v)}</td><td>${v.publicado ? fDay(v.publicado) : '–'}</td><td class="num">${fHMS(v.duracao)}</td><td class="num b">${fN(v.views)}</td><td class="num">${f1(v.horas)}</td><td class="num">${v.inscritos > 0 ? '+' : ''}${fN(v.inscritos)}</td><td class="num">${fN(v.impressoes)}</td><td class="num">${fP(v.ctr)}</td><td class="num">${fHMS(v.dur_media)}</td><td class="num">${fP(v.pct_visto)}</td></tr>`;
   const head = '<thead><tr><th>Vídeo</th><th>Publicado</th><th class="num">Duração</th><th class="num">Visualizações</th><th class="num">Horas</th><th class="num">Inscritos</th><th class="num">Impressões</th><th class="num">Cliques</th><th class="num">Duração média</th><th class="num">% assistido</th></tr></thead>';
   const top = c.comViews.slice().sort((a, b) => b.views - a.views || b.horas - a.horas).slice(0, 15);
-  h += `<div class="card np mt"><div class="ch"><div><h3>Vídeos mais assistidos no período</h3><p>Top 15 por visualizações · clique no título para abrir no YouTube</p></div></div><div class="tw"><table class="t">${head}<tbody>${top.map(tr).join('')}</tbody></table></div></div>`;
+  h += `<div class="card np mt"><div class="ch"><div><h3>Vídeos mais assistidos</h3><p>Top 15 por visualizações de ${arq} · clique no título para abrir no YouTube</p></div></div><div class="tw"><table class="t">${head}<tbody>${top.map(tr).join('')}</tbody></table></div></div>`;
   const pub = c.novos.slice().sort((a, b) => a.publicado < b.publicado ? 1 : -1);
-  h += `<div class="card np mt"><div class="ch"><div><h3>Vídeos publicados no período</h3><p>${fN(pub.length)} vídeos, do mais recente para o mais antigo</p></div></div><div class="tw"><table class="t">${head}<tbody>${pub.length ? pub.map(tr).join('') : '<tr><td colspan="10">Nenhum vídeo publicado no período</td></tr>'}</tbody></table></div></div>`;
+  h += `<div class="card np mt"><div class="ch"><div><h3>Vídeos publicados de ${arq}</h3><p>${fN(pub.length)} vídeos, do mais recente para o mais antigo</p></div></div><div class="tw"><table class="t">${head}<tbody>${pub.length ? pub.map(tr).join('') : '<tr><td colspan="10">Nenhum vídeo publicado no período</td></tr>'}</tbody></table></div></div>`;
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Fonte:</b> exportação manual do YouTube Studio (aba Conteúdo), canal ${ESC(Y.canal)}. Para atualizar, exporte de novo e envie o arquivo .zip.</li>
     <li><b>Totais</b> (visualizações, horas, inscritos, espectadores) vêm da linha "Total" do YouTube Studio. A soma vídeo a vídeo pode diferir um pouco: o Studio desconta inscritos perdidos que não são atribuídos a um vídeo.</li>
     <li><b>Formato:</b> vídeos de até 3 minutos são considerados curtos (Shorts); os demais, longos.</li>
-    <li><b>Filtro de datas:</b> o arquivo não traz visualizações por dia, só o total do período. Com acesso à API do YouTube Analytics, a aba passa a responder ao filtro e atualizar sozinha.</li></ul></details>`;
+    <li><b>Filtro de datas:</b> os cards usam a tabela do Studio agrupada por Data. "Últimos 28 dias" segue o padrão do YouTube Studio (28 dias fechados, até ontem). Duração média e taxa de cliques são médias ponderadas e batem com o total do Studio. Espectadores únicos e as tabelas de vídeos vêm da exportação por vídeo.</li>
+    <li><b>Atualizar:</b> no Studio, Análises › Modo avançado › agrupar por Data › exportar .csv, e envie os arquivos. Dias repetidos são substituídos pelos números mais recentes.</li></ul></details>`;
   return h;
 }
 
