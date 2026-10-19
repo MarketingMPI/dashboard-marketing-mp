@@ -441,6 +441,11 @@ def ig_bloco(ds, M):
             "serie": [[r[0], r[M["views"]] or 0, r[M["reach"]] or 0, r[M["inter"]] or 0] for r in ds]}
 
 
+def _no_ar_ate(ts):
+    """Story fica no ar 24 h depois de publicado (horário de Brasília, texto ISO sem fuso)."""
+    return (datetime.fromisoformat(ts) + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
 def instagram(IGP, f, agora_day):
     if not IGP or not IGP.get("contas"):
         return None
@@ -463,7 +468,10 @@ def instagram(IGP, f, agora_day):
         seg_ini = seg_ate((_d(de) - timedelta(days=1)).isoformat()) if de != "0000-00-00" else None
         seg_fim = seg_ate(T)
         ps = [x for x in c["posts"] if inP(x[0][:10])]
-        sts = [x for x in c.get("stories") or [] if inP(x[0][:10])]
+        st_ini = (_d(de) - timedelta(days=1)).isoformat() if de != "0000-00-00" else de
+        sts_pub = [x for x in c.get("stories") or [] if inP(x[0][:10])]
+        sts = [x for x in c.get("stories") or [] if x[0] >= f"{st_ini}T00:00:00" and x[0][:10] <= ate
+               and (x[0][:10] >= de or _no_ar_ate(x[0]) >= f"{de}T00:00:00")]
         st_desde = c.get("stories_desde")
         st_views = [x[3] for x in sts if x[3] is not None]
         por = {}
@@ -487,7 +495,7 @@ def instagram(IGP, f, agora_day):
             "crescimento": seg_fim - seg_ini if seg_ini is not None and seg_fim is not None else None,
             "posts": len(ps), "views_por_post": pv / len(ps) if ps else None, "interacoes_por_post": pi / len(ps) if ps else None,
             "engajamento_posts": pi / pr * 100 if pr else None,
-            "stories": len(sts) if st_desde else None, "stories_desde": st_desde,
+            "stories": len(sts) if st_desde else None, "stories_publicados": len(sts_pub) if st_desde else None, "stories_desde": st_desde,
             "stories_completo": bool(st_desde) and de >= st_desde,
             "views_por_story": sum(st_views) / len(st_views) if st_views else None,
             "formatos": sorted(por.values(), key=lambda o: (-o["posts"], o["formato"])),
