@@ -119,8 +119,8 @@ class PipedriveHoraEmHoraTests(unittest.TestCase):
         self.assertFalse(self._pular(70, "workflow_dispatch"))
 
     def test_agendado_le_de_hora_em_hora(self):
-        self.assertFalse(self._pular(50, "schedule"))
-        self.assertTrue(self._pular(10, "schedule"))
+        self.assertFalse(self._pular(70, "schedule"))
+        self.assertTrue(self._pular(40, "schedule"))      # reserva do GitHub não relê se o cron-job.org já leu
 
 
 class PipedriveJanelaTests(unittest.TestCase):

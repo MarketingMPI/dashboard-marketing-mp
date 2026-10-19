@@ -961,7 +961,7 @@ def pipedrive_pular(full=False):
         return False, ""
     if not cache.get("per_deal"): return False, ""
     agendado = os.environ.get("GITHUB_EVENT_NAME") == "schedule"
-    limite = 20 if agendado else PIPEDRIVE_INTERVALO_MIN - 5      # agendado: só evita leitura dupla
+    limite = PIPEDRIVE_INTERVALO_MIN - 5      # disparo do cron-job.org (de hora em hora) e o schedule do GitHub (reserva) não leem 2x
     if idade < limite:
         return True, f"última leitura há {idade:.0f} min (Pipedrive só de hora em hora)"
     return False, ""
