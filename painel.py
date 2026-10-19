@@ -17,7 +17,7 @@ Somente stdlib + curl + node. Segredos via variáveis de ambiente (Actions) ou .
 import base64, hashlib, html as htmllib, json, os, unicodedata, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request, pathlib
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 HERE = pathlib.Path(__file__).resolve().parent
 # Funciona tanto na raiz do projeto quanto em v2/ durante o desenvolvimento.
@@ -233,36 +233,58 @@ def person_keys(p):
     return sorted(em | ph)
 
 
+def semana(iso_dia):
+    y, w, _ = date.fromisoformat(iso_dia).isocalendar(); return f"{y}-W{w:02d}"
+
+
 def sync(full=False):
-    """Atualiza o cache. Deals: sempre todos. Atividades/changelog: só negócios novos/alterados,
-    + varredura de atividades alteradas desde a última execução. Recarga completa 1x por dia."""
+    """Atualiza o cache gastando o mínimo da cota diária da API (tokens: lista = 20, item = 2).
+    Leitura normal: lista de negócios + atividades alteradas; atividades/histórico/notas/pessoa só dos negócios
+    novos ou alterados. Recarga completa 1x por SEMANA (1ª leitura da semana); se ela falhar, não se repete no
+    mesmo dia. Na recarga, histórico, nota de entrada e pessoa de negócios que não mudaram são reaproveitados."""
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
     started = datetime.now(timezone.utc)
     today = started.astimezone(BRT).date().isoformat()
-    full = full or cache.get("full_day") != today
+    if not full and (not cache.get("full_day") or semana(cache["full_day"]) != semana(today)):
+        full = cache.get("full_tentado") != today
+    if full and CACHE.exists():                       # marca a tentativa antes de gastar a cota
+        cache["full_tentado"] = today; CACHE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
     deals = fetch_deals()
-    users = {u["id"]: u["name"] for u in get("/v1/users")["data"]}
-    fields = get("/v1/dealFields", limit=500)["data"]
-    labels = {o["id"]: o["label"] for f in fields if f["key"] == "label" for o in (f.get("options") or [])}
-    pipes = {p["id"]: p["name"] for p in get("/v1/pipelines")["data"]}
-    stage_pipe = {s["id"]: pipes.get(s["pipeline_id"], str(s["pipeline_id"])) for s in get("/v1/stages")["data"]}
-    per = {} if full else {int(k): v for k, v in (cache.get("per_deal") or {}).items()}
-    changed = [d["id"] for d in deals if full or d["id"] not in per or per[d["id"]].get("u") != d.get("update_time")]
+    velho = {int(k): v for k, v in (cache.get("per_deal") or {}).items()}
+    meta_ok = not full and cache.get("users") and cache.get("labels") is not None and cache.get("stage_pipe")
+    if meta_ok:                                       # usuários/etiquetas/etapas: só relê se aparecer algo novo
+        U, L, SP = cache["users"], cache["labels"], cache["stage_pipe"]
+        meta_ok = all(str(d.get("owner_id")) in U and str(d.get("stage_id")) in SP and all(str(x) in L for x in d.get("label_ids") or [])
+                      for d in deals)
+    if meta_ok:
+        users = {int(k): v for k, v in cache["users"].items()}; labels = {int(k): v for k, v in cache["labels"].items()}
+        stage_pipe = {int(k): v for k, v in cache["stage_pipe"].items()}
+    else:
+        users = {u["id"]: u["name"] for u in get("/v1/users")["data"]}
+        fields = get("/v1/dealFields", limit=500)["data"]
+        labels = {o["id"]: o["label"] for f in fields if f["key"] == "label" for o in (f.get("options") or [])}
+        pipes = {p["id"]: p["name"] for p in get("/v1/pipelines")["data"]}
+        stage_pipe = {s["id"]: pipes.get(s["pipeline_id"], str(s["pipeline_id"])) for s in get("/v1/stages")["data"]}
+    per = {} if full else dict(velho)
+    mudou = lambda d: d["id"] not in velho or velho[d["id"]].get("u") != d.get("update_time")
+    changed = [d["id"] for d in deals if full or mudou(d)]
     if changed:
+        novos = {d["id"] for d in deals if mudou(d)}
         acts = fetch_paged_deal_items(changed, "acts")
-        logs = fetch_paged_deal_items(changed, "log")
-        notes = get_many({i: ("/v1/notes", {"deal_id": i, "limit": 500}) for i in changed})
-        pids = sorted({d["person_id"] for d in deals if d["id"] in acts and d.get("person_id")})
+        logs = fetch_paged_deal_items(sorted(novos), "log")
+        notes = get_many({i: ("/v1/notes", {"deal_id": i, "limit": 500}) for i in changed if i in novos or not velho[i].get("ent")})
+        pids = sorted({d["person_id"] for d in deals if d["id"] in acts and d.get("person_id") and (d["id"] in novos or not velho[d["id"]].get("pk"))})
         persons = get_many({pid: (f"/v1/persons/{pid}", {}) for pid in pids})
         for d in deals:
             if d["id"] in acts:
+                v = velho.get(d["id"]) or {}
                 pr = (persons.get(d.get("person_id")) or {}).get("data") or {}
                 per[d["id"]] = {"u": d.get("update_time"),
-                                "ent": real_entry((notes.get(d["id"]) or {}).get("data") or []),
-                                "pk": person_keys(pr),
+                                "ent": real_entry((notes.get(d["id"]) or {}).get("data") or []) if d["id"] in notes else v.get("ent"),
+                                "pk": person_keys(pr) if d.get("person_id") in persons else v.get("pk"),
                                 "acts": [norm_activity(a) for a in acts[d["id"]]],
                                 "log": [{"k": e["field_key"], "o": e.get("old_value"), "n": e.get("new_value"), "t": e.get("time")}
-                                        for e in logs[d["id"]]]}
+                                        for e in logs[d["id"]]] if d["id"] in logs else v.get("log", [])}
     # Atividades concluídas/alteradas sem mexer no negócio (garantia extra entre as recargas diárias)
     if not full and cache.get("last_run"):
         since = (parse_utc(cache["last_run"]) - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -282,7 +304,8 @@ def sync(full=False):
             if not cur: break
     ids = {d["id"] for d in deals}
     per = {k: v for k, v in per.items() if k in ids}
-    cache = {"full_day": today if full else cache.get("full_day"), "last_run": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    cache = {"full_day": today if full else cache.get("full_day"), "full_tentado": cache.get("full_tentado"),
+             "last_run": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
              "deals": deals, "users": {str(k): v for k, v in users.items()}, "labels": {str(k): v for k, v in labels.items()},
              "stage_pipe": {str(k): v for k, v in stage_pipe.items()},
              "per_deal": {str(k): v for k, v in per.items()}}
@@ -899,11 +922,22 @@ def ig_payload(ig):
 PIPEDRIVE_INTERVALO_MIN = 60      # leads do Pipedrive: no máximo 1 leitura por hora (cota diária da API)
 
 
+PIPEDRIVE_DIAS = range(0, 5)                 # segunda (0) a sexta (4)
+PIPEDRIVE_HORAS = ("07:00", "19:15")          # 7h às 19h (a leitura das 19h roda alguns minutos depois da hora)
+
+
+def pipedrive_no_horario(agora=None):
+    a = (agora or datetime.now(BRT)).astimezone(BRT)
+    return a.weekday() in PIPEDRIVE_DIAS and PIPEDRIVE_HORAS[0] <= a.strftime("%H:%M") <= PIPEDRIVE_HORAS[1]
+
+
 def pipedrive_pular(full=False):
     """Separa as atualizações: o agendamento de hora em hora lê o Pipedrive; publicações pedidas à mão
     (botão "Atualizar agora", mudanças de layout, rodadas locais) só releem Meta, Kiwify e Instagram,
     a não ser que a última leitura do Pipedrive tenha mais de 1 hora. PIPEDRIVE_FORCAR=1 força a leitura."""
     if full or os.environ.get("PIPEDRIVE_FORCAR") == "1" or not CACHE.exists(): return False, ""
+    if not pipedrive_no_horario():
+        return True, "fora do horário de leitura (segunda a sexta, 7h às 19h)"
     try:
         cache = json.loads(CACHE.read_text(encoding="utf-8"))
         idade = (datetime.now(timezone.utc) - parse_utc(cache["last_run"])).total_seconds() / 60
@@ -1100,7 +1134,7 @@ def collect(full=False):
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
                      "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run"),
-                     "pipedrive_intervalo_min": PIPEDRIVE_INTERVALO_MIN}}
+                     "pipedrive_intervalo_min": PIPEDRIVE_INTERVALO_MIN, "pipedrive_janela": "seg a sex, 7h às 19h"}}
     tmp = SNAP.with_suffix(".tmp"); tmp.write_text(json.dumps(snap, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"); tmp.replace(SNAP)
     return snap
 

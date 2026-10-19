@@ -436,7 +436,7 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
 <div id="app">
 <header class="top">
   <div class="brand"><img src="assets/coruja-branca.png" alt="Meu Patrimônio"><div><h1>Dashboard do Marketing</h1></div></div>
-  <div class="upd"><span>Última atualização em <b id="upd">–</b></span><div class="rf"><span class="live"><i></i>atualização automática a cada 1 hora</span><button type="button" class="rfb" id="rfbtn" hidden title="Atualiza Meta Ads, Kiwify e Instagram e republica o dashboard (cerca de 2 a 3 minutos). Os leads do Pipedrive são lidos de hora em hora."><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Atualizar agora</span></button></div><span class="rfst" id="rfst" aria-live="polite"></span></div>
+  <div class="upd"><span>Última atualização em <b id="upd">–</b></span><div class="rf"><span class="live"><i></i>atualização automática a cada 1 hora</span><button type="button" class="rfb" id="rfbtn" hidden title="Atualiza Meta Ads, Kiwify e Instagram e republica o dashboard (cerca de 2 a 3 minutos). Os leads do Pipedrive são lidos de hora em hora, de segunda a sexta, das 7h às 19h."><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Atualizar agora</span></button></div><span class="rfst" id="rfst" aria-live="polite"></span></div>
 </header>
 <div class="shell">
   <nav class="side" id="nav" aria-label="Abas do dashboard"></nav>
@@ -2524,7 +2524,7 @@ function boot(data) {
   if (PDM.pipedrive_em && !PDM.erro_pipedrive) {
     const u = new Date(PDM.pipedrive_em), loc = new Date(u.getTime() - 3 * 3600e3).toISOString();
     const el = document.createElement('span'); el.className = 'pdinfo';
-    el.textContent = `Leads do Pipedrive: ${fDay(loc.slice(0, 10)) === fDay(TODAY) ? 'hoje' : fDay(loc.slice(0, 10))} às ${loc.slice(11, 16)} · lidos de hora em hora`;
+    el.textContent = `Leads do Pipedrive: ${fDay(loc.slice(0, 10)) === fDay(TODAY) ? 'hoje' : fDay(loc.slice(0, 10))} às ${loc.slice(11, 16)} · lidos de hora em hora, seg a sex, 7h às 19h`;
     document.getElementById('upd').closest('.upd').appendChild(el);
   }
   if (PDM.erro_pipedrive && PDM.pipedrive_em) {

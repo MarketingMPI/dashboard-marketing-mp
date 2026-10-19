@@ -103,13 +103,14 @@ class PipedriveHoraEmHoraTests(unittest.TestCase):
         d = tempfile.mkdtemp(); f = Path(d) / "c.json"
         f.write_text(json.dumps({"per_deal": {"1": {}}, "last_run": (datetime.now(timezone.utc) - timedelta(minutes=minutos)).strftime("%Y-%m-%dT%H:%M:%SZ")}))
         old, painel.CACHE = painel.CACHE, f
+        hor, painel.pipedrive_no_horario = painel.pipedrive_no_horario, (lambda agora=None: True)
         env = os.environ.get("GITHUB_EVENT_NAME")
         try:
             if evento: os.environ["GITHUB_EVENT_NAME"] = evento
             else: os.environ.pop("GITHUB_EVENT_NAME", None)
             return painel.pipedrive_pular()[0]
         finally:
-            painel.CACHE = old
+            painel.CACHE = old; painel.pipedrive_no_horario = hor
             if env is None: os.environ.pop("GITHUB_EVENT_NAME", None)
             else: os.environ["GITHUB_EVENT_NAME"] = env
 
@@ -120,6 +121,29 @@ class PipedriveHoraEmHoraTests(unittest.TestCase):
     def test_agendado_le_de_hora_em_hora(self):
         self.assertFalse(self._pular(50, "schedule"))
         self.assertTrue(self._pular(10, "schedule"))
+
+
+class PipedriveJanelaTests(unittest.TestCase):
+    """Pipedrive só de segunda a sexta, das 7h às 19h (horário de Brasília)."""
+    def _h(self, iso):
+        from datetime import datetime
+        return painel.pipedrive_no_horario(datetime.fromisoformat(iso))
+
+    def test_dias_uteis_no_horario(self):
+        self.assertTrue(self._h("2026-10-19T07:07:00-03:00"))     # segunda 7h07
+        self.assertTrue(self._h("2026-10-23T19:07:00-03:00"))     # sexta 19h07 (última leitura)
+        self.assertTrue(self._h("2026-10-21T15:07:00+00:00"))     # 12h07 em Brasília
+
+    def test_fora_do_horario_e_fim_de_semana(self):
+        self.assertFalse(self._h("2026-10-19T06:59:00-03:00"))
+        self.assertFalse(self._h("2026-10-19T20:07:00-03:00"))
+        self.assertFalse(self._h("2026-10-24T10:07:00-03:00"))    # sábado
+        self.assertFalse(self._h("2026-10-25T10:07:00-03:00"))    # domingo
+        self.assertFalse(self._h("2026-10-19T09:30:00+00:00"))    # 6h30 em Brasília
+
+    def test_recarga_completa_uma_vez_por_semana(self):
+        self.assertEqual(painel.semana("2026-10-19"), painel.semana("2026-10-23"))
+        self.assertNotEqual(painel.semana("2026-10-18"), painel.semana("2026-10-19"))
 
 
 if __name__ == "__main__":
