@@ -403,10 +403,11 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .insl{list-style:none;margin:0;padding:0}.insl li{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--linha);font-size:15px;line-height:1.55}.insl li:last-child{border-bottom:0}
 .insl i{flex:none;width:9px;height:9px;border-radius:50%;margin-top:8px;background:#b9c4bf}.insl li.pos i{background:#00a611}.insl li.neg i{background:#c0392b}
 .mpins{align-items:start}
-.foco{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-@media(max-width:1100px){.foco{grid-template-columns:1fr}}
-.fci{border:1px solid var(--linha);border-radius:12px;padding:14px 16px;background:#fff}
-.fch{display:flex;align-items:center;gap:10px;margin-bottom:10px}.fch b{font-size:15px;color:var(--txt);flex:1}
+.foco{display:flex;flex-direction:column;gap:10px}
+.fci{border:1px solid var(--linha);border-radius:12px;background:#fff;transition:border-color .15s,box-shadow .15s}.fci:hover{border-color:var(--v200)}.fci[open]{border-color:var(--v200);box-shadow:0 4px 14px rgba(0,51,38,.06)}
+.fcb{padding:0 16px 16px 52px}
+.fch{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;list-style:none;user-select:none}.fch::-webkit-details-marker{display:none}.fch b{font-size:15px;color:var(--txt);flex:1}
+.fcc{width:18px;height:18px;flex:none;fill:none;stroke:#8a9590;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}.fci[open] .fcc{transform:rotate(180deg);stroke:var(--verde)}
 .fcn{width:26px;height:26px;border-radius:50%;background:var(--verde);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
 .fcp{font-size:11px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}.fcp.alta{background:#fbe9e6;color:#a3362a}.fcp.media{background:#fbf1dc;color:#8a5d10}
 .fcr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
@@ -1861,12 +1862,12 @@ function mpFoco(x, p) {
 function mpFocoHtml(x, p) {
   const F = mpFoco(x, p);
   if (!F.itens.length) return `<div class="card mt"><div class="ch"><div><h3>Onde focar para melhorar</h3><p>Nenhum indicador do mês ficou pior que a referência de mercado.</p></div></div></div>`;
-  return `<div class="card mt"><div class="ch"><div><h3>Onde focar para melhorar</h3><p>Prioridades de ${mesNome(x.ym)}, da maior para a menor, a partir dos números do mês e das referências de mercado · impacto estimado é ordem de grandeza</p></div></div>
-    <div class="foco">${F.itens.map((f, i) => `<div class="fci"><div class="fch"><span class="fcn">${i + 1}</span><b>${f.t}</b><span class="fcp ${i < 2 ? 'alta' : 'media'}">prioridade ${i < 2 ? 'alta' : 'média'}</span></div>
+  return `<div class="card mt"><div class="ch"><div><h3>Onde focar para melhorar</h3><p>Prioridades de ${mesNome(x.ym)}, da maior para a menor · clique em cada uma para ver o diagnóstico, as ações e o impacto estimado (ordem de grandeza)</p></div></div>
+    <div class="foco">${F.itens.map((f, i) => `<details class="fci" name="mpfoco"><summary class="fch"><span class="fcn">${i + 1}</span><b>${f.t}</b><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="fcb">
       <div class="fcr"><div><span>Hoje</span>${f.hoje}</div><div><span>Meta</span>${f.meta}</div></div>
       <p class="fcw">${f.porque}</p>
       <ul>${f.acoes.map(a => `<li>${a}</li>`).join('')}</ul>
-      ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div>`).join('')}</div>
+      ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div></details>`).join('')}</div>
     ${F.manter.length ? `<div class="fcok"><b>O que manter:</b> ${F.manter.join(' · ')}.</div>` : ''}</div>`;
 }
 function viewMPProMensal() {
