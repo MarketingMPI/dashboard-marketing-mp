@@ -1714,7 +1714,8 @@ const MP_FONTES = {
   baymard: {nome: 'Baymard Institute — taxa média de abandono de carrinho/checkout (50 estudos)', url: 'https://baymard.com/lists/cart-abandonment-rate'},
   synchro: {nome: 'Synchro Hub — Refund rate em infoproduto: faixas por modelo de produto', url: 'https://www.synchrohub.com.br/blog/refund-rate-reembolso-infoproduto-reduzir'},
   skok: {nome: 'David Skok (Matrix Partners) — SaaS Metrics 2.0: LTV:CAC e meses para recuperar o CAC', url: 'https://www.forentrepreneurs.com/saas-metrics-2-definitions-2/'},
-  superads: {nome: 'Superads — Facebook Ads Benchmarks Brasil (mediana de US$ 3 bi em anúncios, jul/2025–jul/2026)', url: 'https://superads.ai/facebook-ads-costs/cpm-cost-per-mille/brazil'},
+  trafius_cpc: {nome: 'Trafius — CPC médio no Meta Ads Brasil 2026 por segmento (cursos/infoprodutos e finanças/investimentos)', url: 'https://trafius.com.br/blog/cpc-medio-meta-ads-brasil-2026'},
+  trafius_cpm: {nome: 'Trafius — CPM médio no Meta Ads Brasil 2026 por segmento (feed)', url: 'https://trafius.com.br/blog/cpm-medio-facebook-ads-brasil-2026'},
   prosp: {nome: 'Júlia Wolf Cruz (Prosp, agência Hotmart) — Métricas do funil de infoproduto, com médias da Hotmart', url: 'https://juliawolfcruz.com.br/blog/metricas-do-funil/'},
   bcb: {nome: 'Banco Central do Brasil — PTAX (dólar venda)', url: 'https://www.bcb.gov.br/estabilidadefinanceira/historicocotacoes'}
 };
@@ -1762,15 +1763,15 @@ const mpBenchList = () => MP_BENCH_ || (MP_BENCH_ = [
   {k: 'reembPct', t: 'Reembolso das novas assinaturas', fmt: v => fP(v), base: 'br', faixa: [4, 10], bom: 'baixo', f: 'synchro',
     br: '4% a 10% para recorrência mensal, nos primeiros 30 dias', gl: null,
     nota: 'Faixa considerada saudável no mercado brasileiro de infoprodutos (Hotmart, Kiwify, Eduzz); acima de 15% indica problema de oferta ou público. Não há tabela oficial das plataformas.'},
-  {k: 'ctr', t: 'CTR do anúncio (link)', fmt: v => fP(v), base: 'br', v: 1.70, bom: 'alto', f: 'superads', f2: 'wordstream',
-    br: '1,70% (mediana Brasil, todos os setores) · piso de 1% para infoproduto (Prosp)', gl: '1,45% Educação · 0,98% Finanças (EUA, 2025)',
-    nota: 'Mediana mensal de jul/2025 a jul/2026 no Brasil, segundo a Superads.'},
-  {k: 'cpc', t: 'Custo por clique (link)', fmt: v => fRc(v), base: 'br', v: 0.20 * USD_BRL * 100, bom: 'baixo', f: 'superads', f2: 'wordstream',
-    br: `US$ 0,20 (≈ ${brlUsd(0.20)}) · mediana Brasil, todos os setores`, gl: `US$ 0,86 Educação (≈ ${brlUsd(0.86)}) · US$ 1,22 Finanças (≈ ${brlUsd(1.22)})`,
-    nota: `Valores em dólar convertidos pela PTAX de ${fDay(USD_BRL_DATA)} (R$ ${fX(USD_BRL)}). Público de finanças costuma pagar bem acima da mediana geral.`},
-  {k: 'cpm', t: 'CPM (custo por mil impressões)', fmt: v => fRc(v), base: 'br', faixa: [800, 3500], bom: 'baixo', f: 'vtg', f2: 'superads',
-    br: `R$ 8 a R$ 35 para infoproduto (VT Group) · mediana geral US$ 3,46 (≈ ${brlUsd(3.46)}), chegando a US$ 6,76 (≈ ${brlUsd(6.76)}) em jul/2026 (Superads)`, gl: 'US$ 20,59 na mediana global (Superads)',
-    nota: 'Ordem de grandeza: o CPM varia muito por público, e finanças paga várias vezes mais que a média.'},
+  {k: 'ctr', t: 'CTR do anúncio (link)', fmt: v => fP(v), base: 'gl', v: 1.45, bom: 'alto', f: 'wordstream',
+    br: null, gl: '1,45% em Educação · 0,98% em Finanças e Seguros (campanhas de tráfego, 2025)',
+    nota: 'Não há estudo público brasileiro de CTR separado por Educação e Finanças; a comparação usa Educação (WordStream).'},
+  {k: 'cpc', t: 'Custo por clique (link)', fmt: v => fRc(v), base: 'br', faixa: [100, 600], bom: 'baixo', f: 'trafius_cpc', f2: 'wordstream',
+    br: 'R$ 1,00 a R$ 2,00 em cursos/infoprodutos · R$ 2,50 a R$ 6,00 em finanças/investimentos', gl: `US$ 0,86 Educação (≈ ${brlUsd(0.86)}) · US$ 1,22 Finanças (≈ ${brlUsd(1.22)})`,
+    nota: `O MP PRO é educação para profissionais de finanças: a faixa de comparação vai do piso de cursos ao teto de finanças. Valores em dólar convertidos pela PTAX de ${fDay(USD_BRL_DATA)} (R$ ${fX(USD_BRL)}).`},
+  {k: 'cpm', t: 'CPM (custo por mil impressões)', fmt: v => fRc(v), base: 'br', faixa: [1800, 6000], bom: 'baixo', f: 'trafius_cpm',
+    br: 'R$ 18 a R$ 32 em cursos/infoprodutos · R$ 35 a R$ 60 em finanças/investimentos (feed)', gl: null,
+    nota: 'Faixa de comparação do piso de cursos ao teto de finanças. Stories e Reels costumam sair mais baratos que o feed.'},
   {k: 'connect', t: 'Connect rate (clique → página carregada)', fmt: v => fP(v), base: 'br', v: 80, bom: 'alto', f: 'prosp',
     br: '80% (referência de agência de infoproduto)', gl: null,
     nota: 'Quem clicou no anúncio e de fato carregou a página. Abaixo de 80% costuma indicar página lenta. No MP PRO: visitas à página ÷ cliques no link.'},
@@ -1819,11 +1820,11 @@ function mpInsights(x, p) {
   // funil x mercado: maior gargalo
   if (x.imp) {
     const g = [];
-    if (x.cpm != null && x.cpm > 3500) g.push(`CPM de ${fRc(x.cpm)} (faixa Brasil: R$ 8–35)`);
+    if (x.cpm != null && x.cpm > 6000) g.push(`CPM de ${fRc(x.cpm)} (Brasil: R$ 18–32 em cursos e R$ 35–60 em finanças)`);
     if (x.convVisita != null && x.convVisita < 1.5) g.push(`conversão da página de ${fP(x.convVisita)} (referência 1,5–2%)`);
-    if (x.ctr != null && x.ctr < 1.7) g.push(`CTR de ${fP(x.ctr)} (mediana Brasil: 1,70%)`);
+    if (x.ctr != null && x.ctr < 1.45) g.push(`CTR de ${fP(x.ctr)} (Educação: 1,45%)`);
     const bons = [];
-    if (x.ctr != null && x.ctr >= 1.7) bons.push(`CTR de ${fP(x.ctr)} acima da mediana Brasil (1,70%)`);
+    if (x.ctr != null && x.ctr >= 1.45) bons.push(`CTR de ${fP(x.ctr)} acima de Educação (1,45%)`);
     if (x.convVisita != null && x.convVisita >= 2) bons.push(`página convertendo ${fP(x.convVisita)} das visitas (referência 1,5–2%)`);
     if (g.length) add('neg', `Gargalo da mídia: ${g.join(' e ')}.${bons.length ? ' Ponto forte: ' + bons.join(' e ') + '.' : ''}`);
     else if (bons.length) add('pos', `Mídia: ${bons.join(' e ')}.`);
@@ -1846,9 +1847,9 @@ function mpFoco(x, p) {
         'Testar plano trimestral/anual com desconto: troca a decisão de renovar todo mês por uma decisão a cada 3 ou 12 meses'],
       impacto: a.ltv != null ? `Com churn de 10%, o assinante ficaria ≈ ${f1(a.vida)} meses: LTV de ≈ ${fRc(a.ltv)}${a.lc != null ? ` e LTV ÷ CAC de ${fX(a.lc)}x (hoje ${fX(x.ltvCac)}x)` : ''}.` : ''});
   }
-  if (x.cpm != null && x.cpm > 3500) {
+  if (x.cpm != null && x.cpm > 6000) {
     const alvo = 5000, cacA = x.cac != null ? x.cac * alvo / x.cpm : null;
-    out.push({k: 'cpm', t: 'Custo da mídia (CPM)', hoje: `CPM de ${fRc(x.cpm)}${p && p.cpm ? ` (${mesCurto(p.ym)}: ${fRc(p.cpm)})` : ''}`, meta: `CPM perto de R$ 50 (Brasil: R$ 8–35 em infoproduto; mediana geral ≈ ${brlUsd(3.46)})`,
+    out.push({k: 'cpm', t: 'Custo da mídia (CPM)', hoje: `CPM de ${fRc(x.cpm)}${p && p.cpm ? ` (${mesCurto(p.ym)}: ${fRc(p.cpm)})` : ''}`, meta: 'CPM perto de R$ 50 (Brasil: R$ 18–32 em cursos e R$ 35–60 em finanças/investimentos)',
       porque: 'O anúncio e a página convertem bem; o que encarece cada assinatura é pagar caro para aparecer.',
       acoes: ['Abrir o público: testar segmentação ampla/Advantage+ e públicos semelhantes aos assinantes, em vez de interesses muito restritos',
         'Renovar criativos a cada 2–3 semanas (vídeo curto em Reels/Stories costuma ter CPM menor que feed)',
@@ -1875,11 +1876,11 @@ function mpFoco(x, p) {
     porque: 'Assinaturas de ticket baixo (até US$ 25/mês) são as que mais perdem assinantes no mercado; com R$ 49, a margem para pagar a mídia é curta.',
     acoes: ['Oferecer a Formação de Consultores para a base ativa (upsell): é a maior receita por cliente do produto',
       'Plano anual com desconto (receita antecipada e menos churn)', 'Depois de melhorar a retenção, testar reajuste do preço para novos assinantes'], impacto: ''});
-  if (p && x.novas < p.novas && x.ctr >= 1.7 && (x.convVisita || 0) >= 1.5) out.push({k: 'vol', t: 'Volume de novas assinaturas', hoje: `${fN(x.novas)} novas (${mesCurto(p.ym)}: ${fN(p.novas)}) com ${fRc(x.investimento)} de mídia`, meta: 'crescer o volume sem piorar o CAC',
+  if (p && x.novas < p.novas && x.ctr >= 1.45 && (x.convVisita || 0) >= 1.5) out.push({k: 'vol', t: 'Volume de novas assinaturas', hoje: `${fN(x.novas)} novas (${mesCurto(p.ym)}: ${fN(p.novas)}) com ${fRc(x.investimento)} de mídia`, meta: 'crescer o volume sem piorar o CAC',
     porque: 'Anúncio e página estão acima da referência de mercado; o volume caiu junto com a verba.',
     acoes: ['Só aumentar verba depois de baixar o CPM e o churn (senão escala o prejuízo)', 'Quando escalar, subir 20–30% por semana para não reiniciar o aprendizado da campanha'], impacto: ''});
   const manter = [];
-  if (x.ctr != null && x.ctr >= 1.7) manter.push(`CTR de ${fP(x.ctr)} (mediana Brasil: 1,70%): manter a linha de criativos que está funcionando`);
+  if (x.ctr != null && x.ctr >= 1.45) manter.push(`CTR de ${fP(x.ctr)} (Educação: 1,45%): manter a linha de criativos que está funcionando`);
   if (x.convCheckout != null && x.convCheckout >= 15) manter.push(`${fP(x.convCheckout)} de quem abre o checkout assina (referência Brasil: 15%)`);
   if (x.convVisita != null && x.convVisita >= 1.5) manter.push(`página convertendo ${fP(x.convVisita)} das visitas (referência 1,5–2%)`);
   if (x.cac != null && p && p.cac != null && x.cac < p.cac) manter.push(`CAC caiu de ${fRc(p.cac)} para ${fRc(x.cac)}`);
@@ -1938,7 +1939,7 @@ function viewMPProMensal() {
           <div class="${b.base === 'br' ? 'usa' : ''}"><span>Referência Brasil</span>${b.br || '<i class="muted">sem estudo público com amostra declarada</i>'}</div>
           <div class="${b.base === 'gl' ? 'usa' : ''}"><span>Referência global</span>${b.gl || '<i class="muted">–</i>'}</div></div>
         <p class="fcw">${ESC(b.nota)}</p><div class="bmf">Fonte: <a href="${fo.url}" target="_blank" rel="noopener">${ESC(fo.nome)}</a>${fo2 ? ` · <a href="${fo2.url}" target="_blank" rel="noopener">${ESC(fo2.nome)}</a>` : ''}</div></div></details>`; }).join('')}</div>
-    <div class="mpfontes bmx">${[['Fontes do Brasil', ['superads', 'vtg', 'prosp', 'synchro', 'bcb']], ['Fontes internacionais', ['recurly', 'wordstream', 'baymard', 'skok']]].map(([tt, ks]) => `<b>${tt}</b><ol>${ks.map(k => MP_FONTES[k]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${ESC(f.nome)}</a></li>`).join('')}</ol>`).join('')}
+    <div class="mpfontes bmx">${[['Fontes do Brasil', ['trafius_cpc', 'trafius_cpm', 'vtg', 'prosp', 'synchro', 'bcb']], ['Fontes internacionais', ['recurly', 'wordstream', 'baymard', 'skok']]].map(([tt, ks]) => `<b>${tt}</b><ol>${ks.map(k => MP_FONTES[k]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${ESC(f.nome)}</a></li>`).join('')}</ol>`).join('')}
     <p>Referências consultadas em ${fDay(USD_BRL_DATA)}. São médias de mercado, com amostras e definições próprias (a maioria internacional): use como ordem de grandeza, não como meta exata. Os números do MP PRO atribuem 100% das novas assinaturas à campanha Perpétuo, porque os pedidos da Kiwify não trazem a origem. Material interno, não é recomendação de investimento.</p></div></div>`;
   return h;
 }
