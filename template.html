@@ -400,10 +400,9 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .mpmeses button{border:1px solid var(--linha);background:#fff;border-radius:99px;padding:6px 14px;font:inherit;font-size:12.5px;font-weight:600;color:#3e4b46;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .mpmeses button small{font-size:10px;font-weight:500;color:var(--cinza)}
 .mpmeses button.on{background:var(--verde);border-color:var(--verde);color:#fff}.mpmeses button.on small{color:#cfe6dc}
-.insl{list-style:none;margin:0;padding:0}.insl li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--linha);font-size:13px;line-height:1.5}.insl li:last-child{border-bottom:0}
-.insl i{flex:none;width:8px;height:8px;border-radius:50%;margin-top:7px;background:#b9c4bf}.insl li.pos i{background:#00a611}.insl li.neg i{background:#c0392b}
+.insl{list-style:none;margin:0;padding:0}.insl li{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--linha);font-size:15px;line-height:1.55}.insl li:last-child{border-bottom:0}
+.insl i{flex:none;width:9px;height:9px;border-radius:50%;margin-top:8px;background:#b9c4bf}.insl li.pos i{background:#00a611}.insl li.neg i{background:#c0392b}
 .mpins{align-items:start}
-.mpev th.sel,.mpev td.sel{background:var(--v50);font-weight:700}
 .mpbm{table-layout:fixed;width:100%}.mpbm td,.mpbm th{vertical-align:top;white-space:normal!important}.mpbm th:nth-child(1){width:34%}.mpbm th:nth-child(2){width:10%}.mpbm th:nth-child(3){width:26%}.mpbm th:nth-child(4){width:14%}.mpbm th:nth-child(5){width:16%}
 .mpbm td:nth-child(2){white-space:nowrap!important}
 .bml{display:inline-block;font-size:11px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}
@@ -1823,17 +1822,8 @@ function viewMPProMensal() {
   ].join('') + '</div>';
   // destaques
   const ins = mpInsights(x, p);
-  h += `<div class="g g2 mt mpins"><div class="card"><div class="ch"><div><h3>Destaques de ${mesNome(ym)}</h3><p>Leitura automática dos números do mês · pronta para reunião</p></div></div>
-    <ul class="insl">${ins.map(([t, s]) => `<li class="${t}"><i></i><span>${s}</span></li>`).join('')}</ul></div>`;
-  // evolução
-  const ev = meses.slice(Math.max(0, i - 5), i + 1).map(mpMes);
-  const LIN = [['Receita líquida', z => fRc(z.liquido)], ['Investimento em mídia', z => fRc(z.investimento)], ['Resultado', z => `<span class="${z.resultado < 0 ? 'red' : ''}">${fRc(z.resultado)}</span>`],
-    ['Novas assinaturas', z => fN(z.novas)], ['Renovações pagas', z => fN(z.renovacoes)], ['Ativos no fim do mês', z => fN(z.ativos)], ['MRR', z => fRc(z.mrr)],
-    ['Churn', z => z.churn == null ? '–' : fP(z.churn)], ['Taxa de renovação', z => z.renov == null ? '–' : fP(z.renov)], ['CAC', z => fRc(z.cac)], ['ROAS', z => z.roas == null ? '–' : fX(z.roas) + 'x'],
-    ['CTR', z => fP(z.ctr)], ['CPM', z => fRc(z.cpm)], ['Conversão visita → assinatura', z => z.convVisita == null ? '–' : fP(z.convVisita)]];
-  h += `<div class="card np"><div class="ch"><div><h3>Evolução mês a mês</h3><p>Até 6 meses, terminando em ${mesCurto(ym)}</p></div></div><div class="tw"><table class="t mpev"><thead><tr><th></th>${ev.map(z => `<th class="num${z.ym === ym ? ' sel' : ''}">${mesCurto(z.ym)}${z.parcial ? '*' : ''}</th>`).join('')}</tr></thead><tbody>
-    ${LIN.map(([n, f]) => `<tr><td>${n}</td>${ev.map(z => `<td class="num${z.ym === ym ? ' sel' : ''}">${f(z)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-    ${ev.some(z => z.parcial) ? '<p class="muted" style="font-size:11.5px;padding:0 18px 14px">* mês em andamento</p>' : ''}</div></div>`;
+  h += `<div class="mt mpins"><div class="card"><div class="ch"><div><h3>Destaques de ${mesNome(ym)}</h3><p>Leitura automática dos números do mês · pronta para reunião</p></div></div>
+    <ul class="insl">${ins.map(([t, s]) => `<li class="${t}"><i></i><span>${s}</span></li>`).join('')}</ul></div></div>`;
   // mercado
   h += `<div class="card np mt"><div class="ch"><div><h3>MP PRO × mercado em ${mesNome(ym)}</h3><p>Assinatura mensal de educação para profissionais de finanças · ticket de ${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · referências públicas, fontes abaixo</p></div></div>
     <div class="tw"><table class="t mpbm"><thead><tr><th>Indicador</th><th class="num">MP PRO</th><th>Referência de mercado</th><th>Leitura</th><th>Fonte</th></tr></thead><tbody>
