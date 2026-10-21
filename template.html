@@ -416,6 +416,12 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .fcw{font-size:16px;color:#3e4b46;margin:0 0 8px;line-height:1.5}
 .fci ul{margin:0 0 4px 20px;padding:0;font-size:16px;line-height:1.5}.fci li{margin:3px 0}
 .fcim{margin-top:10px;font-size:15.5px;background:var(--v50);border-radius:9px;padding:8px 10px;line-height:1.45}.fcim b{color:var(--verde)}
+.bmk .fch{padding:12px 16px}.bmk .fcb{padding-left:16px}
+.bmv{font-size:18px;font-weight:700;color:var(--txt);min-width:110px;text-align:right;font-variant-numeric:tabular-nums}
+.bmk .bml{font-size:13px;padding:3px 11px;width:185px;flex:none;box-sizing:border-box;text-align:center}
+.mpfontes.bmx{font-size:14px}.mpfontes.bmx b{font-size:15px}
+.bmf{font-size:14px;color:var(--cinza);margin-top:4px}.bmf a{color:var(--verde)}
+.mpfontes.bmx{margin:16px -18px -18px}
 .fcok{margin-top:14px;font-size:16px;border-top:1px solid var(--linha);padding-top:12px;line-height:1.5}.fcok b{color:#0b7a3b}
 .mpbm{table-layout:fixed;width:100%}.mpbm td,.mpbm th{vertical-align:top;white-space:normal!important}.mpbm th:nth-child(1){width:40%}.mpbm th:nth-child(2){width:12%}.mpbm th:nth-child(3){width:32%}.mpbm th:nth-child(4){width:16%}
 .mpbm td:nth-child(2){white-space:nowrap!important}
@@ -1903,13 +1909,12 @@ function viewMPProMensal() {
     <ul class="insl">${ins.map(([t, s]) => `<li class="${t}"><i></i><span>${s}</span></li>`).join('')}</ul></div></div>`;
   h += mpFocoHtml(x, p);
   // mercado
-  h += `<div class="card np mt"><div class="ch"><div><h3>MP PRO × mercado em ${mesNome(ym)}</h3><p>Assinatura mensal de educação para profissionais de finanças · ticket de ${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · referências públicas, fontes abaixo</p></div></div>
-    <div class="tw"><table class="t mpbm"><thead><tr><th>Indicador</th><th class="num">MP PRO</th><th>Referência de mercado</th><th>Leitura</th></tr></thead><tbody>
-    ${mpBenchList().map(b => { const [c, t] = mpBenchLeitura(b, x);
-      return `<tr><td><b>${b.t}</b><div class="muted" style="font-size:11px">${ESC(b.nota)}</div></td><td class="num b">${x[b.k] == null ? '–' : b.fmt(x[b.k])}</td><td>${b.ref}</td>
-        <td><span class="bml ${c}">${t}</span></td></tr>`; }).join('')}
-    </tbody></table></div>
-    <div class="mpfontes"><b>Fontes de referência</b><ol>${Object.values(MP_FONTES).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${ESC(f.nome)}</a></li>`).join('')}</ol>
+  h += `<div class="card mt"><div class="ch"><div><h3>MP PRO × mercado em ${mesNome(ym)}</h3><p>Assinatura mensal de educação para profissionais de finanças · ticket de ${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · clique em cada indicador para ver a referência e a fonte</p></div></div>
+    <div class="foco bmk">${mpBenchList().map(b => { const [c, t] = mpBenchLeitura(b, x), fo = MP_FONTES[b.f];
+      return `<details class="fci" name="mpbench"><summary class="fch"><b>${b.t}</b><span class="bmv">${x[b.k] == null ? '–' : b.fmt(x[b.k])}</span><span class="bml ${c}">${t}</span><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="fcb"><div class="fcr"><div><span>MP PRO em ${mesCurto(ym)}</span>${x[b.k] == null ? '–' : b.fmt(x[b.k])}</div><div><span>Referência de mercado</span>${b.ref}</div></div>
+        <p class="fcw">${ESC(b.nota)}</p><div class="bmf">Fonte: <a href="${fo.url}" target="_blank" rel="noopener">${ESC(fo.nome)}</a></div></div></details>`; }).join('')}</div>
+    <div class="mpfontes bmx"><b>Fontes de referência</b><ol>${Object.values(MP_FONTES).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${ESC(f.nome)}</a></li>`).join('')}</ol>
     <p>Referências consultadas em ${fDay(USD_BRL_DATA)}. São médias de mercado, com amostras e definições próprias (a maioria internacional): use como ordem de grandeza, não como meta exata. Os números do MP PRO atribuem 100% das novas assinaturas à campanha Perpétuo, porque os pedidos da Kiwify não trazem a origem. Material interno, não é recomendação de investimento.</p></div></div>`;
   return h;
 }
