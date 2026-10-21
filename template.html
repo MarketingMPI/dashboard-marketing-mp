@@ -212,6 +212,8 @@ table.t tr.tot td{background:#f7faf8;font-weight:700;border-top:1px solid var(--
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
 @media(min-width:1281px){.kpis.k6{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(min-width:761px){.kpis.kmac .kpi.hero{grid-row:span 2;display:flex;flex-direction:column;justify-content:center}}
+.kpi.clk{cursor:pointer;transition:border-color .15s,box-shadow .15s}.kpi.clk:hover{border-color:var(--v200);box-shadow:0 4px 14px rgba(0,51,38,.08)}
 .kpi{background:#fff;border:1px solid var(--linha);border-radius:var(--r);box-shadow:var(--sh);padding:15px 16px 14px;position:relative;min-width:0;cursor:default}
 .kpi.w2{grid-column:span 2}
 .kpi .kl{font-size:12px;color:var(--cinza);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:6px}
@@ -1481,7 +1483,7 @@ function delta(c, p, good = 1, fmt = fN) {
   return `<span class="dl ${tone}">${up ? '▲' : '▼'} ${nf1.format(Math.abs(v))}%</span>${vs}`;
 }
 function kpiCard(o) {
-  return `<div class="kpi${o.cls ? ' ' + o.cls : ''}" data-tip="${ESC(o.tip || '')}"><div class="kl">${o.label}</div>
+  return `<div class="kpi${o.cls ? ' ' + o.cls : ''}"${o.attr || ''} data-tip="${ESC(o.tip || '')}"><div class="kl">${o.label}</div>
     <div class="kv tn">${o.v}</div><div class="ks">${o.sub || ''}</div>${o.extra || ''}<div class="kd">${o.d || ''}</div></div>`;
 }
 
@@ -1573,13 +1575,16 @@ function viewMacro() {
   const pctK = (v, n) => n ? fP(v / n * 100) + ' dos leads' : '';
   const nBase = C.rows.reduce((a, r) => a + (r.l.b ? 1 : 0), 0);
   let h = viewHead('Visão Macro', periodCaption());
-  h += '<div class="kpis">' + [
+  h += '<div class="kpis k6 kmac">' + [
     kpiCard({label: 'Entraram no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k.abertos)} abertos · ${fN(k.ganhos)} ganhos · ${fN(k.perdidos)} perdidos`,
       extra: nBase > 0 ? `<div class="kx">inclui ${fN(nBase)} ex-clientes e contatos antigos reativados</div>` : '',
       d: delta(k.leads, pk.leads, 0), tip: 'Todos os leads que entraram no período (abertos, ganhos e perdidos), com os filtros aplicados'}),
     kpiCard({label: 'Com contato', v: `${fN(k.contatados)}<small>${fP(k.pct_contatados)}</small>`, sub: `${f1(k.contatos_por_lead)} contatos por lead contatado`,
       extra: `<div class="prog"><i style="width:${k.pct_contatados || 0}%"></i></div>`, d: delta(k.pct_contatados, pk.pct_contatados, 1, fP), tip: 'Leads com ao menos uma atividade de contato concluída, ou que já foram agendados.\nVariação do % de contatados.'}),
     kpiCard({label: 'Sem contato', v: fN(k.sem_contato), sub: pctK(k.sem_contato, k.leads), d: delta(k.sem_contato, pk.sem_contato, -1), tip: 'Leads sem nenhum contato concluído e que ainda não foram agendados'}),
+    kpiCard({label: 'Em atraso', cls: 'clk' + (k.leads_em_atraso ? ' red' : ''), attr: ' data-atraso="1"', v: `${fN(k.leads_em_atraso)}<small>${k.leads_em_atraso === 1 ? 'lead' : 'leads'}</small>`,
+      sub: `${fP(pctOf(k.leads_em_atraso, k.abertos))} dos abertos · ${fN(k.atividades_atrasadas)} ${k.atividades_atrasadas === 1 ? 'atividade vencida' : 'atividades vencidas'}`, d: `<span class="dl na">situação em ${fDM(TODAY)}</span>`,
+      tip: 'Leads em aberto com atividade pendente no Pipedrive vencida (data anterior a hoje).\nÉ a situação de hoje, não tem comparação com o período anterior.\nClique para ver a lista no Lead a Lead'}),
     kpiCard({label: 'Entraram no FDS', v: fN(k.fim_de_semana), sub: pctK(k.fim_de_semana, k.leads), d: delta(k.fim_de_semana, pk.fim_de_semana, 0), tip: 'Leads que entraram no sábado ou domingo'}),
     kpiCard({label: 'Tempo até 1º contato', cls: 'm2', v: `${f1(k.media_dias_1o_contato)}<small>dias</small>`, sub: `mediana ${fD(k.mediana_dias_1o_contato)}`, d: delta(k.media_dias_1o_contato, pk.media_dias_1o_contato, -1, fD), tip: 'Média de dias entre a entrada e o 1º contato (só leads contatados)'}),
     kpiCard({label: 'Agendados', v: fN(k.agendados), sub: pctK(k.agendados, k.leads), d: delta(k.agendados, pk.agendados), tip: 'Chegaram à etapa Reunião ou além (ou ganhos)'}),
