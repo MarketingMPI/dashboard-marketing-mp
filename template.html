@@ -1815,8 +1815,7 @@ function mpFoco(x, p) {
     const a = sim(10);
     out.push({k: 'ret', t: 'Retenção dos assinantes', hoje: `churn de ${fP(x.churn)} no mês · assinante fica ≈ ${f1(100 / x.churn)} meses`, meta: 'churn abaixo de 10% no curto prazo (mercado: 4,99%)',
       porque: `É o que mais pesa no resultado: cada assinante gera ${fRc(liq)} líquidos por mês e sai antes de pagar o CAC de ${fRc(x.cac)}.`,
-      acoes: ['Boas-vindas ativa na 1ª semana: mensagem/ligação, roteiro do que assistir primeiro e convite para o próximo encontro ao vivo',
-        'Calendário fixo de encontros e conteúdos novos todo mês, avisados por e-mail e WhatsApp, para o assinante sentir uso antes da renovação',
+      acoes: ['Calendário fixo de encontros e conteúdos novos todo mês, avisados por e-mail e WhatsApp, para o assinante sentir uso antes da renovação',
         `Conversa com quem saiu${x.churnSairam ? ` (${fN(x.churnSairam)} em ${mesCurto(x.ym)})` : ''} para entender o motivo e oferta de retorno`,
         'Testar plano trimestral/anual com desconto: troca a decisão de renovar todo mês por uma decisão a cada 3 ou 12 meses'],
       impacto: a.ltv != null ? `Com churn de 10%, o assinante ficaria ≈ ${f1(a.vida)} meses: LTV de ≈ ${fRc(a.ltv)}${a.lc != null ? ` e LTV ÷ CAC de ${fX(a.lc)}x (hoje ${fX(x.ltvCac)}x)` : ''}.` : ''});
