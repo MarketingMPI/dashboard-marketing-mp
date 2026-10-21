@@ -81,6 +81,17 @@ nav.side button.on .bd{background:#fff;color:var(--verde)}
 nav.side .nh.nb{margin-top:26px;padding-top:18px;border-top:1px solid var(--linha)}
 nav.side button .bd.soon{font-size:10px;font-weight:500;background:none;border:1px dashed #c9d3cf;padding:0 6px;flex:none}
 nav.side .nf{margin-top:auto;padding:14px 12px 6px;display:flex;align-items:center;gap:11px}
+nav.side .nu{margin-top:auto;display:flex;align-items:center;gap:8px;padding:12px 4px 10px 8px;border-top:1px solid var(--linha)}
+nav.side .nu + .nf{margin-top:0;padding-top:8px}
+nav.side .nua{width:32px;height:32px;flex:none;border-radius:50%;background:var(--v50);color:var(--verde);display:flex;align-items:center;justify-content:center}
+nav.side .nua svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+nav.side .nut{min-width:0;flex:1;line-height:1.25}
+nav.side .nut b{display:block;font-size:12.5px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav.side .nut small{display:block;font-size:10.5px;color:var(--cinza);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav.side button.nus{flex:none;width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--linha);color:var(--cinza);border-radius:8px;cursor:pointer}
+nav.side button.nus svg{width:16px;height:16px;opacity:1}
+nav.side button.nus:hover{background:var(--verm-bg);border-color:#efc9c3;color:var(--verm)}
+@media(min-width:961px){.usr{display:none!important}}
 nav.side .nf img{width:38px;height:38px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,51,38,.18))}
 nav.side .nf span{font-size:17px;font-weight:600;color:var(--verde,#00503c);letter-spacing:.2px}
 .main{min-width:0;padding:0 28px 30px}
@@ -409,7 +420,7 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
   .shell{display:block}
   nav.side{flex-direction:row;height:auto;overflow-x:auto;padding:8px 10px;border-right:0;border-bottom:1px solid var(--linha);gap:4px;scrollbar-width:none}
   nav.side::-webkit-scrollbar{display:none}
-  nav.side .nh,nav.side .nf{display:none}
+  nav.side .nh,nav.side .nf,nav.side .nu{display:none}
   nav.side button .bd.soon{display:none}
   nav.side button{width:auto;padding:8px 12px}
   nav.side button.on{box-shadow:inset 0 -3px 0 var(--verde)}
@@ -1061,14 +1072,15 @@ function showApp(data) {
   const lk = document.getElementById('lock'); if (lk) lk.remove();
   boot(data);
   const u = document.getElementById('usr');
-  if (u && USUARIO) {
-    u.innerHTML = `<span>${ESC(USUARIO)}</span><button type="button" id="sair">Sair</button>`;
-    document.getElementById('sair').addEventListener('click', async () => {
-      const x = lerSessao(); if (x) await sb('/auth/v1/logout', {token: x.a});
-      limpaSessao(); location.replace(voltaUrl());
-    });
-  }
+  if (u && USUARIO) u.innerHTML = `<span>${ESC(USUARIO)}</span><button type="button" data-sair="1">Sair</button>`;
+  document.addEventListener('click', async ev => {
+    if (!ev.target.closest('[data-sair]')) return;
+    const x = lerSessao(); if (x) await sb('/auth/v1/logout', {token: x.a});
+    limpaSessao(); location.replace(voltaUrl());
+  });
 }
+// "pedro.cristovam@..." -> "Pedro Cristovam"
+const nomeUsuario = e => String(e || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(x => x[0].toUpperCase() + x.slice(1)).join(' ');
 let MODO = 'entrar';
 function modo(m, msg, ok) {
   MODO = m;
@@ -2503,6 +2515,8 @@ function renderNav() {
   document.getElementById('nav').innerHTML = '<div class="nh">B2C - Análises</div>' + TABS.map(t => `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}">${ICONS[t.id]}<span>${t.nome}</span>${badge[t.id] != null ? `<span class="bd">${fN(badge[t.id])}</span>` : ''}</button>`).join('') +
     '<div class="nh nb">B2B - Análises</div>' + TABS_B2B.map(btn).join('') +
     '<div class="nh nb">Redes Sociais</div>' + TABS_RS.map(btn).join('') +
+    (USUARIO ? `<div class="nu" title="${ESC(USUARIO)}"><span class="nua"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.2-3.6 4.1-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/></svg></span>` +
+      `<div class="nut"><b>${ESC(nomeUsuario(USUARIO))}</b><small>${ESC(USUARIO)}</small></div><button type="button" class="nus" data-sair="1" title="Sair" aria-label="Sair"><svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg></button></div>` : '') +
     `<div class="nf"><img src="assets/favicon.png" alt="Meu Patrimônio"><span>Marketing</span></div>`;
 }
 function viewB2B() {
