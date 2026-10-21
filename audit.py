@@ -696,7 +696,20 @@ def cenarios(D):
         ("mppro_julho_ate_hoje", filtros_base("2026-07-01", h)),
         ("ultimos_30_consultor_top_perf", filtros_base(d30, h, consultores=[top], campanha="trd")),
         ("mes_passado_diag", filtros_base(iso(hoje.replace(day=1) - timedelta(days=hoje.replace(day=1).day + 27)), iso(hoje.replace(day=1) - timedelta(days=1)), campanha="diag")),
-    ]
+    ] + _meses_mppro(hoje)
+
+
+def _meses_mppro(hoje):
+    """Insights mensais do MP PRO: um cenário por mês fechado (1º ao último dia) desde jul/2026."""
+    out, d = [], date(2026, 7, 1)
+    while True:
+        nx = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+        fim = nx - timedelta(days=1)
+        if fim >= hoje:
+            break
+        out.append((f"mppro_mes_{d.isoformat()[:7]}", filtros_base(d.isoformat(), fim.isoformat())))
+        d = nx
+    return out
 
 
 def load():
