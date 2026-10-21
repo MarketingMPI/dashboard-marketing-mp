@@ -2,7 +2,7 @@
 
 Painel de BI do marketing da Meu Patrimônio: leads do **B2C Funil Alpha** (Pipedrive), investimento em mídia (Meta Ads), vendas do **MP PRO** (Kiwify), usuários do **MP HUB** e redes sociais (Instagram e YouTube) — tudo numa página só, atualizada sozinha de hora em hora.
 
-**Publicado em:** https://marketingmpi.github.io/dashboard-marketing-mp/
+**Publicado em:** https://painelmkt.meupatrimonio.com/
 A página é protegida por senha: os dados vão para o GitHub Pages **criptografados (AES‑256‑GCM)** e só são decifrados no navegador depois que a senha é digitada. Quem não tem a senha vê apenas a tela de bloqueio.
 
 ---
