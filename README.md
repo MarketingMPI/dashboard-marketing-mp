@@ -40,7 +40,7 @@ YouTube   ─┘                                                     (HTML+CSS+J
 | Perdidos | Motivos, perdas por etapa e por consultor, tempo e contatos até a perda |
 | Consultores | Funil de eficiência por consultor e ranking comparativo |
 
-**B2B — Análises:** MP PRO (vendas Kiwify), Usuários MP HUB, Aplicação Direta.
+**B2B — Análises:** MP PRO (vendas Kiwify), Usuários MP HUB, Aplicação Direta (candidaturas à Rede: formulário do site `/rede/` + LP de recrutamento, funil B2B - Alpha; quantidade, perfil e etapa atual, sem e-mail/telefone; bloco de mídia paga em branco até existir campanha, ligado por `APL_MIDIA_RX` no `painel.py`).
 **Redes Sociais:** Instagram (4 contas) e YouTube (canal Gabriel Liberato · Meu Patrimônio).
 
 As definições exatas de cada métrica estão em [`SPEC.md`](SPEC.md) — é o **contrato**: o front‑end (`window.MP_DASH.compute`) e a auditoria em Python (`audit.py`) implementam as mesmas fórmulas.
@@ -52,6 +52,7 @@ As definições exatas de cada métrica estão em [`SPEC.md`](SPEC.md) — é o 
 | Fonte | Como entra | Frequência |
 |---|---|---|
 | **Pipedrive** — pipeline 45 (B2C Funil Alpha) | API, coleta incremental | 1×/hora (cota diária da API) |
+| **Pipedrive** — pipeline 60 (B2B - Alpha), negócios `LP_Rede` / `LP_Consultor` | API (~7 chamadas por leitura) | junto com a leitura do B2C |
 | **Meta Ads** — conta Meu Patrimônio CA, campanhas `[B2C]` | Graph API (reprocessa os últimos 35 dias) | toda execução |
 | **Kiwify** — MP PRO (assinatura) e Formação de Consultores | Public API | toda execução |
 | **Instagram** — 4 contas MP | Graph API (somente leitura) | toda execução, com backfill gradual |

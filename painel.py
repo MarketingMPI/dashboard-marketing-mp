@@ -1119,6 +1119,79 @@ def youtube_payload():
         return {"erro": "não foi possível ler os dados do YouTube"}
 
 
+# ---------------------------------------------------------------- Aplicação Direta (candidaturas à Rede, funil B2B - Alpha)
+# Formulários de candidatura: site www.meupatrimonio.com/rede/ (deal "LP_Rede - Nome", api/application.js do site)
+# e a LP de recrutamento anterior (deal "LP_Consultor - [A|B|C] Nome"). As respostas ficam nos campos da PESSOA.
+# Lê no mesmo ritmo do Pipedrive B2C (1x/hora, dias úteis). Só dados de qualificação: sem e-mail e telefone.
+APL_PIPELINE = 60
+APL_RX = re.compile(r"^\s*LP_(Rede|Consultor)\s*-\s*(?:\[([A-Z])\]\s*)?(.*)$", re.I)
+APL_CAMPOS = {"cid": "f454aca8c62d5d0877ce516a6a35aafa1808c822", "uf": "f40ef9ac25754ee8ca6c612bb9a3ae7580b55d47",
+              "mk": "3b7a294bd9f61145b4b0765a67b308fd7a4b54eb", "r": "bddde70208ba5363eb2580e2b59a700c4f75a74a",
+              "c": "b5f03864f08c2bd59b13299b2f95f931bc092d1f", "p": "6ada68b5a6e257fbbb3a501da847f27da90c2abd",
+              "m": "f21e5f985f78b3ceee0af054e7f3534519d59804"}
+# Mídia paga da Aplicação Direta: nenhuma campanha rodando ainda. Quando houver, preencher com o padrão do NOME
+# das campanhas na Meta (ex.: re.compile(r"\[B2B\].*aplica", re.I)); o painel passa a mostrar investimento e CPL.
+APL_MIDIA_RX = None
+
+
+def sync_aplicacao(old):
+    deals = []
+    for st in ("open", "lost", "won"):
+        cur = None
+        while True:
+            q = dict(pipeline_id=APL_PIPELINE, status=st, limit=500)
+            if cur: q["cursor"] = cur
+            d = get("/v2/deals", **q)
+            deals += [x for x in d.get("data") or [] if x.get("pipeline_id") == APL_PIPELINE and APL_RX.match(x.get("title") or "")]
+            cur = (d.get("additional_data") or {}).get("next_cursor")
+            if not cur: break
+    stages = [{"id": x["id"], "nome": x["name"]} for x in sorted(get("/v1/stages", pipeline_id=APL_PIPELINE).get("data") or [],
+                                                                  key=lambda x: x.get("order_nr") or 0)]
+    ids = sorted({x["person_id"] for x in deals if x.get("person_id")})
+    pessoas = {}
+    for i in range(0, len(ids), 100):
+        r = get("/v2/persons", ids=",".join(map(str, ids[i:i + 100])), limit=100)
+        pessoas.update({x["id"]: x.get("custom_fields") or {} for x in r.get("data") or []})
+    out, teste = [], 0
+    for d in deals:
+        title = d.get("title") or ""
+        if TEST_RX.search(title) or TEST_RX.search(d.get("lost_reason") or ""):
+            teste += 1; continue
+        mt = APL_RX.match(title); cf = pessoas.get(d.get("person_id")) or {}
+        val = lambda k: (lambda v: v.get("value") if isinstance(v, dict) else v)(cf.get(APL_CAMPOS[k]))
+        cid = (val("cid") or "").split(",")[0].strip()
+        certs = [c.strip() for c in (val("c") or "").split(",") if c.strip()]
+        out.append({"id": d["id"], "n": sem_pii(mt.group(3).strip()) or f"#{d['id']}",
+                    "o": "rede" if mt.group(1).lower() == "rede" else "recrutamento", "t": (mt.group(2) or "").upper() or None,
+                    "e": brt(d.get("add_time")), "s": d.get("status"), "sg": d.get("stage_id"),
+                    "lr": (d.get("lost_reason") or None) if d.get("status") == "lost" else None,
+                    "m": "escritorio" if "escrit" in (val("m") or "").lower() else "consultor",
+                    "mk": val("mk") or None, "r": val("r") or None, "c": certs, "p": val("p") or None,
+                    "uf": (val("uf") or "").upper() or None, "cid": cid or None})
+    out.sort(key=lambda x: x["e"] or "")
+    return {"leads": out, "stages": stages, "excluidos_teste": teste, "erro": None,
+            "atualizado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S")}
+
+
+def aplicacao_midia(m):
+    """Investimento diário (centavos) das campanhas da Aplicação Direta. Vazio enquanto APL_MIDIA_RX = None."""
+    if APL_MIDIA_RX is None:
+        return {"ativo": False, "campanhas": [], "dias": []}
+    m = m or {}; nomes = m.get("nomes") or {}; dia = {}; camps = set()
+    for key, v in (m.get("dias") or {}).items():
+        day, cid = key.split("|")
+        if not APL_MIDIA_RX.search(nomes.get(cid, "")): continue
+        camps.add(nomes.get(cid, cid)); a = dia.setdefault(day, [0, 0, 0])
+        for i in range(3): a[i] += v[i]
+    return {"ativo": True, "campanhas": sorted(camps), "dias": [[k] + v for k, v in sorted(dia.items())], "erro": m.get("erro")}
+
+
+def aplicacao_payload(cache):
+    a = dict(cache.get("aplicacao") or {"leads": [], "stages": [], "erro": "ainda não lido"})
+    a["midia"] = aplicacao_midia(cache.get("midia"))
+    return a
+
+
 def collect(full=False):
     now = datetime.now(timezone.utc)
     erro_pd = None
@@ -1140,13 +1213,21 @@ def collect(full=False):
         erro_pd = "limite diário de consultas do Pipedrive atingido" if "429" in str(e) else "falha de conexão com o Pipedrive"
         print("AVISO Pipedrive:", erro_pd, "— usando a leitura anterior")
     leads, excl = model(cache)
+    if (not pular and not erro_pd) or not cache.get("aplicacao"):   # mesmo ritmo do Pipedrive B2C
+        try:
+            cache["aplicacao"] = sync_aplicacao(cache.get("aplicacao"))
+            print("Aplicação Direta:", len(cache["aplicacao"]["leads"]), "candidaturas")
+        except Exception as e:
+            cache["aplicacao"] = {**(cache.get("aplicacao") or {"leads": [], "stages": []}),
+                                  "erro": "limite diário de consultas do Pipedrive atingido" if "429" in str(e) else "falha de conexão com o Pipedrive"}
+            print("AVISO Aplicação Direta:", cache["aplicacao"]["erro"])
     cache["midia"] = sync_midia(cache.get("midia"))
     cache["mppro"] = mppro_payload(cache["midia"], cache.get("mppro"))
     cache["ig"] = sync_instagram(cache.get("ig"))
     tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]), "mphub": mphub_payload(), "youtube": youtube_payload(),
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]), "mphub": mphub_payload(), "youtube": youtube_payload(), "aplicacao": aplicacao_payload(cache),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
                      "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run"),
