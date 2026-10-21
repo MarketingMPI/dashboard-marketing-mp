@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src https://api.github.com https://cxbgpbibbxfhvdfhyvpx.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Painel Operacional · Meu Patrimônio</title>
 <link rel="icon" href="assets/favicon-lima.png">
@@ -31,7 +31,24 @@ a{color:var(--verde)}
 #lock input[type=password]:focus{border-color:var(--verde);box-shadow:0 0 0 3px rgba(0,80,60,.12)}
 #lock button{width:100%;margin-top:12px;font-weight:600;font-size:15px;padding:12px;border:0;border-radius:10px;background:var(--verde);color:#fff;cursor:pointer}
 #lock button:hover{background:var(--prof)}#lock label{display:flex;gap:8px;align-items:center;justify-content:center;font-size:13px;color:var(--cinza);margin-top:12px}
-#lock .err{color:var(--verm);font-size:13px;min-height:18px;margin-top:10px}
+#lock .err{color:var(--verm);font-size:13px;min-height:18px;margin-top:10px;line-height:1.45}
+#lock .err.ok{color:var(--verde)}
+#lock [hidden]{display:none!important}
+#lock .lk{background:#fff;border-radius:18px;padding:34px 30px;width:100%;max-width:400px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.3)}
+#lock .lk form{background:none;box-shadow:none;padding:0;max-width:none;border-radius:0}
+#lock .ltabs{display:grid;grid-template-columns:1fr 1fr;background:var(--suave);border-radius:10px;padding:4px;margin:0 0 16px}
+#lock .ltabs button{margin:0;padding:9px;background:none;color:var(--cinza);font-size:14px;border-radius:8px}
+#lock .ltabs button.on{background:#fff;color:var(--verde);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+#lock .ltabs button:hover{background:#fff}
+#lock input[type=email],#lock input[type=password]{width:100%;font-size:16px;padding:12px 14px;border:1px solid #cfd9d4;border-radius:10px;outline:none;margin-bottom:10px}
+#lock input[type=email]:focus{border-color:var(--verde);box-shadow:0 0 0 3px rgba(0,80,60,.12)}
+#lock button[type=submit]{margin-top:2px}
+#lock .la{display:inline-block;margin-top:12px;font-size:13px;color:var(--verde);text-decoration:underline;cursor:pointer;background:none;border:0;padding:0;width:auto}
+#lock .la:hover{background:none;color:var(--prof)}
+#lock .dom{font-size:12px;color:var(--cinza);margin:-4px 0 10px;text-align:left}
+.usr{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#cfe6dc}.usr:empty{display:none}
+.usr button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit}
+.usr button:hover{background:rgba(255,255,255,.22)}
 body.locked #app{display:none}
 /* ---------- header ---------- */
 header.top{background:linear-gradient(115deg,var(--prof) 0%,var(--verde) 55%,#0b6447 100%);color:#fff;padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
@@ -427,20 +444,26 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
 </style>
 </head>
 <body class="locked">
-<div id="lock"><form id="lockf" autocomplete="on">
+<div id="lock"><div class="lk">
   <img src="assets/coruja-branca.png" alt="Meu Patrimônio">
-  <h1>Painel Operacional</h1><p>Acesso restrito. Digite a senha.</p>
-  <input type="text" name="username" value="painel-trd" autocomplete="username" hidden>
-  <input type="password" id="pw" autocomplete="current-password" placeholder="Senha" required autofocus>
-  <button type="submit">Entrar</button>
-  <label><input type="checkbox" id="rem" checked> Lembrar neste dispositivo</label>
-  <div class="err" id="err"></div>
-</form></div>
+  <h1>Painel Operacional</h1><p id="lsub">Acesso exclusivo para e-mails @meupatrimonio.com</p>
+  <div class="ltabs" id="ltabs" role="tablist"><button type="button" data-m="entrar" class="on">Entrar</button><button type="button" data-m="criar">Criar conta</button></div>
+  <form id="lockf" autocomplete="on" novalidate>
+    <input type="email" id="lem" name="email" autocomplete="username" placeholder="seu.nome@meupatrimonio.com" required>
+    <input type="password" id="lpw" autocomplete="current-password" placeholder="Senha" required>
+    <input type="password" id="lpw2" autocomplete="new-password" placeholder="Confirme a senha" hidden>
+    <div class="dom" id="ldica" hidden>Senha com no mínimo 8 caracteres, incluindo letra maiúscula, minúscula e número. Só e-mails @meupatrimonio.com podem criar conta.</div>
+    <button type="submit" id="lbtn">Entrar</button>
+    <label id="lrem"><input type="checkbox" id="rem" checked> Manter conectado neste dispositivo</label>
+    <button type="button" class="la" id="lforgot">Esqueci minha senha</button>
+    <div class="err" id="err" aria-live="polite"></div>
+  </form>
+</div></div>
 
 <div id="app">
 <header class="top">
   <div class="brand"><img src="assets/coruja-branca.png" alt="Meu Patrimônio"><div><h1>Painel Operacional</h1></div></div>
-  <div class="upd"><span>Última atualização em <b id="upd">–</b></span><div class="rf"><span class="live"><i></i>atualização automática a cada 1 hora</span><button type="button" class="rfb" id="rfbtn" hidden title="Atualiza Meta Ads, Kiwify e Instagram e republica o dashboard (cerca de 2 a 3 minutos). Os leads do Pipedrive são lidos de hora em hora, de segunda a sexta, das 7h às 19h."><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Atualizar agora</span></button></div><span class="rfst" id="rfst" aria-live="polite"></span></div>
+  <div class="upd"><span>Última atualização em <b id="upd">–</b></span><div class="rf"><span class="live"><i></i>atualização automática a cada 1 hora</span><button type="button" class="rfb" id="rfbtn" hidden title="Atualiza Meta Ads, Kiwify e Instagram e republica o dashboard (cerca de 2 a 3 minutos). Os leads do Pipedrive são lidos de hora em hora, de segunda a sexta, das 7h às 19h."><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Atualizar agora</span></button></div><span class="rfst" id="rfst" aria-live="polite"></span><span class="usr" id="usr"></span></div>
 </header>
 <div class="shell">
   <nav class="side" id="nav" aria-label="Abas do dashboard"></nav>
@@ -977,35 +1000,167 @@ async function decrypt(pw) {
   const pt = await crypto.subtle.decrypt({name: 'AES-GCM', iv: b64(ENC.iv)}, key, b64(ENC.ct));
   return JSON.parse(new TextDecoder().decode(pt));
 }
-const KEY = 'mp-painel-trd-pw';
+/* Acesso: conta no Supabase (projeto MP GLOBAL), só e-mails @meupatrimonio.com confirmados.
+   O servidor recusa criar conta fora do domínio e só entrega a chave que abre os dados para quem está logado. */
+const SB = {url: 'https://cxbgpbibbxfhvdfhyvpx.supabase.co', key: 'sb_publishable_-BoisE7eh2RStAF9m5H1Ug_MYPKiNa1'};
+const SKEY = 'mp-painel-sessao';
+const DOMINIO_OK = e => /^[a-z0-9._%+-]+@meupatrimonio\.com$/.test(String(e || '').trim().toLowerCase());
+const MSG_DOMINIO = 'Acesso permitido somente para e-mails @meupatrimonio.com.';
+const voltaUrl = () => location.origin + location.pathname;
+let USUARIO = null, RECUP = null;
+async function sb(path, {method = 'POST', body, token} = {}) {
+  try {
+    const r = await fetch(SB.url + path, {method, headers: Object.assign({apikey: SB.key, 'Content-Type': 'application/json'}, token ? {Authorization: 'Bearer ' + token} : {}),
+      body: body === undefined ? undefined : JSON.stringify(body)});
+    let j = null; try { j = await r.json(); } catch (e) { /* sem corpo */ }
+    return {ok: r.ok, status: r.status, j: j || {}};
+  } catch (e) { return {ok: false, status: 0, j: {}}; }
+}
+const jwtEmail = t => { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || ''; } catch (e) { return ''; } };
+function salvaSessao(x, lembrar) {
+  const v = JSON.stringify({a: x.access_token, r: x.refresh_token, x: Date.now() + (Number(x.expires_in) || 3600) * 1000, e: jwtEmail(x.access_token)});
+  try { (lembrar ? localStorage : sessionStorage).setItem(SKEY, v); (lembrar ? sessionStorage : localStorage).removeItem(SKEY); } catch (e) { /* modo privado */ }
+}
+function lerSessao() {
+  try { const l = localStorage.getItem(SKEY), v = sessionStorage.getItem(SKEY) || l; return v ? Object.assign(JSON.parse(v), {lembrar: !!l}) : null; } catch (e) { return null; }
+}
+function limpaSessao() { try { localStorage.removeItem(SKEY); sessionStorage.removeItem(SKEY); localStorage.removeItem('mp-painel-trd-pw'); } catch (e) { /* */ } }
+async function renova(x) {
+  if (!x || !x.r) return null;
+  const r = await sb('/auth/v1/token?grant_type=refresh_token', {body: {refresh_token: x.r}});
+  if (!r.ok) return null;
+  salvaSessao(r.j, x.lembrar); return lerSessao();
+}
+function erroAuth(r) {
+  const c = r.j.error_code || r.j.code || '', m = String(r.j.msg || r.j.message || r.j.error_description || '');
+  if (!r.status) return 'Sem conexão. Verifique a internet e tente de novo.';
+  if (c === 'invalid_credentials' || /invalid login/i.test(m)) return 'E-mail ou senha incorretos.';
+  if (c === 'email_not_confirmed' || /not confirmed/i.test(m)) return 'NAO_CONFIRMADO';
+  if (c === 'user_already_exists' || /already registered/i.test(m)) return 'Este e-mail já tem conta. Use "Entrar" ou "Esqueci minha senha".';
+  if (c === 'weak_password' || /password/i.test(m) && /least|weak|short/i.test(m)) return 'Senha fraca: use no mínimo 8 caracteres, com letra maiúscula, minúscula e número.';
+  if (/rate|too many/i.test(c + m) || r.status === 429) return 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.';
+  if (/database error saving new user|meupatrimonio/i.test(m) || r.status === 500 && /saving/i.test(m)) return MSG_DOMINIO;
+  if (/sending|smtp|email address not authorized/i.test(m)) return 'Não foi possível enviar o e-mail agora. Avise o time de Marketing.';
+  return 'Não foi possível concluir agora. Tente de novo em instantes.';
+}
+async function abrePainel(x) {
+  if (!x) return false;
+  if (!DOMINIO_OK(x.e)) { limpaSessao(); return 'dominio'; }
+  if (Date.now() > x.x - 60000) { x = await renova(x); if (!x) return false; }
+  let r = await sb('/rest/v1/rpc/painel_chave', {body: {}, token: x.a});
+  if (r.status === 401) { x = await renova(x); if (!x) return false; r = await sb('/rest/v1/rpc/painel_chave', {body: {}, token: x.a}); }
+  if (!r.ok || typeof r.j !== 'string') return r.status === 403 || r.status === 400 ? 'negado' : false;
+  let data; try { data = await decrypt(r.j); } catch (e) { return 'chave'; }
+  USUARIO = x.e; showApp(data);
+  setTimeout(() => location.reload(), 30 * 60 * 1000);  // quem deixa aberto recebe a versão nova
+  return true;
+}
 function showApp(data) {
   document.body.classList.remove('locked');
   const lk = document.getElementById('lock'); if (lk) lk.remove();
   boot(data);
+  const u = document.getElementById('usr');
+  if (u && USUARIO) {
+    u.innerHTML = `<span>${ESC(USUARIO)}</span><button type="button" id="sair">Sair</button>`;
+    document.getElementById('sair').addEventListener('click', async () => {
+      const x = lerSessao(); if (x) await sb('/auth/v1/logout', {token: x.a});
+      limpaSessao(); location.replace(voltaUrl());
+    });
+  }
 }
-async function unlock(pw, remember) {
-  let data;
-  try { data = await decrypt(pw); } catch (e) { return false; }
-  try { if (remember) localStorage.setItem(KEY, pw); else localStorage.removeItem(KEY); } catch (e) { /* modo privado */ }
-  showApp(data);
-  setTimeout(() => location.reload(), 30 * 60 * 1000);  // quem deixa aberto recebe a versão nova
-  return true;
+let MODO = 'entrar';
+function modo(m, msg, ok) {
+  MODO = m;
+  const $ = id => document.getElementById(id);
+  const titulos = {entrar: 'Acesso exclusivo para e-mails @meupatrimonio.com', criar: 'Crie sua conta com o e-mail @meupatrimonio.com',
+    esqueci: 'Informe seu e-mail para receber o link de nova senha', nova: 'Crie uma nova senha', aviso: ''};
+  $('lsub').textContent = titulos[m] || '';
+  $('ltabs').hidden = !(m === 'entrar' || m === 'criar');
+  for (const b of $('ltabs').querySelectorAll('button')) b.classList.toggle('on', b.dataset.m === m);
+  $('lem').hidden = m === 'nova' || m === 'aviso';
+  $('lpw').hidden = m === 'esqueci' || m === 'aviso';
+  $('lpw').placeholder = m === 'nova' ? 'Nova senha' : 'Senha';
+  $('lpw').autocomplete = m === 'entrar' ? 'current-password' : 'new-password';
+  $('lpw2').hidden = !(m === 'criar' || m === 'nova');
+  $('ldica').hidden = !(m === 'criar' || m === 'nova');
+  $('lrem').hidden = m !== 'entrar';
+  $('lbtn').hidden = m === 'aviso';
+  $('lbtn').textContent = {entrar: 'Entrar', criar: 'Criar conta', esqueci: 'Enviar link', nova: 'Salvar nova senha'}[m] || 'OK';
+  $('lforgot').textContent = m === 'entrar' ? 'Esqueci minha senha' : 'Voltar para entrar';
+  $('lforgot').hidden = m === 'nova';
+  const e = $('err'); e.className = 'err' + (ok ? ' ok' : ''); e.innerHTML = msg || '';
+}
+async function enviar(ev) {
+  ev.preventDefault();
+  const $ = id => document.getElementById(id), err = $('err');
+  const email = $('lem').value.trim().toLowerCase(), pw = $('lpw').value, pw2 = $('lpw2').value;
+  const falha = t => { err.className = 'err'; err.innerHTML = t; $('lbtn').disabled = false; };
+  if (MODO !== 'nova' && !DOMINIO_OK(email)) return falha(MSG_DOMINIO);
+  if ((MODO === 'criar' || MODO === 'nova') && (pw.length < 8 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw))) return falha('A senha precisa ter no mínimo 8 caracteres, com letra maiúscula, minúscula e número.');
+  if ((MODO === 'criar' || MODO === 'nova') && pw !== pw2) return falha('As senhas não conferem.');
+  $('lbtn').disabled = true; err.className = 'err'; err.textContent = 'Aguarde...';
+  const red = '?redirect_to=' + encodeURIComponent(voltaUrl());
+  if (MODO === 'entrar') {
+    const r = await sb('/auth/v1/token?grant_type=password', {body: {email, password: pw}});
+    if (!r.ok) {
+      const m = erroAuth(r);
+      if (m === 'NAO_CONFIRMADO') return falha('Confirme seu e-mail antes de entrar: abra o link que enviamos. <button type="button" class="la" id="reenv">Reenviar e-mail de confirmação</button>');
+      return falha(m);
+    }
+    salvaSessao(r.j, $('rem').checked);
+    const res = await abrePainel(lerSessao());
+    if (res !== true) { limpaSessao(); return falha(res === 'dominio' || res === 'negado' ? MSG_DOMINIO : 'Não foi possível abrir os dados agora. Tente de novo em instantes.'); }
+  } else if (MODO === 'criar') {
+    const r = await sb('/auth/v1/signup' + red, {body: {email, password: pw}});
+    if (!r.ok) return falha(erroAuth(r));
+    if (r.j.access_token) { salvaSessao(r.j, true); return void (await abrePainel(lerSessao())); }
+    modo('aviso', `<b>Conta criada!</b><br>Enviamos um link de confirmação para <b>${ESC(email)}</b>. Abra o e-mail e clique no link para liberar o acesso.<br><button type="button" class="la" id="lvolta">Voltar para entrar</button>`, true);
+  } else if (MODO === 'esqueci') {
+    const r = await sb('/auth/v1/recover' + red, {body: {email}});
+    if (!r.ok && r.status !== 0 && r.status < 500) return falha(erroAuth(r));
+    if (!r.ok) return falha(erroAuth(r));
+    modo('aviso', `Se <b>${ESC(email)}</b> tiver conta, você vai receber um link para criar uma nova senha.<br><button type="button" class="la" id="lvolta">Voltar para entrar</button>`, true);
+  } else if (MODO === 'nova' && RECUP) {
+    const r = await sb('/auth/v1/user', {method: 'PUT', body: {password: pw}, token: RECUP.access_token});
+    if (!r.ok) return falha(erroAuth(r));
+    salvaSessao(RECUP, true);
+    const res = await abrePainel(lerSessao());
+    if (res !== true) { limpaSessao(); return falha(MSG_DOMINIO); }
+  }
+  $('lbtn').disabled = false;
 }
 function start() {
-if (RAW) {
-  showApp(RAW);
-} else {
-  document.getElementById('lockf').addEventListener('submit', async ev => {
-    ev.preventDefault();
-    const err = document.getElementById('err'); err.textContent = 'Verificando...';
-    const ok = await unlock(document.getElementById('pw').value, document.getElementById('rem').checked);
-    if (!ok) err.textContent = 'Senha incorreta.';
+  if (RAW) { showApp(RAW); return; }
+  const $ = id => document.getElementById(id);
+  $('lockf').addEventListener('submit', enviar);
+  $('ltabs').addEventListener('click', ev => { const b = ev.target.closest('button[data-m]'); if (b) modo(b.dataset.m); });
+  $('lforgot').addEventListener('click', () => modo(MODO === 'entrar' ? 'esqueci' : 'entrar'));
+  $('err').addEventListener('click', async ev => {
+    if (ev.target.id === 'lvolta') modo('entrar');
+    if (ev.target.id === 'reenv') {
+      const email = $('lem').value.trim().toLowerCase();
+      const r = await sb('/auth/v1/resend?redirect_to=' + encodeURIComponent(voltaUrl()), {body: {type: 'signup', email}});
+      modo('entrar', r.ok ? `Reenviamos o link de confirmação para <b>${ESC(email)}</b>.` : erroAuth(r), r.ok);
+    }
   });
-  (async () => {
-    let saved = null; try { saved = localStorage.getItem(KEY); } catch (e) { /* */ }
-    if (saved && ENC && !(await unlock(saved, true))) try { localStorage.removeItem(KEY); } catch (e) { /* */ }
-  })();
-}
+  // volta do link do e-mail (confirmação de conta ou nova senha): tokens chegam no endereço
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get('access_token') || h.get('error_description')) history.replaceState(null, '', voltaUrl());
+  if (h.get('error_description')) {
+    modo('entrar', /expired|invalid/i.test(h.get('error_description')) ? 'Este link expirou ou já foi usado. Entre com sua senha ou peça um novo link.' : 'Não foi possível validar o link. Tente entrar com sua senha.');
+    return;
+  }
+  if (h.get('access_token')) {
+    const x = {access_token: h.get('access_token'), refresh_token: h.get('refresh_token'), expires_in: h.get('expires_in')};
+    if (h.get('type') === 'recovery') { RECUP = x; modo('nova'); return; }
+    salvaSessao(x, true);
+  }
+  modo('entrar');
+  const x = lerSessao();
+  if (x) {
+    $('err').textContent = 'Entrando...';
+    abrePainel(x).then(res => { if (res !== true) { limpaSessao(); modo('entrar', res === 'dominio' || res === 'negado' ? MSG_DOMINIO : ''); } });
+  }
 }
 
 /* =========================================================================

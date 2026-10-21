@@ -7,8 +7,9 @@ const mode = process.argv[2];
 const chunks = [];
 process.stdin.on('data', c => chunks.push(c));
 process.stdin.on('end', () => {
-  const pw = process.env.PAINEL_SENHA;
-  if (!pw) { console.error('PAINEL_SENHA ausente'); process.exit(2); }
+  const pws = String(process.env.PAINEL_SENHA || '').split('||').filter(Boolean);
+  if (!pws.length) { console.error('PAINEL_SENHA ausente'); process.exit(2); }
+  const pw = pws[0];   // "NOVA||ANTIGA": cifra com a nova, decifra com qualquer uma (troca de chave)
   const input = Buffer.concat(chunks);
   if (mode === 'enc') {
     const iter = 600000, salt = crypto.randomBytes(16), iv = crypto.randomBytes(12);
@@ -18,10 +19,16 @@ process.stdin.on('end', () => {
     process.stdout.write(JSON.stringify({v: 1, iter, salt: salt.toString('base64'), iv: iv.toString('base64'), ct: ct.toString('base64')}));
   } else if (mode === 'dec') {
     const E = JSON.parse(input.toString('utf8'));
-    const key = crypto.pbkdf2Sync(pw, Buffer.from(E.salt, 'base64'), E.iter, 32, 'sha256');
     const ct = Buffer.from(E.ct, 'base64');
-    const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(E.iv, 'base64'));
-    d.setAuthTag(ct.subarray(ct.length - 16));
-    process.stdout.write(Buffer.concat([d.update(ct.subarray(0, ct.length - 16)), d.final()]));
+    for (const k of pws) {
+      try {
+        const key = crypto.pbkdf2Sync(k, Buffer.from(E.salt, 'base64'), E.iter, 32, 'sha256');
+        const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(E.iv, 'base64'));
+        d.setAuthTag(ct.subarray(ct.length - 16));
+        process.stdout.write(Buffer.concat([d.update(ct.subarray(0, ct.length - 16)), d.final()]));
+        return;
+      } catch (e) { /* tenta a próxima chave */ }
+    }
+    console.error('nenhuma chave decifra'); process.exit(3);
   } else { console.error('uso: node crypt.js enc|dec'); process.exit(2); }
 });
