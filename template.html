@@ -1874,8 +1874,7 @@ function mpFoco(x, p) {
     impacto: x.checkouts ? `Com 15%, os ${fN(x.checkouts)} checkouts do mês dariam ${fN(Math.round(x.checkouts * 0.15))} assinaturas (foram ${fN(x.novas)}).` : ''});
   if (x.ltvCac != null && x.ltvCac < 1) out.push({k: 'tic', t: 'Receita por assinante', hoje: `${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · LTV ÷ CAC de ${fX(x.ltvCac)}x`, meta: 'LTV ÷ CAC acima de 3x',
     porque: 'Assinaturas de ticket baixo (até US$ 25/mês) são as que mais perdem assinantes no mercado; com R$ 49, a margem para pagar a mídia é curta.',
-    acoes: ['Oferecer a Formação de Consultores para a base ativa (upsell): é a maior receita por cliente do produto',
-      'Plano anual com desconto (receita antecipada e menos churn)', 'Depois de melhorar a retenção, testar reajuste do preço para novos assinantes'], impacto: ''});
+    acoes: ['Plano anual com desconto (receita antecipada e menos churn)', 'Depois de melhorar a retenção, testar reajuste do preço para novos assinantes'], impacto: ''});
   if (p && x.novas < p.novas && x.ctr >= 1.45 && (x.convVisita || 0) >= 1.5) out.push({k: 'vol', t: 'Volume de novas assinaturas', hoje: `${fN(x.novas)} novas (${mesCurto(p.ym)}: ${fN(p.novas)}) com ${fRc(x.investimento)} de mídia`, meta: 'crescer o volume sem piorar o CAC',
     porque: 'Anúncio e página estão acima da referência de mercado; o volume caiu junto com a verba.',
     acoes: ['Só aumentar verba depois de baixar o CPM e o churn (senão escala o prejuízo)', 'Quando escalar, subir 20–30% por semana para não reiniciar o aprendizado da campanha'], impacto: ''});
