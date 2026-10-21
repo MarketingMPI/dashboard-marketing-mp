@@ -377,10 +377,14 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .dwb h4{margin:22px 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}
 .dwb h4:first-child{margin-top:0}
 .facts{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;font-size:13px}
-.hubl{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px;margin-top:4px}
-.hubi{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1px solid var(--linha);border-radius:12px;padding:10px 12px;cursor:pointer;font-family:inherit;color:inherit;transition:border-color .15s,box-shadow .15s,transform .15s}
-.hubi:hover{border-color:var(--v200);box-shadow:0 4px 14px rgba(0,51,38,.08);transform:translateY(-1px)}
-.hubav{width:36px;height:36px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;letter-spacing:.3px;background:var(--v50);color:var(--verde)}
+.hubl{display:flex;flex-direction:column;max-height:640px;overflow-y:auto;border-top:1px solid var(--linha)}
+.hubrow{align-items:start}
+.hubside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.hubrow .card.np .ch{padding:16px 18px 10px}
+.hubi{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:0;border-bottom:1px solid var(--linha);border-radius:0;padding:8px 18px;cursor:pointer;font-family:inherit;color:inherit;transition:background .15s}
+.hubi:last-child{border-bottom:0}
+.hubi:hover{background:var(--suave)}
+.hubav{width:32px;height:32px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;letter-spacing:.3px;background:var(--v50);color:var(--verde)}
 .hubav.abe{background:#eef6f1;color:#3d7a5c}.hubav.ree{background:#fbf4e6;color:var(--amb)}.hubav.ren{background:#f1f3f2;color:#8a9590}
 .hubn{flex:1;min-width:0;line-height:1.3}.hubn b{display:block;font-size:13.5px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hubn small{display:block;font-size:11.5px;color:var(--cinza);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1945,20 +1949,20 @@ function viewMPHub() {
   g2 += `<line x1="30" x2="${W2 - 10}" y1="${H2 - 26}" y2="${H2 - 26}" stroke="#cfd9d4"/>`;
   const coh = new Map(); for (const u of c.base) { const k = u[HU.criado].slice(0, 7); const x = coh.get(k) || {n: 0, a: 0}; x.n++; if (c.st(u) === 'ativo7' || c.st(u) === 'ativo30') x.a++; coh.set(k, x); }
   const cohH = '<div class="mpco">' + [...coh].sort().map(([k, x]) => `<div data-tip="${ESC(`Cadastrados em ${MESN(k)}: ${x.n}\nCom acesso nos últimos 30 dias: ${x.a}`)}"><span class="mut">${MESN(k)}</span><span class="mpt"><i style="width:100%;background:#e6ece9"></i><i class="ov" style="width:${pctOf(x.a, x.n)}%"></i></span><b>${fP(pctOf(x.a, x.n)).replace(',0%', '%')}</b><small>${x.a} de ${x.n}</small></div>`).join('') + '</div>';
-  h += `<div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Logins nas últimas 24 horas</h3><p>Por hora, até ${snap} · total ${fN(log24)}</p></div></div>${a24.length ? `<div class="svgc"><svg width="${W2}" height="${H2}" viewBox="0 0 ${W2} ${H2}">${g2}</svg></div>` : emptyBox('Sem dados')}</div>
+  const ladoDir = `<div class="hubside"><div class="card"><div class="ch"><div><h3>Logins nas últimas 24 horas</h3><p>Por hora, até ${snap} · total ${fN(log24)}</p></div></div>${a24.length ? `<div class="svgc"><svg width="${W2}" height="${H2}" viewBox="0 0 ${W2} ${H2}">${g2}</svg></div>` : emptyBox('Sem dados')}</div>
     <div class="card"><div class="ch"><div><h3>Retenção por mês de cadastro</h3><p>% com acesso nos últimos 30 dias (em ${fDay(c.SD)})</p></div></div>${cohH}</div></div>`;
   // lista de usuários: pelo ÚLTIMO ACESSO, do mais recente; quem nunca acessou vai para o fim
   const STN = {ativo7: ['ativo', 'nov'], ativo30: ['ativo 8–30d', 'abe'], inativo: ['inativo', 'ree'], nunca: ['nunca acessou', 'ren']};
   const lin = c.base.slice().sort((a, b) => (b[HU.ult] || '') > (a[HU.ult] || '') ? 1 : (b[HU.ult] || '') < (a[HU.ult] || '') ? -1 : (b[HU.criado] > a[HU.criado] ? 1 : -1));
   HUBCTX = {c, H, STN};
   const ini = n => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('') || '?';
-  h += `<div class="card mt"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} usuários · do acesso mais recente ao mais antigo · clique para ver os detalhes</p></div>
+  h += `<div class="g g2 mt hubrow"><div class="card np"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} usuários · do acesso mais recente ao mais antigo · clique para ver os detalhes</p></div>
       <div class="lg">${Object.values(STN).map(([t, k]) => `<span><i class="hubd ${k}"></i>${t}</span>`).join('')}</div></div><div class="hubl">` +
     lin.map(u => { const s2 = STN[c.st(u)], l = u[HU.ult];
       return `<button type="button" class="hubi" data-hub="${u[HU.id]}"><span class="hubav ${s2[1]}">${ESC(ini(u[HU.nome]))}</span>
         <span class="hubn"><b>${ESC(u[HU.nome] || '–')}</b><small>${l ? `${fDay(l.slice(0, 10))} às ${l.slice(11, 16)} · ${hubHa(l, H.extraido_em)}` : 'nunca acessou'}</small></span>
         <span class="hubd ${s2[1]}" title="${ESC(s2[0])}"></span><svg class="hubc" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>`; }).join('') +
-    `</div></div>`;
+    `</div></div>${ladoDir}</div>`;
   h += `<details class="mpd mt"><summary>O que o MP HUB ainda não registra (para pedir ao desenvolvedor)</summary><ul>
     <li><b>Tempo de uso:</b> o HUB não guarda início e fim das sessões, então não há tempo médio no MP HUB.</li>
     <li><b>Histórico de acessos:</b> só o último acesso fica salvo. Com o histórico, dá para medir ativos em qualquer período passado, frequência e retenção real.</li>
