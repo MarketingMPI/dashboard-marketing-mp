@@ -403,6 +403,19 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .insl{list-style:none;margin:0;padding:0}.insl li{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--linha);font-size:15px;line-height:1.55}.insl li:last-child{border-bottom:0}
 .insl i{flex:none;width:9px;height:9px;border-radius:50%;margin-top:8px;background:#b9c4bf}.insl li.pos i{background:#00a611}.insl li.neg i{background:#c0392b}
 .mpins{align-items:start}
+.foco{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media(max-width:1100px){.foco{grid-template-columns:1fr}}
+.fci{border:1px solid var(--linha);border-radius:12px;padding:14px 16px;background:#fff}
+.fch{display:flex;align-items:center;gap:10px;margin-bottom:10px}.fch b{font-size:15px;color:var(--txt);flex:1}
+.fcn{width:26px;height:26px;border-radius:50%;background:var(--verde);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.fcp{font-size:11px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}.fcp.alta{background:#fbe9e6;color:#a3362a}.fcp.media{background:#fbf1dc;color:#8a5d10}
+.fcr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.fcr > div{background:var(--suave);border-radius:9px;padding:8px 10px;font-size:13px;line-height:1.4;color:var(--txt)}
+.fcr span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--cinza);margin-bottom:2px}
+.fcw{font-size:13.5px;color:#3e4b46;margin:0 0 8px;line-height:1.5}
+.fci ul{margin:0 0 4px 18px;padding:0;font-size:13.5px;line-height:1.5}.fci li{margin:3px 0}
+.fcim{margin-top:10px;font-size:13px;background:var(--v50);border-radius:9px;padding:8px 10px;line-height:1.45}.fcim b{color:var(--verde)}
+.fcok{margin-top:14px;font-size:13.5px;border-top:1px solid var(--linha);padding-top:12px;line-height:1.5}.fcok b{color:#0b7a3b}
 .mpbm{table-layout:fixed;width:100%}.mpbm td,.mpbm th{vertical-align:top;white-space:normal!important}.mpbm th:nth-child(1){width:34%}.mpbm th:nth-child(2){width:10%}.mpbm th:nth-child(3){width:26%}.mpbm th:nth-child(4){width:14%}.mpbm th:nth-child(5){width:16%}
 .mpbm td:nth-child(2){white-space:nowrap!important}
 .bml{display:inline-block;font-size:11px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}
@@ -1732,7 +1745,7 @@ function mpMes(ym) {
 let MP_BENCH_ = null;
 const mpBenchList = () => MP_BENCH_ || (MP_BENCH_ = [
   {k: 'churn', t: 'Churn mensal de assinantes', fmt: v => fP(v), ref: '4,99% em Educação · 4,29% na faixa de US$ 10–25/mês', v: 4.99, bom: 'baixo', f: 'recurly',
-    nota: 'Mediana da rede Recurly (jul/2026). O MP PRO custa ~US$ 10/mês, a faixa de preço com maior churn do estudo.'},
+    nota: 'Mediana da rede Recurly (jul/2026). O MP PRO custa cerca de US$ 10/mês, a faixa de preço com maior churn do estudo.'},
   {k: 'reembPct', t: 'Reembolso das novas assinaturas', fmt: v => fP(v), ref: '4% a 10% (recorrência mensal, 1ºs 30 dias)', faixa: [4, 10], bom: 'baixo', f: 'synchro',
     nota: 'Faixa considerada saudável para assinatura mensal; acima de 15% indica problema de oferta ou público.'},
   {k: 'ctr', t: 'CTR do anúncio (link)', fmt: v => fP(v), ref: '1,45% Educação · 0,98% Finanças · 1,71% média', v: 1.45, bom: 'alto', f: 'wordstream',
@@ -1792,6 +1805,70 @@ function mpInsights(x, p) {
   if (x.reemb) add(x.reembPct > 10 ? 'neg' : 'neu', `${fN(x.reemb)} das ${fN(x.novas)} novas assinaturas foi reembolsada (${fP(x.reembPct)}; referência saudável: 4–10%).`.replace('foi reembolsada', x.reemb > 1 ? 'foram reembolsadas' : 'foi reembolsada'));
   return out;
 }
+
+/* Onde focar: prioridades do mês, geradas a partir dos números do mês × referências de mercado */
+function mpFoco(x, p) {
+  const m = x.m, liq = m.base.liquido_medio, out = [];
+  const sim = churnAlvo => { const vida = 100 / churnAlvo, ltv = liq != null ? vida * liq : null; return {vida, ltv, lc: ltv != null && x.cac ? ltv / x.cac : null}; };
+  if (x.churn != null && x.churn > 4.99) {
+    const a = sim(10);
+    out.push({k: 'ret', t: 'Retenção dos assinantes', hoje: `churn de ${fP(x.churn)} no mês · assinante fica ≈ ${f1(100 / x.churn)} meses`, meta: 'churn abaixo de 10% no curto prazo (mercado: 4,99%)',
+      porque: `É o que mais pesa no resultado: cada assinante gera ${fRc(liq)} líquidos por mês e sai antes de pagar o CAC de ${fRc(x.cac)}.`,
+      acoes: ['Boas-vindas ativa na 1ª semana: mensagem/ligação, roteiro do que assistir primeiro e convite para o próximo encontro ao vivo',
+        'Calendário fixo de encontros e conteúdos novos todo mês, avisados por e-mail e WhatsApp, para o assinante sentir uso antes da renovação',
+        `Conversa com quem saiu${x.churnSairam ? ` (${fN(x.churnSairam)} em ${mesCurto(x.ym)})` : ''} para entender o motivo e oferta de retorno`,
+        'Testar plano trimestral/anual com desconto: troca a decisão de renovar todo mês por uma decisão a cada 3 ou 12 meses'],
+      impacto: a.ltv != null ? `Com churn de 10%, o assinante ficaria ≈ ${f1(a.vida)} meses: LTV de ≈ ${fRc(a.ltv)}${a.lc != null ? ` e LTV ÷ CAC de ${fX(a.lc)}x (hoje ${fX(x.ltvCac)}x)` : ''}.` : ''});
+  }
+  if (x.cpm != null && x.cpm > 3500) {
+    const alvo = 5000, cacA = x.cac != null ? x.cac * alvo / x.cpm : null;
+    out.push({k: 'cpm', t: 'Custo da mídia (CPM)', hoje: `CPM de ${fRc(x.cpm)}${p && p.cpm ? ` (${mesCurto(p.ym)}: ${fRc(p.cpm)})` : ''}`, meta: 'CPM perto de R$ 50 (faixa Brasil de infoproduto: R$ 8–35)',
+      porque: 'O anúncio e a página convertem bem; o que encarece cada assinatura é pagar caro para aparecer.',
+      acoes: ['Abrir o público: testar segmentação ampla/Advantage+ e públicos semelhantes aos assinantes, em vez de interesses muito restritos',
+        'Renovar criativos a cada 2–3 semanas (vídeo curto em Reels/Stories costuma ter CPM menor que feed)',
+        'Acompanhar a frequência: acima de 3 por pessoa o CPM sobe e o CTR cai',
+        'Evitar dividir uma verba pequena em muitos conjuntos de anúncio (cada um fica em aprendizado e mais caro)'],
+      impacto: cacA != null ? `Mantendo CTR e conversão, um CPM de R$ 50 levaria o CAC de ${fRc(x.cac)} para ≈ ${fRc(cacA)}.` : ''});
+  }
+  if (x.recusas || x.inad) {
+    out.push({k: 'cob', t: 'Cobrança e renovação', hoje: `${fN(x.recusas)} cobranças recusadas no cartão · ${fN(x.inad)} inadimplente${x.inad === 1 ? '' : 's'} · renovação de ${fP(x.renov)}`, meta: 'nenhuma renovação perdida por cartão (mercado: cerca de 1,7% de churn involuntário em educação)',
+      porque: 'Parte de quem "cancela" não quis sair: o cartão recusou (saldo, limite ou banco) e a assinatura caiu.',
+      acoes: ['Lembrete 2–3 dias antes do vencimento e no dia da recusa, com o link para atualizar o pagamento',
+        'Oferecer Pix automático como alternativa ao cartão para quem já teve recusa',
+        'Lista semanal de cobranças recusadas para contato individual do time (base ainda pequena: dá para falar com cada um)'],
+      impacto: x.previstas ? `Recuperar as renovações perdidas no mês levaria a renovação de ${fP(x.renov)} para perto de 100%.` : ''});
+  }
+  if (x.reembPct != null && x.reembPct > 10) out.push({k: 'ree', t: 'Reembolso das novas assinaturas', hoje: `${fN(x.reemb)} de ${fN(x.novas)} novas reembolsadas (${fP(x.reembPct)})`, meta: 'até 10% (faixa saudável de 4–10%)',
+    porque: 'Reembolso alto indica promessa da página diferente do que a pessoa encontra no primeiro acesso.',
+    acoes: ['Conferir se a página de vendas descreve exatamente o que está disponível no primeiro dia', 'Primeiro acesso guiado: uma aula/entrega rápida de valor nas primeiras 48 horas', 'Perguntar o motivo a cada pedido de reembolso e registrar'], impacto: ''});
+  if (x.abandono != null && x.abandono > 70.22) out.push({k: 'chk', t: 'Checkout', hoje: `${fP(x.abandono)} dos checkouts iniciados não viraram assinatura`, meta: 'abaixo de 70% (média de mercado: 70,22%)',
+    porque: 'Quem chegou ao checkout já decidiu comprar; cada ponto recuperado vira venda sem custo extra de mídia.',
+    acoes: ['Recuperação de checkout abandonado da Kiwify (e-mail/WhatsApp) ligada', 'Pix em destaque e selo de garantia de 7 dias visível no checkout', 'Remarketing para quem iniciou o checkout e não comprou'],
+    impacto: x.checkouts ? `Com abandono de 70%, os ${fN(x.checkouts)} checkouts do mês dariam ≈ ${fN(Math.round(x.checkouts * 0.3))} assinaturas (foram ${fN(x.novas)}).` : ''});
+  if (x.ltvCac != null && x.ltvCac < 1) out.push({k: 'tic', t: 'Receita por assinante', hoje: `${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · LTV ÷ CAC de ${fX(x.ltvCac)}x`, meta: 'LTV ÷ CAC acima de 3x',
+    porque: 'Assinaturas de ticket baixo (até US$ 25/mês) são as que mais perdem assinantes no mercado; com R$ 49, a margem para pagar a mídia é curta.',
+    acoes: ['Oferecer a Formação de Consultores para a base ativa (upsell): é a maior receita por cliente do produto',
+      'Plano anual com desconto (receita antecipada e menos churn)', 'Depois de melhorar a retenção, testar reajuste do preço para novos assinantes'], impacto: ''});
+  if (p && x.novas < p.novas && x.ctr >= 1.45 && (x.convVisita || 0) >= 1.5) out.push({k: 'vol', t: 'Volume de novas assinaturas', hoje: `${fN(x.novas)} novas (${mesCurto(p.ym)}: ${fN(p.novas)}) com ${fRc(x.investimento)} de mídia`, meta: 'crescer o volume sem piorar o CAC',
+    porque: 'Anúncio e página estão acima da referência de mercado; o volume caiu junto com a verba.',
+    acoes: ['Só aumentar verba depois de baixar o CPM e o churn (senão escala o prejuízo)', 'Quando escalar, subir 20–30% por semana para não reiniciar o aprendizado da campanha'], impacto: ''});
+  const manter = [];
+  if (x.ctr != null && x.ctr >= 1.45) manter.push(`CTR de ${fP(x.ctr)} (Educação: 1,45%): manter a linha de criativos que está funcionando`);
+  if (x.convVisita != null && x.convVisita >= 1.5) manter.push(`página convertendo ${fP(x.convVisita)} das visitas (referência 1,5–2%)`);
+  if (x.cac != null && p && p.cac != null && x.cac < p.cac) manter.push(`CAC caiu de ${fRc(p.cac)} para ${fRc(x.cac)}`);
+  return {itens: out, manter};
+}
+function mpFocoHtml(x, p) {
+  const F = mpFoco(x, p);
+  if (!F.itens.length) return `<div class="card mt"><div class="ch"><div><h3>Onde focar para melhorar</h3><p>Nenhum indicador do mês ficou pior que a referência de mercado.</p></div></div></div>`;
+  return `<div class="card mt"><div class="ch"><div><h3>Onde focar para melhorar</h3><p>Prioridades de ${mesNome(x.ym)}, da maior para a menor, a partir dos números do mês e das referências de mercado · impacto estimado é ordem de grandeza</p></div></div>
+    <div class="foco">${F.itens.map((f, i) => `<div class="fci"><div class="fch"><span class="fcn">${i + 1}</span><b>${f.t}</b><span class="fcp ${i < 2 ? 'alta' : 'media'}">prioridade ${i < 2 ? 'alta' : 'média'}</span></div>
+      <div class="fcr"><div><span>Hoje</span>${f.hoje}</div><div><span>Meta</span>${f.meta}</div></div>
+      <p class="fcw">${f.porque}</p>
+      <ul>${f.acoes.map(a => `<li>${a}</li>`).join('')}</ul>
+      ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div>`).join('')}</div>
+    ${F.manter.length ? `<div class="fcok"><b>O que manter:</b> ${F.manter.join(' · ')}.</div>` : ''}</div>`;
+}
 function viewMPProMensal() {
   let h = viewHead('MP PRO', 'B2B - Análises · insights mensais: cada mês do dia 1º ao último dia, comparado com o mês anterior e com referências de mercado');
   const MP = D.mppro || {};
@@ -1824,6 +1901,7 @@ function viewMPProMensal() {
   const ins = mpInsights(x, p);
   h += `<div class="mt mpins"><div class="card"><div class="ch"><div><h3>Destaques de ${mesNome(ym)}</h3><p>Leitura automática dos números do mês · pronta para reunião</p></div></div>
     <ul class="insl">${ins.map(([t, s]) => `<li class="${t}"><i></i><span>${s}</span></li>`).join('')}</ul></div></div>`;
+  h += mpFocoHtml(x, p);
   // mercado
   h += `<div class="card np mt"><div class="ch"><div><h3>MP PRO × mercado em ${mesNome(ym)}</h3><p>Assinatura mensal de educação para profissionais de finanças · ticket de ${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · referências públicas, fontes abaixo</p></div></div>
     <div class="tw"><table class="t mpbm"><thead><tr><th>Indicador</th><th class="num">MP PRO</th><th>Referência de mercado</th><th>Leitura</th><th>Fonte</th></tr></thead><tbody>
