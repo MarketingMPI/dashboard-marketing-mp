@@ -100,6 +100,13 @@ def lead_metrics(l, agora):
     else:
         m["contatos_ate_perda"] = None
 
+    # cadência (situação na data de referência): vencida = vencimento antes de hoje
+    hoje = agora.date().isoformat()
+    pv = (l.get("pv") or []) if l["s"] == "open" else []
+    atr = [a[0] for a in pv if a[0] < hoje]
+    m["atividades_atrasadas"] = len(atr)
+    m["cadencia"] = None if l["s"] != "open" else ("atraso" if atr else "hoje" if any(a[0] == hoje for a in pv)
+                                                    else "dia" if pv else "sem")
     if l["s"] == "open":
         ref = max([dt(x[0]) for x in k] + ([t_ag] if t_ag else [])) if (k or t_ag) else e
         m["dias_sem_contato"] = dias(agora, ref)
@@ -531,6 +538,9 @@ def bloco(P, M):
         "abertos": sum(1 for l in P if l["s"] == "open"),
         "abertos_sem_contato": sum(1 for l, m in zip(P, ms) if l["s"] == "open" and not m["contatado"]),
         "parados_7d": sum(1 for m in ms if m["parado_7d"]),
+        "leads_em_atraso": sum(1 for m in ms if m["cadencia"] == "atraso"),
+        "atividades_atrasadas": sum(m["atividades_atrasadas"] for m in ms),
+        "leads_sem_proxima": sum(1 for m in ms if m["cadencia"] == "sem"),
     }
 
 
@@ -580,6 +590,11 @@ def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
         "perdidos": b["perdidos"],
         "abertos": b["abertos"],
         "parados_7d": b["parados_7d"],
+        "leads_em_atraso": b["leads_em_atraso"],
+        "atividades_atrasadas": b["atividades_atrasadas"],
+        "leads_vence_hoje": sum(1 for m in ms if m["cadencia"] == "hoje"),
+        "leads_em_dia": sum(1 for m in ms if m["cadencia"] == "dia"),
+        "leads_sem_proxima": b["leads_sem_proxima"],
         "taxa_conversao": b["ganhos"] / b["leads"] * 100 if b["leads"] else 0,
     }
 

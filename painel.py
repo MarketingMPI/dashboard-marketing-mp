@@ -429,12 +429,15 @@ def model(cache):
             if contacts and contacts[0][0] < entry:  # houve contato antes: o lead já existia
                 entry, fonte = contacts[0][0], "1º contato registrado (anterior à criação no CRM)"
         pend = sorted(a["due"] for a in info["acts"] if not a["done"] and a.get("due"))
+        # Cadência: atividades pendentes (data de vencimento + assunto) só dos abertos -> bloco "Atividades em atraso"
+        pv = sorted([a["due"], sem_pii(a.get("subj") or "")[:50]] for a in info["acts"]
+                    if not a["done"] and not a.get("deleted") and a.get("due")) if d["status"] == "open" else []
         leads.append({
             "id": d["id"], "n": sem_pii(title), "s": d["status"], "sg": d["stage_id"], "c": owner, "o": origem(title, lb), "lb": lb,
             "e": entry, "ec": crm, "ef": fonte, "b": 1 if (d["id"] in base or reat) else 0, "pk": info.get("pk") or [], "w": brt(d.get("won_time")), "l": brt(d.get("lost_time")),
             "lr": (d.get("lost_reason") or "").strip() or ("Sem motivo informado" if d["status"] == "lost" else None),
             "k": contacts,
-            "pa": len(pend), "nx": pend[0] if pend else None,
+            "pa": len(pend), "nx": pend[0] if pend else None, "pv": pv,
             "h": hist,
         })
     return dedupe(leads), excl
@@ -474,6 +477,8 @@ def dedupe(leads, window_days=14):
                 c["k"] = sorted(x for l in cl for x in l["k"])
                 c["b"] = min(l["b"] for l in cl)
                 c["dd"] = [l["id"] for l in cl_sorted[1:]]
+                if c["s"] == "open":
+                    c["pv"] = sorted(x for l in cl if l["s"] == "open" for x in (l.get("pv") or []))
             if i > 0:
                 prev = clusters[i - 1][0]
                 c["re"] = prev["e"][:10]  # reincidente: já tinha entrado antes

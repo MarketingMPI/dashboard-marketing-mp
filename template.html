@@ -392,7 +392,24 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .lg .hubd{margin-right:5px;vertical-align:0}
 .hubc{width:16px;height:16px;flex:none;fill:none;stroke:#b3bfba;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .hubi:hover .hubc{stroke:var(--verde)}
-.facts b .mpk{display:inline-block;width:auto}
+.facts b .mpk,.facts b .cad{display:inline-block;width:auto}
+.cad{display:inline-block;font-size:11px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}
+.cad.atr{background:#fbe9e6;color:#a3362a}.cad.hoj{background:#fbf1dc;color:#8a5d10}.cad.dia{background:#e3f3ea;color:#0b6b3a}.cad.sem{background:#eef1f0;color:#69727d}
+.cadmini{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:4px 0 16px}
+.cadmini > div{border:1px solid var(--linha);border-radius:12px;padding:12px 14px;background:#fff}
+.cadmini span{display:block;font-size:12px;color:var(--cinza);font-weight:600}
+.cadmini b{display:block;font-size:24px;font-weight:700;color:var(--txt);margin:4px 0 2px;line-height:1.1}.cadmini b small{font-size:12px;font-weight:500;color:var(--cinza);margin-left:4px}
+.cadmini > div > small{display:block;font-size:11.5px;color:var(--cinza)}
+.cadmini .red b{color:#c0392b}.cadmini .amb b{color:#a8701c}
+.cadbar{display:flex;height:12px;border-radius:99px;overflow:hidden;background:#eef1f0}.cadbar i{display:block;height:100%}
+.cadlg{margin-top:8px}.cadlg b{margin-left:3px;color:var(--txt)}
+.cadh{font-size:13px;font-weight:700;margin:0 0 8px;color:var(--txt)}
+.cadg{gap:24px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.cadg .t th{white-space:normal}.cadg .t td,.cadg .t th{padding-left:8px;padding-right:8px}
+.cadg .t td.wrap{min-width:150px}
+.cadl{list-style:none;margin:0;padding:0}.cadl li{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--linha);font-size:12.5px}
+.cadl li:last-child{border-bottom:0}.cadl .cad{flex:none;min-width:92px;text-align:center}.cadl .cadt{flex:1;min-width:0}
+@media (max-width:900px){.cadmini{grid-template-columns:1fr 1fr}}
 .facts div span{display:block;font-size:11.5px;color:var(--cinza)}
 .facts div b{font-weight:600}
 .mets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -617,6 +634,16 @@ function derive(l, agora) {
     dGanho: won && l.w ? (tms(l.w) - e) / DAY : null,
     cPerda, dSem, parado: open && dSem > 7, open, won, lost
   };
+  // cadência: atividades pendentes do lead aberto, comparadas com o dia de referência (vencida = antes de hoje)
+  const hj = dkey(agora), pv = open ? (l.pv || []) : [];
+  let atr = 0, hoje = 0, venc = null, vencS = '', prox = null, proxS = '';
+  for (const a of pv) {
+    if (a[0] < hj) { atr++; if (venc === null || a[0] < venc) { venc = a[0]; vencS = a[1]; } }
+    else if (a[0] === hj) hoje++;
+    else if (prox === null || a[0] < prox) { prox = a[0]; proxS = a[1]; }
+  }
+  Object.assign(d, {atr, hojeN: hoje, venc, vencS, prox, proxS, hj, dAtr: venc ? diffDays(venc, hj) : null,
+    cad: open ? (atr ? 'atraso' : hoje ? 'hoje' : prox ? 'dia' : 'sem') : null});
   DCACHE.set(l, {a: agora, d});
   return d;
 }
@@ -654,7 +681,7 @@ function makePred(f, skip) {
 }
 
 function groupStats(rows) {
-  let cont = 0, fds = 0, ag = 0, reu = 0, won = 0, lost = 0, open = 0, par = 0, openSem = 0;
+  let cont = 0, fds = 0, ag = 0, reu = 0, won = 0, lost = 0, open = 0, par = 0, openSem = 0, atrL = 0, atrA = 0, semP = 0, hojeL = 0, diaL = 0;
   const d1 = [], nks = [];
   for (const {d} of rows) {
     if (d.cont) { cont++; d1.push(d.d1); if (d.nk) nks.push(d.nk); } else if (d.open) openSem++;
@@ -665,9 +692,11 @@ function groupStats(rows) {
     if (d.lost) lost++;
     if (d.open) open++;
     if (d.parado) par++;
+    if (d.cad === 'atraso') atrL++; else if (d.cad === 'sem') semP++; else if (d.cad === 'hoje') hojeL++; else if (d.cad === 'dia') diaL++;
+    atrA += d.atr || 0;
   }
   const n = rows.length;
-  return {n, cont, fds, ag, reu, won, lost, open, par, openSem,
+  return {n, cont, fds, ag, reu, won, lost, open, par, openSem, atrL, atrA, semP, hojeL, diaL,
     pct: n ? cont / n * 100 : null, m1: mean(d1), md1: median(d1), cpl: mean(nks)};
 }
 
@@ -682,6 +711,7 @@ function computeFull(leads, f, agoraStr) {
     leads: g.n, contatados: g.cont, sem_contato: g.n - g.cont, pct_contatados: g.pct, fim_de_semana: g.fds,
     media_dias_1o_contato: g.m1, mediana_dias_1o_contato: g.md1, contatos_por_lead: g.cpl,
     agendados: g.ag, reunioes: g.reu, ganhos: g.won, perdidos: g.lost, abertos: g.open, parados_7d: g.par,
+    leads_em_atraso: g.atrL, atividades_atrasadas: g.atrA, leads_vence_hoje: g.hojeL, leads_em_dia: g.diaL, leads_sem_proxima: g.semP,
     taxa_conversao: g.n ? g.won / g.n * 100 : 0   // leads gerados no período → ganhos (0% quando não há leads)
   };
   const etapas = STAGES.map(st => {
@@ -728,13 +758,14 @@ function computeFull(leads, f, agoraStr) {
     const s = groupStats(rs);
     return {consultor: c, leads: s.n, contatados: s.cont, pct_contatados: s.pct, media_dias_1o_contato: s.m1,
       mediana_dias_1o_contato: s.md1, contatos_por_lead: s.cpl, agendados: s.ag, reunioes: s.reu, ganhos: s.won,
-      perdidos: s.lost, abertos: s.open, abertos_sem_contato: s.openSem, parados_7d: s.par};
+      perdidos: s.lost, abertos: s.open, abertos_sem_contato: s.openSem, parados_7d: s.par,
+      leads_em_atraso: s.atrL, atividades_atrasadas: s.atrA, leads_sem_proxima: s.semP};
   });
   // equipe atual aparece sempre (zerada), salvo se o filtro de consultor a excluir
   const fc = Array.isArray(f.consultores) && f.consultores.length ? new Set(f.consultores) : null;
   for (const c of ((D && D.equipe) || [])) if (!byC.has(c) && (!fc || fc.has(c))) consultores.push({consultor: c, leads: 0, contatados: 0,
     pct_contatados: null, media_dias_1o_contato: null, mediana_dias_1o_contato: null, contatos_por_lead: null, agendados: 0, reunioes: 0,
-    ganhos: 0, perdidos: 0, abertos: 0, abertos_sem_contato: 0, parados_7d: 0});
+    ganhos: 0, perdidos: 0, abertos: 0, abertos_sem_contato: 0, parados_7d: 0, leads_em_atraso: 0, atividades_atrasadas: 0, leads_sem_proxima: 0});
   consultores.sort((a, b) => b.leads - a.leads || (a.consultor < b.consultor ? -1 : a.consultor > b.consultor ? 1 : 0));
   const lostRows = rows.filter(r => r.d.lost), motivos = {};
   for (const {l} of lostRows) { const m = l.lr || SEM_MOTIVO; motivos[m] = (motivos[m] || 0) + 1; }
@@ -1490,6 +1521,7 @@ const LL_COLS = [
   {k: 'd1', t: '1º contato', num: true, tip: 'Dias da entrada até o 1º contato concluído (ou até o agendamento, se veio antes)', get: r => r.d.d1, html: r => dayCell(r.d.d1, 2)},
   {k: 'nk', t: 'Contatos', num: true, tip: 'Contatos realizados (atividades de contato concluídas)', get: r => r.d.nk, html: r => r.d.nk ? fN(r.d.nk) : '<span class="red b">0</span>'},
   {k: 'last', t: 'Último contato', get: r => r.d.last, html: r => r.d.last ? fDMT(r.d.last) : '<span class="muted">–</span>'},
+  {k: 'cad', t: 'Cadência', tip: 'Atividades pendentes no Pipedrive: em atraso (vencida antes de hoje), vence hoje, em dia (próxima data) ou sem próxima atividade', get: r => r.d.open ? ({atraso: 0, hoje: 1, dia: 2, sem: 3}[r.d.cad] * 1e4 - (r.d.dAtr || 0)) : null, html: r => cadPill(r.d)},
   {k: 'dSem', t: 'Dias s/ contato', num: true, tip: 'Só abertos: dias desde o último contato (ou desde a entrada)', get: r => r.d.dSem, html: r => dayCell(r.d.dSem, 7)},
   {k: 'dAg', t: 'Até agend.', num: true, tip: 'Dias até chegar à etapa Reunião ou além', get: r => r.d.dAg, html: r => dayCell(r.d.dAg)},
   {k: 'dReu', t: 'Até reunião', num: true, tip: 'Dias até a primeira reunião concluída', get: r => r.d.dReu, html: r => dayCell(r.d.dReu)},
@@ -1577,7 +1609,47 @@ function viewMacro() {
     <div class="card"><div class="ch"><div><h3>Leads por origem</h3><p>Verde = contatados · cinza = sem contato · clique para filtrar</p></div></div>${hbars(oItems, {dim: 'origens'})}</div>
     <div class="card"><div class="ch"><div><h3>Leads por consultor</h3><p>Verde = contatados · cinza = sem contato · clique para filtrar</p></div></div>${hbars(cItems, {dim: 'consultores'})}</div>
   </div>`;
+  h += blocoAtraso(C, k);
   return h;
+}
+/* ---- Atividades em atraso (cadência) — situação na data de referência, leads abertos do filtro ---- */
+const CAD = {atraso: ['Em atraso', '#c0392b', 'atr'], hoje: ['Vence hoje', '#d9a441', 'hoj'], dia: ['Em dia', '#00a611', 'dia'], sem: ['Sem próxima atividade', '#b9c4bf', 'sem']};
+function cadPill(d) {
+  if (!d.open) return '<span class="muted">–</span>';
+  const c = CAD[d.cad];
+  const t = d.cad === 'atraso' ? `Atrasada · ${fN(d.dAtr)} ${d.dAtr === 1 ? 'dia' : 'dias'}` : d.cad === 'dia' ? `Em dia · ${fDM(d.prox)}` : c[0];
+  return `<span class="cad ${c[2]}">${t}</span>`;
+}
+function blocoAtraso(C, k) {
+  const ab = C.rows.filter(r => r.d.open);
+  const hj = dkey(AGORA);
+  if (!ab.length) return `<div class="card mt"><div class="ch"><div><h3>Atividades em atraso</h3><p>Nenhum lead em aberto com os filtros atuais</p></div></div></div>`;
+  const seg = ['atraso', 'hoje', 'dia', 'sem'].map(x => [x, ab.filter(r => r.d.cad === x).length]);
+  const bar = `<div class="cadbar">${seg.filter(s => s[1]).map(([x, n]) => `<i style="width:${n / ab.length * 100}%;background:${CAD[x][1]}" data-tip="${ESC(`${CAD[x][0]}\n${fN(n)} leads (${fP(n / ab.length * 100)} dos abertos)`)}"></i>`).join('')}</div>
+    <div class="lg cadlg">${seg.map(([x, n]) => `<span><i style="background:${CAD[x][1]}"></i>${CAD[x][0]} <b>${fN(n)}</b></span>`).join('')}</div>`;
+  const atr = ab.filter(r => r.d.cad === 'atraso');
+  const mdA = atr.length ? atr.reduce((a, r) => a + r.d.dAtr, 0) / atr.length : null;
+  const mx = atr.reduce((a, r) => Math.max(a, r.d.dAtr), 0);
+  const mini = [
+    ['Leads em atraso', fN(k.leads_em_atraso), `${fP(pctOf(k.leads_em_atraso, ab.length))} dos ${fN(ab.length)} abertos`, 'red'],
+    ['Atividades vencidas', fN(k.atividades_atrasadas), 'pendentes com vencimento antes de hoje', 'red'],
+    ['Atraso médio', mdA == null ? '–' : `${f1(mdA)}<small>dias</small>`, mx ? `maior atraso: ${fN(mx)} dias` : 'sem atrasos', ''],
+    ['Sem próxima atividade', fN(k.leads_sem_proxima), 'abertos fora da cadência (nada agendado)', 'amb']];
+  const cons = C.res.consultores.filter(c => c.abertos).slice().sort((a, b) => b.leads_em_atraso - a.leads_em_atraso || b.abertos - a.abertos);
+  const top = atr.slice().sort((a, b) => b.d.dAtr - a.d.dAtr || b.d.atr - a.d.atr).slice(0, 10);
+  return `<div class="card mt"><div class="ch"><div><h3>Atividades em atraso</h3><p>Cadência dos leads em aberto do filtro · situação em ${fDay(hj)} · vencida = atividade pendente no Pipedrive com data anterior a hoje</p></div>
+      <button type="button" class="btn gh" data-atraso="1">Ver todos no Lead a Lead</button></div>
+    <div class="cadmini">${mini.map(([a, v, s, c]) => `<div class="${c}"><span>${a}</span><b>${v}</b><small>${s}</small></div>`).join('')}</div>
+    ${bar}
+    <div class="g g2 mt cadg">
+      <div><h4 class="cadh">Por consultor</h4><div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">Abertos</th><th class="num">Em atraso</th><th class="num">Vencidas</th><th class="num">Sem próx.</th></tr></thead><tbody>
+        ${cons.map(c => `<tr><td class="wrap"><b data-xf="consultores" data-v="${ESC(c.consultor)}" style="cursor:pointer">${ESC(c.consultor)}</b></td><td class="num">${fN(c.abertos)}</td>
+          <td class="num"><b class="${c.leads_em_atraso ? 'red' : ''}">${fN(c.leads_em_atraso)}</b><div class="muted" style="font-size:11px">${fP(pctOf(c.leads_em_atraso, c.abertos))}</div></td><td class="num">${fN(c.atividades_atrasadas)}</td><td class="num">${fN(c.leads_sem_proxima)}</td></tr>`).join('')}</tbody></table></div></div>
+      <div><h4 class="cadh">Mais atrasados</h4>${top.length ? `<div class="tw"><table class="t"><thead><tr><th>Lead</th><th>Atividade vencida</th><th class="num">Atraso</th></tr></thead><tbody>
+        ${top.map(r => `<tr data-lead="${r.l.id}"><td>${leadCell(r.l)}<div class="muted" style="font-size:11px">${ESC(r.l.c)} · ${ESC(stageName(r.l.sg))}</div></td>
+          <td class="wrap">${ESC(r.d.vencS || 'Atividade')}<div class="muted" style="font-size:11px">venceu em ${fDay(r.d.venc)}${r.d.atr > 1 ? ` · +${fN(r.d.atr - 1)} vencida${r.d.atr > 2 ? 's' : ''}` : ''}</div></td>
+          <td class="num"><b class="red">${fN(r.d.dAtr)} ${r.d.dAtr === 1 ? 'dia' : 'dias'}</b><div class="muted" style="font-size:11px;white-space:nowrap">${fD(r.d.dSem)} sem contato</div></td></tr>`).join('')}</tbody></table></div>` : emptyBox('Nenhuma atividade em atraso', 'Todos os leads em aberto estão com a cadência em dia.')}</div>
+    </div></div>`;
 }
 
 /* ---- Performance ---- */
@@ -2203,7 +2275,7 @@ function viewYouTube() {
 
 /* ---- Lead a Lead ---- */
 const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['sem', 'Sem contato', d => !d.cont], ['parados', 'Parados > 7d', d => d.parado],
-  ['fds', 'Entrada no FDS', d => d.fds], ['agendados', 'Agendados', d => d.agendado]];
+  ['fds', 'Entrada no FDS', d => d.fds], ['agendados', 'Agendados', d => d.agendado], ['atraso', 'Em atraso', d => d.cad === 'atraso'], ['semprox', 'Sem próxima atividade', d => d.cad === 'sem']];
 function listaRows() {
   const C = cur(), q = QUICK.find(x => x[0] === S.ll.quick) || QUICK[0];
   return sortRows(C.rows.filter(r => q[2](r.d)), LL_COLS, S.ll);
@@ -2398,6 +2470,8 @@ function openDrawer(id) {
   const facts = [['Consultor', ESC(l.c)], ['Origem', ESC(l.o)], ['Entrada', `${fDT(l.e)} · ${WD[d.wd]}${d.fds ? ' <span class="fds">FDS</span>' : ''}`],
     ['Situação', ESC(fim)], ['Etiquetas', (l.lb || []).length ? l.lb.map(ESC).join(', ') : '<span class="muted">–</span>'],
     ['Atividades pendentes', `${fN(l.pa || 0)}${l.nx ? ` · próxima em ${fDay(l.nx)}` : ''}`]];
+  if (d.open) facts.push(['Cadência', `${cadPill(d)}${d.cad === 'atraso' ? `<br><span class="muted">${fN(d.atr)} vencida${d.atr > 1 ? 's' : ''} · a mais antiga em ${fDay(d.venc)}</span>` : ''}`],
+    ['Dias sem contato', `${fD(d.dSem)}`]);
   if (l.ef && l.ef !== 'Criação no CRM') facts.push(['Fonte da entrada', `${ESC(l.ef)}<br><span class="muted">criado no CRM em ${fDT(l.ec)}</span>`]);
   if (l.b) facts.push(['Tipo', 'Base reativada (não é lead novo)']);
   if ((l.dd || []).length) facts.push(['Negócios da mesma pessoa', l.dd.map(x => `<a href="${pdUrl(x)}" target="_blank" rel="noopener">#${ESC(x)}</a>`).join(', ')]);
@@ -2417,6 +2491,10 @@ function openDrawer(id) {
   if (l.s === 'lost' && l.l) ev.push({t: l.l, o: 3, c: 'lost', x: `Perdido: ${l.lr || SEM_MOTIVO}`, s: `${fD(d.dPerda)} após a entrada · ${fN(d.cPerda)} contatos até a perda`});
   ev.sort((a, b) => a.t < b.t ? -1 : a.t > b.t ? 1 : a.o - b.o);
   const LIM = 40, cut = ev.length > LIM && !S.tlAll;
+  const pvs = d.open ? (l.pv || []) : [];
+  const pend = pvs.length ? `<ul class="cadl">${pvs.map(a => { const st = a[0] < d.hj ? 'atr' : a[0] === d.hj ? 'hoj' : 'dia';
+      const lab = st === 'atr' ? `atrasada ${fN(diffDays(a[0], d.hj))} d` : st === 'hoj' ? 'vence hoje' : `em ${fN(diffDays(d.hj, a[0]))} d`;
+      return `<li><span class="cad ${st}">${lab}</span><span class="cadt">${ESC(a[1] || 'Atividade')}</span><span class="muted">${fDay(a[0])}</span></li>`; }).join('')}</ul>` : '';
   const tl = `<ul class="tl${cut ? ' cut' : ''}">` + ev.map((e, i) => `<li class="${e.c}${cut && i >= LIM - 5 && i < ev.length - 5 ? ' more' : ''}"><div><span class="tx">${ESC(e.x)}</span>${e.s ? `<span class="ts"> · ${ESC(e.s)}</span>` : ''}</div><div class="tt">${fDT(e.t)}</div></li>`).join('') + '</ul>';
   const more = cut ? `<button class="tlm" data-act="tl-all" data-id="${l.id}">Mostrar todos os ${fN(ev.length)} eventos</button>` : '';
   const dw = document.getElementById('drawer');
@@ -2424,6 +2502,7 @@ function openDrawer(id) {
     <div class="pp">${statusPill(l.s)}${stagePill(l.sg)}${d.parado ? '<span class="pill s-lost">parado > 7d</span>' : ''}<a class="pd" href="${pdUrl(l.id)}" target="_blank" rel="noopener">Abrir no Pipedrive ↗</a></div></div>
     <div class="dwb"><h4>Dados</h4><div class="facts">${facts.map(([a, b]) => `<div><span>${a}</span><b>${b}</b></div>`).join('')}</div>
     <h4>Tempos</h4><div class="mets">${mets.map(([a, b]) => `<div><b>${b}</b>${a}</div>`).join('')}</div>
+    ${pend ? `<h4>Atividades pendentes (cadência)</h4>${pend}` : ''}
     <h4>Jornada por etapa</h4>${jr}
     <h4>Linha do tempo</h4>${tl}${more}</div>`;
   if (cut) { // posiciona o botão logo antes dos últimos eventos
@@ -2699,6 +2778,7 @@ function bindEvents() {
     const pb = t.closest('[data-pop]');
     if (pb) { openPop(pb.dataset.pop, pb, pb.dataset.k); return; }
     if (POP) closePop();
+    if (t.closest('[data-atraso]')) { S.tab = 'lista'; S.ll.quick = 'atraso'; S.ll.page = 0; S.ll.sort = 'cad'; S.ll.dir = 1; update({anim: true}); window.scrollTo({top: 0, behavior: 'smooth'}); return; }
     const tab = t.closest('[data-tab]');
     if (tab) { S.tab = tab.dataset.tab; update({anim: true}); window.scrollTo({top: Math.min(window.scrollY, document.querySelector('.shell').offsetTop), behavior: 'smooth'}); return; }
     const rm = t.closest('[data-rm]');
