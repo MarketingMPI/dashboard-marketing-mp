@@ -474,7 +474,7 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
         <div><dt>Data do contato</dt><dd>Hora em que a atividade foi concluída. Contato lançado depois do fato (atividade criada já concluída, com data anterior) vale pela data informada na atividade. Cada atividade de contato concluída conta como 1 contato, mesmo que várias sejam concluídas no mesmo minuto.</dd></div>
         <div><dt>Período</dt><dd>Filtra pela data de entrada do lead (horário de Brasília), incluindo o primeiro e o último dia. A comparação (▲▼) usa o mesmo número de dias imediatamente anterior, com os mesmos filtros.</dd></div>
         <div><dt>Contato</dt><dd>Atividade de contato <b>concluída</b> no Pipedrive: ligação, WhatsApp, mensagem, e-mail ou reunião. Atividades pendentes da cadência não contam como contato.</dd></div>
-        <div><dt>Tempo até o 1º contato</dt><dd>Dias entre a entrada do lead e o primeiro contato concluído (0,5 d = 12 horas). Média e mediana calculadas só entre os leads contatados.</dd></div>
+        <div><dt>Tempo até o 1º contato</dt><dd>Dias entre a entrada do lead e o primeiro contato concluído (0,5 d = 12 horas). Quem foi agendado conta como contatado, mesmo sem a atividade registrada; nesse caso vale a data do agendamento. Média e mediana calculadas só entre os leads contatados.</dd></div>
         <div><dt>Agendado e Reunião</dt><dd><b>Agendado</b>: o lead chegou à etapa Reunião, Negociação ou Fechamento (ou foi ganho). <b>Reunião</b>: existe uma reunião (ou reunião de qualificação) concluída.</dd></div>
         <div><dt>Dias sem contato e parados</dt><dd>Só para leads abertos: dias desde o último contato (ou desde a entrada, se nunca houve contato). <b>Parado</b> = mais de 7 dias sem contato.</dd></div>
         <div><dt>Funil / Mapa do CRM</dt><dd>Etapas do funil sem o Cultivo. <b>Entraram</b>: leads que estiveram na etapa. <b>Avançaram</b>: chegaram a uma etapa seguinte (em Fechamento: ganhos). <b>Ainda estão</b>: abertos na etapa hoje. <b>Saíram sem avançar</b>: perdidos na etapa, enviados ao Cultivo ou que voltaram de etapa. Entraram = avançaram + ainda estão + saíram sem avançar. <b>Média até avançar</b>: dias da entrada na etapa até chegar à próxima (só quem avançou).</dd></div>
@@ -538,20 +538,26 @@ function derive(l, agora) {
   if (c && c.a === agora) return c.d;
   const e = tms(l.e), k = l.k || [], h = l.h || [], nk = k.length;
   const open = l.s === 'open', won = l.s === 'won', lost = l.s === 'lost';
-  const d1 = nk ? Math.max(0, (tms(k[0][0]) - e) / DAY) : null;
   let seg = null;
   for (const s of h) if (AGENDA_STAGES.has(Number(s[0]))) { seg = s; break; }
   const dAg = seg ? Math.max(0, (tms(seg[1]) - e) / DAY) : (won && l.w ? Math.max(0, (tms(l.w) - e) / DAY) : null);
+  // Regra (20/10/2026): quem foi agendado (ou ganho) conta como contatado, mesmo sem atividade de contato registrada.
+  // 1º contato = o que veio primeiro: a 1ª atividade de contato ou o agendamento.
+  const tAg = seg ? tms(seg[1]) : (won && l.w ? tms(l.w) : null);
+  const t1 = nk ? (tAg != null ? Math.min(tms(k[0][0]), tAg) : tms(k[0][0])) : tAg;
+  const cont = nk > 0 || !!seg || won;
+  const d1 = cont && t1 != null ? Math.max(0, (t1 - e) / DAY) : null;
   let reu = null;
   for (const x of k) if (MEETING_TYPES.has(x[1])) { reu = x; break; }
   let cPerda = null;
   if (lost) { cPerda = 0; for (const x of k) if (!l.l || x[0] <= l.l) cPerda++; }
   let last = null;
   for (const x of k) if (last === null || x[0] > last) last = x[0];
-  const dSem = open ? (agora - tms(last || l.e)) / DAY : null;
+  const toque = Math.max(last ? tms(last) : -Infinity, tAg != null ? tAg : -Infinity);
+  const dSem = open ? (agora - (toque > -Infinity ? toque : tms(l.e))) / DAY : null;
   const day = String(l.e || '').slice(0, 10), wd = weekday(day);
   const d = {
-    e, day, wd, fds: wd === 0 || wd === 6, nk, d1, last,
+    e, day, wd, fds: wd === 0 || wd === 6, nk, cont, d1, last,
     agendado: !!seg || won, dAg,
     reuniao: !!reu, dReu: reu ? (tms(reu[0]) - e) / DAY : null,
     dPerda: lost && l.l ? (tms(l.l) - e) / DAY : null,
@@ -598,7 +604,7 @@ function groupStats(rows) {
   let cont = 0, fds = 0, ag = 0, reu = 0, won = 0, lost = 0, open = 0, par = 0, openSem = 0;
   const d1 = [], nks = [];
   for (const {d} of rows) {
-    if (d.nk > 0) { cont++; d1.push(d.d1); nks.push(d.nk); } else if (d.open) openSem++;
+    if (d.cont) { cont++; d1.push(d.d1); if (d.nk) nks.push(d.nk); } else if (d.open) openSem++;
     if (d.fds) fds++;
     if (d.agendado) ag++;
     if (d.reuniao) reu++;
@@ -683,7 +689,7 @@ function computeFull(leads, f, agoraStr) {
   const perdidos = {
     total: lostRows.length, media_dias_ate_perda: mPerda,
     media_contatos_ate_perda: mean(lostRows.map(r => r.d.cPerda)),
-    sem_contato: lostRows.filter(r => r.d.cPerda === 0).length, motivos
+    sem_contato: lostRows.filter(r => r.d.cPerda === 0 && !r.d.agendado).length, motivos
   };
   const lead_time = {
     media_dias_1o_contato: g.m1,
@@ -722,7 +728,7 @@ function computePerf(leads, f, agora) {
     let id = null; for (const k of ['trd', 'diag', 'isca']) if (PAGAS[k].rx.test(l.n || '')) { id = k; break; }
     if (!id) continue;
     const d = derive(l, agora), g = G[id];
-    g.leads++; if (d.nk > 0) g.contatados++; if (d.agendado) g.agendados++; if (d.reuniao) g.reunioes++; if (d.won) g.ganhos++;
+    g.leads++; if (d.cont) g.contatados++; if (d.agendado) g.agendados++; if (d.reuniao) g.reunioes++; if (d.won) g.ganhos++;
   }
   const fin = g => {
     const inv = g.investimento_centavos / 100, by = n => n ? inv / n : null;
@@ -1192,7 +1198,7 @@ function chartDaily(rows, de, ate, width) {
   for (const {d} of rows) {
     const key = mode === 'dia' ? d.day : mode === 'semana' ? monday(d.day) : d.day.slice(0, 7);
     const b = bins[idx.get(key)];
-    if (b) { if (d.nk) b.c++; else b.s++; }
+    if (b) { if (d.cont) b.c++; else b.s++; }
   }
   const W = Math.max(300, width), H = 300, pl = 34, pr = 6, pt = 18, pb = 30, pw = W - pl - pr, ph = H - pt - pb;
   const mx = niceMax(Math.max(1, ...bins.map(b => b.c + b.s)));
@@ -1295,7 +1301,7 @@ const LL_COLS = [
   {k: 'sg', t: 'Etapa', get: r => stageIdx(r.l.sg), html: r => stagePill(r.l.sg)},
   {k: 's', t: 'Status', html: r => statusPill(r.l.s)},
   {k: 'e', t: 'Entrada', html: r => entradaCell(r.l, r.d)},
-  {k: 'd1', t: '1º contato', num: true, tip: 'Dias da entrada até o 1º contato concluído', get: r => r.d.d1, html: r => dayCell(r.d.d1, 2)},
+  {k: 'd1', t: '1º contato', num: true, tip: 'Dias da entrada até o 1º contato concluído (ou até o agendamento, se veio antes)', get: r => r.d.d1, html: r => dayCell(r.d.d1, 2)},
   {k: 'nk', t: 'Contatos', num: true, tip: 'Contatos realizados (atividades de contato concluídas)', get: r => r.d.nk, html: r => r.d.nk ? fN(r.d.nk) : '<span class="red b">0</span>'},
   {k: 'last', t: 'Último contato', get: r => r.d.last, html: r => r.d.last ? fDMT(r.d.last) : '<span class="muted">–</span>'},
   {k: 'dSem', t: 'Dias s/ contato', num: true, tip: 'Só abertos: dias desde o último contato (ou desde a entrada)', get: r => r.d.dSem, html: r => dayCell(r.d.dSem, 7)},
@@ -1354,8 +1360,8 @@ function viewMacro() {
       extra: nBase > 0 ? `<div class="kx">inclui ${fN(nBase)} ex-clientes e contatos antigos reativados</div>` : '',
       d: delta(k.leads, pk.leads, 0), tip: 'Todos os leads que entraram no período (abertos, ganhos e perdidos), com os filtros aplicados'}),
     kpiCard({label: 'Com contato', v: `${fN(k.contatados)}<small>${fP(k.pct_contatados)}</small>`, sub: `${f1(k.contatos_por_lead)} contatos por lead contatado`,
-      extra: `<div class="prog"><i style="width:${k.pct_contatados || 0}%"></i></div>`, d: delta(k.pct_contatados, pk.pct_contatados, 1, fP), tip: 'Leads com ao menos uma atividade de contato concluída.\nVariação do % de contatados.'}),
-    kpiCard({label: 'Sem contato', v: fN(k.sem_contato), sub: pctK(k.sem_contato, k.leads), d: delta(k.sem_contato, pk.sem_contato, -1), tip: 'Leads sem nenhum contato concluído'}),
+      extra: `<div class="prog"><i style="width:${k.pct_contatados || 0}%"></i></div>`, d: delta(k.pct_contatados, pk.pct_contatados, 1, fP), tip: 'Leads com ao menos uma atividade de contato concluída, ou que já foram agendados.\nVariação do % de contatados.'}),
+    kpiCard({label: 'Sem contato', v: fN(k.sem_contato), sub: pctK(k.sem_contato, k.leads), d: delta(k.sem_contato, pk.sem_contato, -1), tip: 'Leads sem nenhum contato concluído e que ainda não foram agendados'}),
     kpiCard({label: 'Entraram no FDS', v: fN(k.fim_de_semana), sub: pctK(k.fim_de_semana, k.leads), d: delta(k.fim_de_semana, pk.fim_de_semana, 0), tip: 'Leads que entraram no sábado ou domingo'}),
     kpiCard({label: 'Tempo até 1º contato', cls: 'm2', v: `${f1(k.media_dias_1o_contato)}<small>dias</small>`, sub: `mediana ${fD(k.mediana_dias_1o_contato)}`, d: delta(k.media_dias_1o_contato, pk.media_dias_1o_contato, -1, fD), tip: 'Média de dias entre a entrada e o 1º contato (só leads contatados)'}),
     kpiCard({label: 'Agendados', v: fN(k.agendados), sub: pctK(k.agendados, k.leads), d: delta(k.agendados, pk.agendados), tip: 'Chegaram à etapa Reunião ou além (ou ganhos)'}),
@@ -1375,7 +1381,7 @@ function viewMacro() {
   const B = [['< 1 dia', 0, '#003326', 'Mesmo dia (menos de 1 dia)'], ['1–2 dias', 0, '#00503c'], ['2–3 dias', 0, '#3d8a6b'], ['3–7 dias', 0, '#7db59c'], ['> 7 dias', 0, '#b4d6c6', 'Mais de 7 dias'], ['Sem contato', 0, '#d5ddd9']];
   for (const {d} of C.rows) { const v = d.d1; B[v == null ? 5 : v < 1 ? 0 : v < 2 ? 1 : v < 3 ? 2 : v <= 7 ? 3 : 4][1]++; }
   const dist = C.rows.length ? columns(B.map(([label, v, c, longo]) => ({label, v, c, tip: `${longo || label}\n${fN(v)} leads (${fP(pctOf(v, k.leads))})`}))) : emptyBox();
-  const byO = new Map(); for (const {l, d} of C.rows) { const o = byO.get(l.o) || {v: 0, v2: 0}; d.nk ? o.v++ : o.v2++; byO.set(l.o, o); }
+  const byO = new Map(); for (const {l, d} of C.rows) { const o = byO.get(l.o) || {v: 0, v2: 0}; d.cont ? o.v++ : o.v2++; byO.set(l.o, o); }
   const oItems = [...byO].sort((a, b) => (b[1].v + b[1].v2) - (a[1].v + a[1].v2) || (a[0] < b[0] ? -1 : 1)).map(([o, x]) => ({key: o, label: o, v: x.v, v2: x.v2, extra: fP(pctOf(x.v + x.v2, k.leads)),
     tip: `${o}\nLeads: ${fN(x.v + x.v2)}\nContatados: ${fN(x.v)} (${fP(pctOf(x.v, x.v + x.v2))})\nClique para filtrar esta origem`}));
   const cItems = C.res.consultores.map(c => ({key: c.consultor, label: c.consultor, v: c.contatados, v2: c.leads - c.contatados, extra: fP(pctOf(c.leads, k.leads)),
@@ -2008,7 +2014,7 @@ function viewYouTube() {
 }
 
 /* ---- Lead a Lead ---- */
-const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['sem', 'Sem contato', d => !d.nk], ['parados', 'Parados > 7d', d => d.parado],
+const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['sem', 'Sem contato', d => !d.cont], ['parados', 'Parados > 7d', d => d.parado],
   ['fds', 'Entrada no FDS', d => d.fds], ['agendados', 'Agendados', d => d.agendado]];
 function listaRows() {
   const C = cur(), q = QUICK.find(x => x[0] === S.ll.quick) || QUICK[0];

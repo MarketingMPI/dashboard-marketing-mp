@@ -68,9 +68,8 @@ def lead_metrics(l, agora):
     e = dt(l["e"])
     k = l["k"] or []
     h = l["h"] or []
-    m = {"e": e, "contatado": len(k) > 0, "n_contatos": len(k)}
+    m = {"e": e, "n_contatos": len(k)}
     m["fds"] = e.weekday() >= 5
-    m["dias_1o_contato"] = max(0.0, dias(dt(k[0][0]), e)) if k else None
 
     # agendado
     segs_ag = [s for s in h if s[0] in AGENDADO_STAGES]
@@ -82,6 +81,11 @@ def lead_metrics(l, agora):
         m["dias_ate_agendamento"] = max(0.0, dias(dt(l["w"]), e))
     else:
         m["dias_ate_agendamento"] = None
+    # regra: agendado (ou ganho) conta como contatado; 1º contato = o que veio antes (contato ou agendamento)
+    t_ag = min(dt(s[1]) for s in segs_ag) if segs_ag else (dt(l["w"]) if l["s"] == "won" and l["w"] else None)
+    toques = ([dt(k[0][0])] if k else []) + ([t_ag] if t_ag else [])
+    m["contatado"] = bool(k) or m["agendado"]
+    m["dias_1o_contato"] = max(0.0, dias(min(toques), e)) if m["contatado"] and toques else None
 
     # reunião (contato meeting/qualificacao) — SPEC não manda limitar a 0
     reun = [dt(x[0]) for x in k if x[1] in REUNIAO_TIPOS]
@@ -97,7 +101,7 @@ def lead_metrics(l, agora):
         m["contatos_ate_perda"] = None
 
     if l["s"] == "open":
-        ref = max(dt(x[0]) for x in k) if k else e
+        ref = max([dt(x[0]) for x in k] + ([t_ag] if t_ag else [])) if (k or t_ag) else e
         m["dias_sem_contato"] = dias(agora, ref)
         m["parado_7d"] = m["dias_sem_contato"] > 7
     else:
@@ -519,13 +523,13 @@ def bloco(P, M):
         "pct_contatados": pct(len(cont), len(P)),
         "media_dias_1o_contato": media(d1),
         "mediana_dias_1o_contato": mediana(d1),
-        "contatos_por_lead": media(m["n_contatos"] for m in cont),
+        "contatos_por_lead": media(m["n_contatos"] for m in cont if m["n_contatos"]),
         "agendados": sum(1 for m in ms if m["agendado"]),
         "reunioes": sum(1 for m in ms if m["reuniao"]),
         "ganhos": sum(1 for l in P if l["s"] == "won"),
         "perdidos": sum(1 for l in P if l["s"] == "lost"),
         "abertos": sum(1 for l in P if l["s"] == "open"),
-        "abertos_sem_contato": sum(1 for l in P if l["s"] == "open" and not l["k"]),
+        "abertos_sem_contato": sum(1 for l, m in zip(P, ms) if l["s"] == "open" and not m["contatado"]),
         "parados_7d": sum(1 for m in ms if m["parado_7d"]),
     }
 
@@ -621,7 +625,7 @@ def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
         "total": len(lost),
         "media_dias_ate_perda": media(m["dias_ate_perda"] for m in lm if m["dias_ate_perda"] is not None),
         "media_contatos_ate_perda": media(m["contatos_ate_perda"] for m in lm if m["contatos_ate_perda"] is not None),
-        "sem_contato": sum(1 for m in lm if m["contatos_ate_perda"] == 0),
+        "sem_contato": sum(1 for m in lm if m["contatos_ate_perda"] == 0 and not m["agendado"]),
         "motivos": dict(Counter(str(l["lr"]) for l in lost)),
     }
 
