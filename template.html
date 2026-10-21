@@ -417,7 +417,7 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .fci ul{margin:0 0 4px 20px;padding:0;font-size:16px;line-height:1.5}.fci li{margin:3px 0}
 .fcim{margin-top:10px;font-size:15.5px;background:var(--v50);border-radius:9px;padding:8px 10px;line-height:1.45}.fcim b{color:var(--verde)}
 .fcok{margin-top:14px;font-size:16px;border-top:1px solid var(--linha);padding-top:12px;line-height:1.5}.fcok b{color:#0b7a3b}
-.mpbm{table-layout:fixed;width:100%}.mpbm td,.mpbm th{vertical-align:top;white-space:normal!important}.mpbm th:nth-child(1){width:34%}.mpbm th:nth-child(2){width:10%}.mpbm th:nth-child(3){width:26%}.mpbm th:nth-child(4){width:14%}.mpbm th:nth-child(5){width:16%}
+.mpbm{table-layout:fixed;width:100%}.mpbm td,.mpbm th{vertical-align:top;white-space:normal!important}.mpbm th:nth-child(1){width:40%}.mpbm th:nth-child(2){width:12%}.mpbm th:nth-child(3){width:32%}.mpbm th:nth-child(4){width:16%}
 .mpbm td:nth-child(2){white-space:nowrap!important}
 .bml{display:inline-block;font-size:11px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap}
 .bml.bom{background:#e3f3ea;color:#0b6b3a}.bml.ok{background:#eef6f1;color:#3d7a5c}.bml.ruim{background:#fbe9e6;color:#a3362a}.bml.na{background:#eef1f0;color:#69727d}
@@ -1904,10 +1904,10 @@ function viewMPProMensal() {
   h += mpFocoHtml(x, p);
   // mercado
   h += `<div class="card np mt"><div class="ch"><div><h3>MP PRO × mercado em ${mesNome(ym)}</h3><p>Assinatura mensal de educação para profissionais de finanças · ticket de ${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · referências públicas, fontes abaixo</p></div></div>
-    <div class="tw"><table class="t mpbm"><thead><tr><th>Indicador</th><th class="num">MP PRO</th><th>Referência de mercado</th><th>Leitura</th><th>Fonte</th></tr></thead><tbody>
-    ${mpBenchList().map(b => { const [c, t] = mpBenchLeitura(b, x); const fo = MP_FONTES[b.f];
+    <div class="tw"><table class="t mpbm"><thead><tr><th>Indicador</th><th class="num">MP PRO</th><th>Referência de mercado</th><th>Leitura</th></tr></thead><tbody>
+    ${mpBenchList().map(b => { const [c, t] = mpBenchLeitura(b, x);
       return `<tr><td><b>${b.t}</b><div class="muted" style="font-size:11px">${ESC(b.nota)}</div></td><td class="num b">${x[b.k] == null ? '–' : b.fmt(x[b.k])}</td><td>${b.ref}</td>
-        <td><span class="bml ${c}">${t}</span></td><td><a href="${fo.url}" target="_blank" rel="noopener">${ESC(fo.nome.split(' — ')[0])}</a></td></tr>`; }).join('')}
+        <td><span class="bml ${c}">${t}</span></td></tr>`; }).join('')}
     </tbody></table></div>
     <div class="mpfontes"><b>Fontes de referência</b><ol>${Object.values(MP_FONTES).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${ESC(f.nome)}</a></li>`).join('')}</ol>
     <p>Referências consultadas em ${fDay(USD_BRL_DATA)}. São médias de mercado, com amostras e definições próprias (a maioria internacional): use como ordem de grandeza, não como meta exata. Os números do MP PRO atribuem 100% das novas assinaturas à campanha Perpétuo, porque os pedidos da Kiwify não trazem a origem. Material interno, não é recomendação de investimento.</p></div></div>`;
