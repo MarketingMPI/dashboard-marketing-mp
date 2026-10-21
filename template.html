@@ -80,6 +80,7 @@ nav.side button .bd{margin-left:auto;font-size:11.5px;background:var(--suave);co
 nav.side button.on .bd{background:#fff;color:var(--verde)}
 nav.side .nh.nb{margin-top:26px;padding-top:18px;border-top:1px solid var(--linha)}
 nav.side button .bd.soon{font-size:10px;font-weight:500;background:none;border:1px dashed #c9d3cf;padding:0 6px;flex:none}
+nav.side button.off{cursor:not-allowed;color:#9aa6a1}nav.side button.off:hover{background:none}nav.side button.off svg{opacity:.5}
 nav.side .nf{margin-top:auto;padding:14px 12px 6px;display:flex;align-items:center;gap:11px}
 nav.side .nu{margin-top:auto;display:flex;align-items:center;gap:8px;padding:12px 4px 10px 8px;border-top:1px solid var(--linha)}
 nav.side .nu + .nf{margin-top:0;padding-top:8px}
@@ -1226,7 +1227,7 @@ const TABS = [
   {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'perdidos', nome: 'Perdidos'}, {id: 'consultores', nome: 'Consultores'}];
 // B2B: seções em construção (sem dados do Funil Alpha; filtros B2C ficam ocultos)
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
-const TABS_RS = [{id: 'instagram', nome: 'Instagram'}, {id: 'youtube', nome: 'YouTube'}];
+const TABS_RS = [{id: 'instagram', nome: 'Instagram'}, {id: 'youtube', nome: 'YouTube', off: 'Em breve: aguardando a conexão com a API do YouTube do Gabriel'}];
 const isB2B = id => TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id);
 const SO_PERIODO = new Set(['mppro', 'mphub', 'instagram', 'youtube']);
 const PRESETS = [['hoje', 'Hoje'], ['7d', 'Últimos 7 dias'], ['semana', 'Esta semana'], ['semana_ant', 'Semana passada'],
@@ -1301,7 +1302,7 @@ function writeHash() {
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const ok = /^\d{4}-\d{2}-\d{2}$/;
-  S.tab = TABS.concat(TABS_B2B, TABS_RS).some(t => t.id === p.get('aba')) ? p.get('aba') : 'macro';
+  S.tab = TABS.concat(TABS_B2B, TABS_RS).some(t => t.id === p.get('aba') && !t.off) ? p.get('aba') : 'macro';
   const pr = p.get('p');
   if (p.get('de') && ok.test(p.get('de')) && p.get('ate') && ok.test(p.get('ate'))) {
     S.preset = 'custom'; S.de = p.get('de'); S.ate = p.get('ate');
@@ -2511,7 +2512,8 @@ function renderChips() {
 function renderNav() {
   const k = cur().res.kpis;
   const badge = {lista: k.leads, perdidos: S.perdaData ? lostRun()[0].res.perdidos.total : k.perdidos, consultores: cur().res.consultores.length};
-  const btn = t => `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}">${ICONS[t.id]}<span>${t.nome}</span></button>`;
+  const btn = t => t.off ? `<button type="button" class="off" disabled aria-disabled="true" title="${ESC(t.off)}">${ICONS[t.id]}<span>${t.nome}</span><span class="bd soon">em breve</span></button>`
+    : `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}">${ICONS[t.id]}<span>${t.nome}</span></button>`;
   document.getElementById('nav').innerHTML = '<div class="nh">B2C - Análises</div>' + TABS.map(t => `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}">${ICONS[t.id]}<span>${t.nome}</span>${badge[t.id] != null ? `<span class="bd">${fN(badge[t.id])}</span>` : ''}</button>`).join('') +
     '<div class="nh nb">B2B - Análises</div>' + TABS_B2B.map(btn).join('') +
     '<div class="nh nb">Redes Sociais</div>' + TABS_RS.map(btn).join('') +
