@@ -377,6 +377,18 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .dwb h4{margin:22px 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}
 .dwb h4:first-child{margin-top:0}
 .facts{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;font-size:13px}
+.hubl{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:8px;margin-top:4px}
+.hubi{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1px solid var(--linha);border-radius:12px;padding:10px 12px;cursor:pointer;font-family:inherit;color:inherit;transition:border-color .15s,box-shadow .15s,transform .15s}
+.hubi:hover{border-color:var(--v200);box-shadow:0 4px 14px rgba(0,51,38,.08);transform:translateY(-1px)}
+.hubav{width:36px;height:36px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;letter-spacing:.3px;background:var(--v50);color:var(--verde)}
+.hubav.abe{background:#eef6f1;color:#3d7a5c}.hubav.ree{background:#fbf4e6;color:var(--amb)}.hubav.ren{background:#f1f3f2;color:#8a9590}
+.hubn{flex:1;min-width:0;line-height:1.3}.hubn b{display:block;font-size:13.5px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hubn small{display:block;font-size:11.5px;color:var(--cinza);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hubd{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block;background:#00a611}.hubd.abe{background:#7fbf9f}.hubd.ree{background:#d9a441}.hubd.ren{background:#c2cbc7}
+.lg .hubd{margin-right:5px;vertical-align:0}
+.hubc{width:16px;height:16px;flex:none;fill:none;stroke:#b3bfba;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hubi:hover .hubc{stroke:var(--verde)}
+.facts b .mpk{display:inline-block;width:auto}
 .facts div span{display:block;font-size:11.5px;color:var(--cinza)}
 .facts div b{font-weight:600}
 .mets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -1938,13 +1950,15 @@ function viewMPHub() {
   // lista de usuários: pelo ÚLTIMO ACESSO, do mais recente; quem nunca acessou vai para o fim
   const STN = {ativo7: ['ativo', 'nov'], ativo30: ['ativo 8–30d', 'abe'], inativo: ['inativo', 'ree'], nunca: ['nunca acessou', 'ren']};
   const lin = c.base.slice().sort((a, b) => (b[HU.ult] || '') > (a[HU.ult] || '') ? 1 : (b[HU.ult] || '') < (a[HU.ult] || '') ? -1 : (b[HU.criado] > a[HU.criado] ? 1 : -1));
-  h += `<div class="card np mt"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} usuários, ordenados pelo último acesso (mais recente primeiro) · sem e-mail e telefone</p></div></div><div class="tw" style="max-height:520px"><table class="t stk"><thead><tr><th>Usuário</th><th>Último acesso</th><th>Situação</th><th>Tipo</th><th>Perfil</th><th>Cidade / UF</th><th>Empresa</th><th>PL aproximado</th><th>Dispositivo</th><th>Cadastro</th></tr></thead><tbody>` +
+  HUBCTX = {c, H, STN};
+  const ini = n => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('') || '?';
+  h += `<div class="card mt"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} usuários · do acesso mais recente ao mais antigo · clique para ver os detalhes</p></div>
+      <div class="lg">${Object.values(STN).map(([t, k]) => `<span><i class="hubd ${k}"></i>${t}</span>`).join('')}</div></div><div class="hubl">` +
     lin.map(u => { const s2 = STN[c.st(u)], l = u[HU.ult];
-      return `<tr><td><b>${ESC(u[HU.nome] || '–')}</b><div class="mut">#${u[HU.id]}</div></td><td>${l ? `<b>${fDay(l.slice(0, 10))} ${l.slice(11, 16)}</b><div class="mut">${hubHa(l, H.extraido_em)}</div>` : '<span class="mut">nunca acessou</span>'}</td>
-        <td><span class="mpk ${s2[1]}">${s2[0]}</span></td><td>${ESC(HUB_ROLE[u[HU.role]] || u[HU.role] || '–')}</td><td class="wrap" style="max-width:200px">${ESC(hubPerfil(u[HU.perfil]))}</td>
-        <td>${ESC([u[HU.cid], u[HU.uf]].filter(Boolean).join(' / ') || '–')}</td><td>${ESC(u[HU.emp] || '–')}</td><td>${ESC(u[HU.pl] == null ? '–' : hubPL(u[HU.pl]))}</td>
-        <td>${u[HU.disp] === 'desktop' ? 'Computador' : u[HU.disp] === 'mobile' ? 'Celular' : ESC(u[HU.disp] || '–')}</td><td>${fDay(u[HU.criado].slice(0, 10))}</td></tr>`; }).join('') +
-    `</tbody></table></div></div>`;
+      return `<button type="button" class="hubi" data-hub="${u[HU.id]}"><span class="hubav ${s2[1]}">${ESC(ini(u[HU.nome]))}</span>
+        <span class="hubn"><b>${ESC(u[HU.nome] || '–')}</b><small>${l ? `${fDay(l.slice(0, 10))} às ${l.slice(11, 16)} · ${hubHa(l, H.extraido_em)}` : 'nunca acessou'}</small></span>
+        <span class="hubd ${s2[1]}" title="${ESC(s2[0])}"></span><svg class="hubc" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>`; }).join('') +
+    `</div></div>`;
   h += `<details class="mpd mt"><summary>O que o MP HUB ainda não registra (para pedir ao desenvolvedor)</summary><ul>
     <li><b>Tempo de uso:</b> o HUB não guarda início e fim das sessões, então não há tempo médio no MP HUB.</li>
     <li><b>Histórico de acessos:</b> só o último acesso fica salvo. Com o histórico, dá para medir ativos em qualquer período passado, frequência e retenção real.</li>
@@ -2416,6 +2430,33 @@ function openDrawer(id) {
   dw.classList.add('on'); dw.setAttribute('aria-hidden', 'false');
   document.getElementById('ovl').classList.add('on');
 }
+let HUBCTX = null;
+function openHubDrawer(id) {
+  if (!HUBCTX) return;
+  const {c, H, STN} = HUBCTX, u = c.base.find(x => String(x[HU.id]) === String(id)); if (!u) return;
+  const s2 = STN[c.st(u)], l = u[HU.ult];
+  const disp = u[HU.disp] === 'desktop' ? 'Computador' : u[HU.disp] === 'mobile' ? 'Celular' : (u[HU.disp] || '–');
+  const facts = [
+    ['Último acesso', l ? `${fDay(l.slice(0, 10))} às ${l.slice(11, 16)}<br><span class="muted">${hubHa(l, H.extraido_em)}</span>` : '<span class="muted">nunca acessou</span>'],
+    ['Situação', `<span class="mpk ${s2[1]}">${s2[0]}</span>`],
+    ['Tipo de usuário', ESC(HUB_ROLE[u[HU.role]] || u[HU.role] || '–')],
+    ['Perfil profissional', ESC(hubPerfil(u[HU.perfil]))],
+    ['Cidade / UF', ESC([u[HU.cid], u[HU.uf]].filter(Boolean).join(' / ') || '–')],
+    ['Empresa', ESC(u[HU.emp] || '–')],
+    ['Escritório', ESC(u[12] || '–')],
+    ['Meu Patrimônio?', u[HU.mp] ? 'Sim' : 'Não'],
+    ['PL aproximado', ESC(u[HU.pl] == null ? '–' : hubPL(u[HU.pl]))],
+    ['Tempo de mercado', ESC(u[HU.anos] == null ? '–' : hubAnos(u[HU.anos]))],
+    ['Dispositivo do último acesso', ESC(disp)],
+    ['Cadastro', `${fDay(u[HU.criado].slice(0, 10))} às ${u[HU.criado].slice(11, 16)}`]];
+  const dw = document.getElementById('drawer');
+  dw.innerHTML = `<div class="dwh"><div class="k">Usuário MP HUB #${ESC(u[HU.id])}</div><h3>${ESC(u[HU.nome] || '–')}</h3><button class="x" data-act="close" aria-label="Fechar">✕</button>
+    <div class="pp"><span class="mpk ${s2[1]}">${s2[0]}</span></div></div>
+    <div class="dwb"><h4>Dados</h4><div class="facts">${facts.map(([a, b]) => `<div><span>${a}</span><b>${b}</b></div>`).join('')}</div>
+    <p class="muted" style="font-size:12px;margin-top:18px">Fotografia do painel admin do MP HUB em ${fDay(H.extraido_em.slice(0, 10))} às ${H.extraido_em.slice(11, 16)}. E-mail, telefone e IP não são trazidos para o painel.</p></div>`;
+  dw.dataset.id = ''; dw.classList.add('on'); dw.setAttribute('aria-hidden', 'false');
+  document.getElementById('ovl').classList.add('on');
+}
 function closeDrawer() {
   const dw = document.getElementById('drawer');
   dw.classList.remove('on'); dw.setAttribute('aria-hidden', 'true');
@@ -2699,6 +2740,8 @@ function bindEvents() {
     if (t.closest('a')) return;
     const row = t.closest('[data-lead]');
     if (row) { openDrawer(row.dataset.lead); return; }
+    const hu = t.closest('[data-hub]');
+    if (hu) { openHubDrawer(hu.dataset.hub); return; }
   });
   document.addEventListener('input', ev => {
     if (ev.target.matches('[data-popq]') && POP) { POP.q = ev.target.value; renderPopList(); }
