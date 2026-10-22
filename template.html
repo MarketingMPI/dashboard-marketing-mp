@@ -423,7 +423,8 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .bmf{font-size:14px;color:var(--cinza);margin-top:4px;line-height:1.5}
 .bmo{font-size:11.5px;font-weight:600;border-radius:99px;padding:2px 9px;white-space:nowrap;flex:none}.bmo.br{background:#e3f3ea;color:#0b6b3a}.bmo.gl{background:#e8eef9;color:#28457a}
 .fcr.bm3{grid-template-columns:.7fr 1.15fr 1.15fr}.fcr > div.usa{box-shadow:inset 0 0 0 1.5px var(--v200)}.bmf a{color:var(--verde)}
-.mpfontes.bmx{margin:16px -18px -18px}
+.mpfx{margin-top:14px}.mpfx .mpfontes.bmx{margin:0;border-top:0;padding:0 16px 16px}
+.mpfxn{font-size:13px;color:var(--cinza);font-weight:500}
 .fcok{margin-top:14px;font-size:16px;border-top:1px solid var(--linha);padding-top:12px;line-height:1.5}.fcok b{color:#0b7a3b}
 .mpbm{table-layout:fixed;width:100%}.mpbm td,.mpbm th{vertical-align:top;white-space:normal!important}.mpbm th:nth-child(1){width:40%}.mpbm th:nth-child(2){width:12%}.mpbm th:nth-child(3){width:32%}.mpbm th:nth-child(4){width:16%}
 .mpbm td:nth-child(2){white-space:nowrap!important}
@@ -1884,6 +1885,7 @@ function mpFocoHtml(x, p) {
       ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div></details>`).join('')}</div>
     ${F.manter.length ? `<div class="fcok"><b>O que manter:</b> ${F.manter.join(' · ')}.</div>` : ''}</div>`;
 }
+const FONTES_GRP = [['Fontes do Brasil', ['trafius_cpm', 'vtg', 'prosp', 'synchro', 'bcb']], ['Fontes internacionais', ['recurly', 'wordstream', 'baymard', 'skok']]];
 function viewMPProMensal() {
   let h = viewHead('MP PRO', 'B2B - Análises · insights mensais: cada mês do dia 1º ao último dia, comparado com o mês anterior e com referências de mercado');
   const MP = D.mppro || {};
@@ -1926,8 +1928,9 @@ function viewMPProMensal() {
           <div class="${b.base === 'br' ? 'usa' : ''}"><span>Referência Brasil</span>${b.br || '<i class="muted">sem estudo público com amostra declarada</i>'}</div>
           <div class="${b.base === 'gl' ? 'usa' : ''}"><span>Referência global</span>${b.gl || '<i class="muted">–</i>'}</div></div>
         <p class="fcw">${ESC(b.nota)}</p><div class="bmf">Fonte: <a href="${fo.url}" target="_blank" rel="noopener">${ESC(fo.nome)}</a>${fo2 ? ` · <a href="${fo2.url}" target="_blank" rel="noopener">${ESC(fo2.nome)}</a>` : ''}</div></div></details>`; }).join('')}</div>
-    <div class="mpfontes bmx">${[['Fontes do Brasil', ['trafius_cpc', 'trafius_cpm', 'vtg', 'prosp', 'synchro', 'bcb']], ['Fontes internacionais', ['recurly', 'wordstream', 'baymard', 'skok']]].map(([tt, ks]) => `<b>${tt}</b><ol>${ks.map(k => MP_FONTES[k]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${ESC(f.nome)}</a></li>`).join('')}</ol>`).join('')}
-    <p>Referências consultadas em ${fDay(USD_BRL_DATA)}. São médias de mercado, com amostras e definições próprias (a maioria internacional): use como ordem de grandeza, não como meta exata. Os números do MP PRO atribuem 100% das novas assinaturas à campanha Perpétuo, porque os pedidos da Kiwify não trazem a origem. Material interno, não é recomendação de investimento.</p></div></div>`;
+    <details class="fci mpfx"><summary class="fch"><b>Fontes de referência</b><span class="mpfxn">${FONTES_GRP.reduce((a, g) => a + g[1].length, 0)} fontes · Brasil e internacionais</span><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+    <div class="mpfontes bmx">${FONTES_GRP.map(([tt, ks]) => `<b>${tt}</b><ol>${ks.map(k => MP_FONTES[k]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${ESC(f.nome)}</a></li>`).join('')}</ol>`).join('')}
+    <p>Referências consultadas em ${fDay(USD_BRL_DATA)}. São médias de mercado, com amostras e definições próprias (a maioria internacional): use como ordem de grandeza, não como meta exata. Os números do MP PRO atribuem 100% das novas assinaturas à campanha Perpétuo, porque os pedidos da Kiwify não trazem a origem. Material interno, não é recomendação de investimento.</p></div></details></div>`;
   return h;
 }
 const ymPrev = ym => { let y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1; if (!m) { m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
