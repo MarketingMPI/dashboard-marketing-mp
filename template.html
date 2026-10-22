@@ -396,7 +396,7 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .hubi:hover .hubc{stroke:var(--verde)}
 .facts b .mpk,.facts b .cad{display:inline-block;width:auto}
 .mpmodo{margin:0 0 16px}
-.mpmetas{margin-bottom:16px}.mt-g{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.mpmetas{margin-bottom:16px}.mpmetas.big .mt-g{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}@media(max-width:1280px){.mpmetas.big .mt-g{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.mpmetas.big .mt-g{grid-template-columns:1fr}}.mpmetas.big .mt-i{padding:16px 18px}.mpmetas.big .mt-h span{font-size:14px}.mpmetas.big .mt-h b{font-size:28px}.mpmetas.big .mt-f{font-size:13.5px}.mpmetas.big .mt-bar{height:9px}.mt-g{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 @media(max-width:1280px){.mt-g{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.mt-g{grid-template-columns:1fr 1fr}}
 .mt-i{border:1px solid var(--linha);border-radius:12px;padding:12px 14px;background:#fff;display:flex;flex-direction:column;gap:8px}
 .mt-i.main{background:linear-gradient(135deg,var(--verde),var(--prof));border-color:var(--verde);color:#fff}
@@ -1472,7 +1472,7 @@ function writeHash() {
   if (S.perdaData) p.set('pd', '1');
   if (S.camp) p.set('camp', S.camp);
   if (S.tab === 'aplicacao' && S.aplPx) p.set('apx', S.aplPx);
-  if (S.tab === 'mppro' && S.mpModo === 'mensal') { p.set('mpv', 'mensal'); if (S.mpMes) p.set('mpm', S.mpMes); }
+  if (S.tab === 'mppro' && S.mpModo !== 'periodo') { p.set('mpv', S.mpModo); if (S.mpMes) p.set('mpm', S.mpMes); }
   const h = p.toString(), want = h ? '#' + h : '';
   if (want === location.hash || (!want && !location.hash)) return;
   try { history.replaceState(null, '', location.pathname + location.search + (want || '#')); } catch (e) { location.hash = h; }
@@ -1498,7 +1498,7 @@ function readHash() {
   S.perdaData = p.get('pd') === '1';
   S.camp = CAMPANHAS[p.get('camp')] ? p.get('camp') : (p.get('trd') === '1' ? 'trd' : '');
   S.igModo = IG_MODOS[p.get('ig')] ? p.get('ig') : 'org';
-  S.mpModo = p.get('mpv') === 'mensal' ? 'mensal' : 'periodo';
+  S.mpModo = ['mensal', 'metas'].includes(p.get('mpv')) ? p.get('mpv') : 'periodo';
   S.aplPx = p.get('apx') || '';
   S.mpMes = /^\d{4}-\d{2}$/.test(p.get('mpm') || '') ? p.get('mpm') : '';
 }
@@ -2011,6 +2011,19 @@ function mpMetasHtml(x) {
     <div class="lg"><span><i style="background:#00a611"></i>100% ou mais</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
     <div class="mt-g">${MP_METAS.map(card).join('')}</div></div>`;
 }
+function viewMPProMetas() {
+  let h = viewHead('MP PRO', `B2B - Análises · metas fixas até ${fDay(MP_METAS_ATE)} e quanto de cada meta já foi atingido`);
+  const meses = mpMeses();
+  h += mpModoSeg();
+  if (!meses.length) return h + `<div class="card">${emptyBox('Dados do MP PRO indisponíveis')}</div>`;
+  if (!meses.includes(S.mpMes)) S.mpMes = meses[meses.length - 1];   // padrão: mês atual
+  const ym = S.mpMes, x = mpMes(ym);
+  h += `<div class="mpmeses">${meses.map(m => `<button type="button" data-mpmes="${m}" class="${m === ym ? 'on' : ''}">${mesCurto(m)}${ymLast(m) >= TODAY ? '<small>parcial</small>' : ''}</button>`).join('')}</div>`;
+  if (!x) return h + `<div class="card">${emptyBox('Sem dados neste mês')}</div>`;
+  const faltam = Math.max(0, diffDays(TODAY, MP_METAS_ATE));
+  h += `<div class="mph"><span>${mesNome(ym).toUpperCase()}</span>${x.parcial ? `mês em andamento, dados até ${fDay(TODAY)} · ` : ''}faltam ${fN(faltam)} dias para ${fDay(MP_METAS_ATE)}</div>`;
+  return h + mpMetasHtml(x).replace('card mt mpmetas', 'card mpmetas big');
+}
 const FONTES_GRP = [['Fontes do Brasil', ['trafius_cpm', 'vtg', 'prosp', 'synchro', 'bcb']], ['Fontes internacionais', ['recurly', 'wordstream', 'baymard', 'skok']]];
 function viewMPProMensal() {
   let h = viewHead('MP PRO', 'B2B - Análises · insights mensais: cada mês do dia 1º ao último dia, comparado com o mês anterior e com referências de mercado');
@@ -2026,7 +2039,6 @@ function viewMPProMensal() {
   if (!x) return h + `<div class="card">${emptyBox('Sem dados neste mês')}</div>`;
   h += `<div class="mph"><span>${mesNome(ym).toUpperCase()}</span>${fDay(x.de)} a ${fDay(ymLast(ym))}${x.parcial ? ` · <b class="red">mês em andamento, dados até ${fDay(TODAY)}</b>` : ''}${p ? ` · comparado com ${mesNome(p.ym)}` : ''} · o filtro de datas do topo não se aplica aqui</div>`;
   const P = p || {};
-  h += mpMetasHtml(x);
   if (x.novas < 10 || (x.churnBase || 0) < 30) h += `<div class="note">Base ainda pequena (${fN(x.novas)} novas assinaturas e ${fN(x.ativos)} ativos): uma assinatura a mais ou a menos muda bastante os percentuais. Leia as variações junto com os números absolutos.</div>`;
   h += '<div class="kpis">' + [
     kpiCard({label: 'Receita líquida', cls: 'hero gold', v: fRc(x.liquido), sub: `${fRc(x.bruto)} bruto · ${fN(x.pagamentos)} pagamentos`, d: p ? delta(x.liquido, P.liquido, 1, fRc0) : '', tip: 'Pagamentos aprovados no mês (MP PRO + Formação), já sem a taxa da Kiwify'}),
@@ -2216,10 +2228,11 @@ function mpEvolChart(ev, width) {
   return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pagamentos por mês">${g}</svg></div>`;
 }
 function mpModoSeg() {
-  return `<div class="seg mpmodo">${[['periodo', 'Análise do período'], ['mensal', 'Insights mensais']].map(([k, t]) => `<button type="button" data-mpmodo="${k}" class="${S.mpModo === k ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+  return `<div class="seg mpmodo">${[['periodo', 'Análise do período'], ['mensal', 'Insights mensais'], ['metas', 'Metas']].map(([k, t]) => `<button type="button" data-mpmodo="${k}" class="${S.mpModo === k ? 'on' : ''}">${t}</button>`).join('')}</div>`;
 }
 function viewMPPro() {
   if (S.mpModo === 'mensal') return viewMPProMensal();
+  if (S.mpModo === 'metas') return viewMPProMetas();
   return viewMPProPeriodo().replace('<div class="mph"><span>VISÃO GERAL</span>', mpModoSeg() + '<div class="mph"><span>VISÃO GERAL</span>');
 }
 function viewMPProPeriodo() {
