@@ -1194,6 +1194,7 @@ def sync_aplicacao(old):
                     "o": ("rede" if mt.group(1).lower() == "rede" else "recrutamento") if mt else None, "t": ((mt.group(2) or "").upper() or None) if mt else None,
                     "e": brt(d.get("add_time")), "s": d.get("status"), "sg": d.get("stage_id"),
                     "lr": (d.get("lost_reason") or None) if d.get("status") == "lost" else None,
+                    "lt": brt(d.get("lost_time")) if d.get("status") == "lost" else None, "wt": brt(d.get("won_time")) if d.get("status") == "won" else None,
                     "m": "escritorio" if "escrit" in mod else "consultor" if mod else None,
                     "mk": val("mk") or None, "r": val("r") or None, "c": certs, "p": val("p") or None,
                     "uf": (val("uf") or "").upper() or None, "cid": cid or None})

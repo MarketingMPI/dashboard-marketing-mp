@@ -396,6 +396,8 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .hubi:hover .hubc{stroke:var(--verde)}
 .facts b .mpk,.facts b .cad{display:inline-block;width:auto}
 .mpmodo{margin:0 0 16px}
+.aplperd{align-items:start}
+.kpi.gain .kv{color:#0b7a3b}
 .aplpx{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}.aplpx > span{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--cinza)}
 .aplpx .seg button small{margin-left:6px;font-size:11px;color:var(--cinza);font-weight:500}
 .mpmeses{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
@@ -2952,9 +2954,11 @@ function aplCompute(A, de, ate, px) {
   const st = A.stages || [], ix = id => st.findIndex(x => x.id === id);
   const iReu = st.findIndex(x => /reuni[aã]o agendada/i.test(x.nome)), cult = new Set(st.filter(x => /cultivo/i.test(x.nome)).map(x => x.id));
   const reuniao = L.filter(l => l.s === 'won' || (iReu >= 0 && ix(l.sg) >= iReu && !cult.has(l.sg) && l.s !== 'lost'));
+  const fech = new Set(st.filter(x => /fechad/i.test(x.nome)).map(x => x.id));
+  const fechados = L.filter(l => l.s === 'won' || (l.s === 'open' && fech.has(l.sg)));
   const M = (A.midia && A.midia.ativo) ? A.midia.dias.filter(r => r[0] >= de && r[0] <= ate) : null;
   const md = M ? {gasto: M.reduce((a, r) => a + r[1], 0), impr: M.reduce((a, r) => a + r[2], 0), cliques: M.reduce((a, r) => a + r[3], 0)} : null;
-  return {L, n: L.length, cons: L.filter(l => l.m === 'consultor').length, esc: L.filter(l => l.m === 'escritorio').length, semModelo: L.filter(l => !l.m).length, reuniao: reuniao.length,
+  return {L, n: L.length, cons: L.filter(l => l.m === 'consultor').length, esc: L.filter(l => l.m === 'escritorio').length, semModelo: L.filter(l => !l.m).length, reuniao: reuniao.length, fechados: fechados.length, ganhos: L.filter(l => l.s === 'won').length,
     carteira: L.filter(l => !['Não informado', 'Não tem carteira'].includes(aplCart(l))).length, perdidos: L.filter(l => l.s === 'lost').length, md};
 }
 function aplChart(L, de, ate, width) {
@@ -2987,12 +2991,13 @@ function viewAplicacao() {
   const c = aplCompute(A, S.de, S.ate, S.aplPx), [pd, pa] = prevRange(), p = aplCompute(A, pd, pa, S.aplPx), pct = (a, b) => fP(pctOf(a, b)), nd = diffDays(S.de, S.ate) + 1;
   const nPx = x => aplCompute(A, S.de, S.ate, x).n;
   h += `<div class="aplpx"><span>Prefixo do negócio</span><div class="seg">${[['', 'Todos']].concat(pxs.map(x => [x, x])).map(([k, t]) => `<button type="button" data-aplpx="${ESC(k)}" class="${(S.aplPx || '') === k ? 'on' : ''}">${ESC(t)}<small>${fN(nPx(k))}</small></button>`).join('')}</div></div>`;
-  h += '<div class="kpis">' + [
+  h += '<div class="kpis k6">' + [
     kpiCard({label: 'Leads', cls: 'hero', v: fN(c.n), sub: `${S.aplPx ? 'prefixo ' + ESC(S.aplPx) : 'LP_Rede, LP_Consultor e IND'} · ${f1(c.n / nd)} por dia`, d: delta(c.n, p.n), tip: 'Negócios do funil B2B - Alpha que entraram no Pipedrive no período (data de criação), no prefixo escolhido. Testes excluídos.'}),
     kpiCard({label: 'Consultor', v: fN(c.cons), sub: `${pct(c.cons, c.n)} dos leads`, d: delta(c.cons, p.cons), tip: 'Quer seguir carreira como consultor em um escritório da Rede'}),
     kpiCard({label: 'Escritório Parceiro', v: fN(c.esc), sub: `${pct(c.esc, c.n)} dos leads`, d: delta(c.esc, p.esc), tip: 'Quer abrir ou migrar um escritório próprio para a Rede'}),
     kpiCard({label: 'Com carteira de clientes', v: fN(c.carteira), sub: `${pct(c.carteira, c.n)} dos leads`, d: delta(c.carteira, p.carteira), tip: 'Informaram ter carteira de clientes (qualquer faixa)'}),
-    kpiCard({label: 'Reunião agendada ou além', v: fN(c.reuniao), sub: `${pct(c.reuniao, c.n)} dos leads · etapa atual`, d: delta(c.reuniao, p.reuniao), tip: 'Leads do período que hoje estão em Reunião Agendada, Negociação ou Fechado no funil B2B - Alpha (ou ganhos). Cultivo e perdidos não contam.'})
+    kpiCard({label: 'Reunião agendada ou além', v: fN(c.reuniao), sub: `${pct(c.reuniao, c.n)} dos leads · etapa atual`, d: delta(c.reuniao, p.reuniao), tip: 'Leads do período que hoje estão em Reunião Agendada, Negociação ou Fechado no funil B2B - Alpha (ou ganhos). Cultivo e perdidos não contam.'}),
+    kpiCard({label: 'Fechados ou ganhos', cls: 'gain', v: fN(c.fechados), sub: `${pct(c.fechados, c.n)} dos leads · ${fN(c.ganhos)} ${c.ganhos === 1 ? 'ganho' : 'ganhos'}`, d: delta(c.fechados, p.fechados), tip: 'Leads do período marcados como ganho no Pipedrive ou que hoje estão na etapa Fechado do funil B2B - Alpha'})
   ].join('') + '</div>';
   // mídia paga: fica em branco até existir campanha vinculada
   const md = c.md && c.md.gasto ? c.md : null, off = !md, sub0 = (A.midia && A.midia.campanhas && A.midia.campanhas.length) ? 'sem gasto no período' : 'sem campanhas no ar';
@@ -3027,6 +3032,15 @@ function viewAplicacao() {
       <td>${l.m ? `<span class="mpk ${l.m === 'escritorio' ? 'abe' : 'nov'}">${APL_MODELO[l.m]}</span>` : '<span class="muted">–</span>'}</td><td class="wrap" style="max-width:160px">${ESC(l.mk === 'Não' ? 'Não atua no mercado' : l.r || '–')}</td>
       <td class="wrap" style="max-width:120px">${ESC(l.p ? aplCart(l) : '–')}</td><td class="wrap" style="max-width:150px">${ESC([...new Set(l.c.map(aplCert))].join(', ') || '–')}</td><td class="wrap" style="max-width:150px">${ESC([l.cid, l.uf].filter(Boolean).join(' / ') || '–')}</td>
       <td class="wrap" style="max-width:150px">${l.s === 'open' ? `<span class="pill" style="white-space:normal;line-height:1.3">${ESC(etapa(l))}</span>` : statusPill(l.s)}${l.lr ? `<div class="mut">${ESC(l.lr)}</div>` : ''}</td></tr>`).join('') + '</tbody></table></div></div>';
+  // perdidos e motivos
+  const LP = c.L.filter(l => l.s === 'lost').sort((a, b) => (b.lt || b.e) < (a.lt || a.e) ? -1 : 1);
+  const mot = new Map(); for (const l of LP) { const m = l.lr || 'Sem motivo informado'; mot.set(m, (mot.get(m) || 0) + 1); }
+  const motItems = [...mot].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([k, v]) => ({label: k, v, extra: pct(v, LP.length), tip: `${k}\n${fN(v)} perdidos (${pct(v, LP.length)})`}));
+  h += `<div class="mph mt"><span>PERDIDOS</span>Leads do período marcados como perdidos no Pipedrive e o motivo informado</div>`;
+  h += LP.length ? `<div class="g g2 mt aplperd"><div class="card"><div class="ch"><div><h3>Motivos de perda</h3><p>${fN(LP.length)} ${LP.length === 1 ? 'lead perdido' : 'leads perdidos'} · ${pct(LP.length, c.n)} dos leads do período</p></div></div>${hbars(motItems)}</div>
+    <div class="card np"><div class="ch"><div><h3>Perdidos, um a um</h3><p>Do mais recente para o mais antigo · clique no nome para abrir no Pipedrive</p></div></div><div class="tw" style="max-height:420px"><table class="t"><thead><tr><th>Lead</th><th>Entrada</th><th>Perdido em</th><th>Motivo</th></tr></thead><tbody>` +
+    LP.map(l => `<tr><td style="max-width:200px">${leadCell(l)}<div class="mut">${ESC(aplPx(l))}</div></td><td>${fDM(l.e.slice(0, 10))}</td><td>${l.lt ? fDM(l.lt.slice(0, 10)) : '–'}</td><td class="wrap red" style="max-width:220px">${ESC(l.lr || 'Sem motivo informado')}</td></tr>`).join('') +
+    `</tbody></table></div></div></div>` : `<div class="card mt">${emptyBox('Nenhum lead perdido no período', 'Nenhum lead deste filtro foi marcado como perdido.')}</div>`;
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Lead</b> = todo negócio do funil <b>B2B - Alpha</b> do Pipedrive, pela data de criação. O <b>prefixo</b> do título separa as origens analisadas: LP_Rede (site /rede/), LP_Consultor (LP de recrutamento, Tier A/B/C) e IND. Negócios com outros prefixos (Simulador, LISTA, APEX, FORMS) ou sem prefixo ficam fora desta página. Testes excluídos.</li>
     <li><b>Perfil</b> (modelo, atuação, carteira, certificações, cidade) vem das respostas do formulário, gravadas na pessoa no Pipedrive. E-mail e telefone não aparecem no painel.</li>
