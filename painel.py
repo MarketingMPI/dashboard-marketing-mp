@@ -1124,19 +1124,36 @@ def youtube_payload():
         return {"erro": "não foi possível ler os dados do YouTube"}
 
 
-# ---------------------------------------------------------------- Aplicação Direta (candidaturas à Rede, funil B2B - Alpha)
-# Formulários de candidatura: site www.meupatrimonio.com/rede/ (deal "LP_Rede - Nome", api/application.js do site)
-# e a LP de recrutamento anterior (deal "LP_Consultor - [A|B|C] Nome"). As respostas ficam nos campos da PESSOA.
+# ---------------------------------------------------------------- Aplicação Direta (funil B2B - Alpha, pipeline 60)
+# TODOS os negócios do funil B2B - Alpha, separados pelo PREFIXO do título (IND, LP_Rede, LP_Consultor, Simulador, ...).
+# Formulários de candidatura (LP_Rede = site /rede/, LP_Consultor = LP de recrutamento) gravam as respostas na PESSOA.
 # Lê no mesmo ritmo do Pipedrive B2C (1x/hora, dias úteis). Só dados de qualificação: sem e-mail e telefone.
 APL_PIPELINE = 60
 APL_RX = re.compile(r"^\s*LP_(Rede|Consultor)\s*-\s*(?:\[([A-Z])\]\s*)?(.*)$", re.I)
+APL_PREFIXOS = [("IND", r"IND\b"), ("LP_Rede", r"LP_Rede\b"), ("LP_Consultor", r"LP_Consultor\b"), ("Simulador", r"Simulador\b"),
+                ("LISTA", r"LISTA\b"), ("APEX", r"APEX\b"), ("FORMS", r"FORMS\b")]
+APL_PREF_RX = [(n, re.compile(r"^\s*" + rx, re.I)) for n, rx in APL_PREFIXOS]
+APL_PREF_GEN = re.compile(r"^\s*([A-Za-z][A-Za-z_]{1,19})\s+[-—|]\s+\S")   # prefixo novo no padrão "XXX - Nome"
 APL_CAMPOS = {"cid": "f454aca8c62d5d0877ce516a6a35aafa1808c822", "uf": "f40ef9ac25754ee8ca6c612bb9a3ae7580b55d47",
               "mk": "3b7a294bd9f61145b4b0765a67b308fd7a4b54eb", "r": "bddde70208ba5363eb2580e2b59a700c4f75a74a",
               "c": "b5f03864f08c2bd59b13299b2f95f931bc092d1f", "p": "6ada68b5a6e257fbbb3a501da847f27da90c2abd",
               "m": "f21e5f985f78b3ceee0af054e7f3534519d59804"}
-# Mídia paga da Aplicação Direta: nenhuma campanha rodando ainda. Quando houver, preencher com o padrão do NOME
-# das campanhas na Meta (ex.: re.compile(r"\[B2B\].*aplica", re.I)); o painel passa a mostrar investimento e CPL.
-APL_MIDIA_RX = None
+# Mídia paga: só as campanhas B2B de Aplicação Direta na Meta (nome com "B2B" e "Aplica..."). Leads = os do Pipedrive.
+APL_MIDIA_RX = re.compile(r"(?=.*\bB2B\b)(?=.*aplica)", re.I)
+
+
+def apl_prefixo(title):
+    """(prefixo, nome do lead) a partir do título do negócio."""
+    t = title or ""
+    for n, rx in APL_PREF_RX:
+        if rx.match(t):
+            if "|" in t: nome = t.split("|", 1)[1]
+            else: nome = re.sub(r"^\s*\S+(?:\s+[A-Z]{2,})?\s*[-—]\s*(?:\[[A-Z]\]\s*)?", "", t, count=1) if re.search(r"[-—]", t) else t[rx.match(t).end():]
+            return n, nome.strip(" -—|")
+    m = APL_PREF_GEN.match(t)
+    if m and not m.group(1)[0].islower() and m.group(1).isupper():
+        return m.group(1).upper(), t[m.end() - 1:].strip()
+    return "Sem prefixo", t.strip()
 
 
 def sync_aplicacao(old):
@@ -1147,39 +1164,46 @@ def sync_aplicacao(old):
             q = dict(pipeline_id=APL_PIPELINE, status=st, limit=500)
             if cur: q["cursor"] = cur
             d = get("/v2/deals", **q)
-            deals += [x for x in d.get("data") or [] if x.get("pipeline_id") == APL_PIPELINE and APL_RX.match(x.get("title") or "")]
+            deals += [x for x in d.get("data") or [] if x.get("pipeline_id") == APL_PIPELINE]
             cur = (d.get("additional_data") or {}).get("next_cursor")
             if not cur: break
     stages = [{"id": x["id"], "nome": x["name"]} for x in sorted(get("/v1/stages", pipeline_id=APL_PIPELINE).get("data") or [],
                                                                   key=lambda x: x.get("order_nr") or 0)]
-    ids = sorted({x["person_id"] for x in deals if x.get("person_id")})
-    pessoas = {}
-    for i in range(0, len(ids), 100):
-        r = get("/v2/persons", ids=",".join(map(str, ids[i:i + 100])), limit=100)
-        pessoas.update({x["id"]: x.get("custom_fields") or {} for x in r.get("data") or []})
+    # respostas do formulário (campos da pessoa): só lê pessoas novas; as já lidas ficam no cache (sem e-mail/telefone)
+    pessoas = {int(k): v for k, v in ((old or {}).get("pessoas") or {}).items()}
+    novos = sorted({x["person_id"] for x in deals if x.get("person_id")} - set(pessoas))
+    for i in range(0, len(novos), 100):
+        r = get("/v2/persons", ids=",".join(map(str, novos[i:i + 100])), limit=100)
+        for x in r.get("data") or []:
+            cf = x.get("custom_fields") or {}
+            pessoas[x["id"]] = {k: (lambda v: v.get("value") if isinstance(v, dict) else v)(cf.get(f)) for k, f in APL_CAMPOS.items()}
+        for pid in novos[i:i + 100]: pessoas.setdefault(pid, {})
+    vivos = {x.get("person_id") for x in deals}
+    pessoas = {k: v for k, v in pessoas.items() if k in vivos}
     out, teste = [], 0
     for d in deals:
         title = d.get("title") or ""
         if TEST_RX.search(title) or TEST_RX.search(d.get("lost_reason") or ""):
             teste += 1; continue
-        mt = APL_RX.match(title); cf = pessoas.get(d.get("person_id")) or {}
-        val = lambda k: (lambda v: v.get("value") if isinstance(v, dict) else v)(cf.get(APL_CAMPOS[k]))
+        px, nome = apl_prefixo(title); mt = APL_RX.match(title); pv = pessoas.get(d.get("person_id")) or {}
+        val = lambda k: pv.get(k)
         cid = (val("cid") or "").split(",")[0].strip()
         certs = [c.strip() for c in (val("c") or "").split(",") if c.strip()]
-        out.append({"id": d["id"], "n": sem_pii(mt.group(3).strip()) or f"#{d['id']}",
-                    "o": "rede" if mt.group(1).lower() == "rede" else "recrutamento", "t": (mt.group(2) or "").upper() or None,
+        mod = (val("m") or "").lower()
+        out.append({"id": d["id"], "n": sem_pii(nome) or f"#{d['id']}", "px": px,
+                    "o": ("rede" if mt.group(1).lower() == "rede" else "recrutamento") if mt else None, "t": ((mt.group(2) or "").upper() or None) if mt else None,
                     "e": brt(d.get("add_time")), "s": d.get("status"), "sg": d.get("stage_id"),
                     "lr": (d.get("lost_reason") or None) if d.get("status") == "lost" else None,
-                    "m": "escritorio" if "escrit" in (val("m") or "").lower() else "consultor",
+                    "m": "escritorio" if "escrit" in mod else "consultor" if mod else None,
                     "mk": val("mk") or None, "r": val("r") or None, "c": certs, "p": val("p") or None,
                     "uf": (val("uf") or "").upper() or None, "cid": cid or None})
     out.sort(key=lambda x: x["e"] or "")
-    return {"leads": out, "stages": stages, "excluidos_teste": teste, "erro": None,
+    return {"leads": out, "stages": stages, "excluidos_teste": teste, "erro": None, "pessoas": {str(k): v for k, v in pessoas.items()},
             "atualizado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S")}
 
 
 def aplicacao_midia(m):
-    """Investimento diário (centavos) das campanhas da Aplicação Direta. Vazio enquanto APL_MIDIA_RX = None."""
+    """Investimento, impressões e cliques diários das campanhas B2B de Aplicação Direta (Meta)."""
     if APL_MIDIA_RX is None:
         return {"ativo": False, "campanhas": [], "dias": []}
     m = m or {}; nomes = m.get("nomes") or {}; dia = {}; camps = set()
@@ -1193,6 +1217,7 @@ def aplicacao_midia(m):
 
 def aplicacao_payload(cache):
     a = dict(cache.get("aplicacao") or {"leads": [], "stages": [], "erro": "ainda não lido"})
+    a.pop("pessoas", None)   # cache interno de respostas por pessoa: não vai para o painel
     a["midia"] = aplicacao_midia(cache.get("midia"))
     return a
 

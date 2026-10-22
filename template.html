@@ -396,6 +396,8 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .hubi:hover .hubc{stroke:var(--verde)}
 .facts b .mpk,.facts b .cad{display:inline-block;width:auto}
 .mpmodo{margin:0 0 16px}
+.aplpx{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}.aplpx > span{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--cinza)}
+.aplpx .seg button small{margin-left:6px;font-size:11px;color:var(--cinza);font-weight:500}
 .mpmeses{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .mpmeses button{border:1px solid var(--linha);background:#fff;border-radius:99px;padding:6px 14px;font:inherit;font-size:12.5px;font-weight:600;color:#3e4b46;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .mpmeses button small{font-size:10px;font-weight:500;color:var(--cinza)}
@@ -1382,6 +1384,7 @@ function writeHash() {
   if (S.busca.trim()) p.set('q', S.busca.trim());
   if (S.perdaData) p.set('pd', '1');
   if (S.camp) p.set('camp', S.camp);
+  if (S.tab === 'aplicacao' && S.aplPx) p.set('apx', S.aplPx);
   if (S.tab === 'mppro' && S.mpModo === 'mensal') { p.set('mpv', 'mensal'); if (S.mpMes) p.set('mpm', S.mpMes); }
   const h = p.toString(), want = h ? '#' + h : '';
   if (want === location.hash || (!want && !location.hash)) return;
@@ -1409,6 +1412,7 @@ function readHash() {
   S.camp = CAMPANHAS[p.get('camp')] ? p.get('camp') : (p.get('trd') === '1' ? 'trd' : '');
   S.igModo = IG_MODOS[p.get('ig')] ? p.get('ig') : 'org';
   S.mpModo = p.get('mpv') === 'mensal' ? 'mensal' : 'periodo';
+  S.aplPx = p.get('apx') || '';
   S.mpMes = /^\d{4}-\d{2}$/.test(p.get('mpm') || '') ? p.get('mpm') : '';
 }
 
@@ -2935,57 +2939,70 @@ function renderNav() {
 }
 /* ---- B2B · Aplicação Direta (candidaturas à Rede, funil B2B - Alpha; página única, enxuta) ---- */
 const APL_ORIGEM = {rede: 'Site /rede/', recrutamento: 'LP de recrutamento'};
+const aplCart = l => { const v = (l.p || '').trim(); if (!v) return 'Não informado'; if (/^n[aã]o/i.test(v)) return 'Não tem carteira';
+  if (/^sim$/i.test(v)) return 'Tem (faixa não informada)'; return v.replace(/^sim\s*-\s*/i, ''); };
+const aplCert = c => /^n[aã]o$/i.test(c) ? 'Nenhuma' : c.replace(/^sim\s*-\s*/i, '');
+const APL_PX_ORD = ['IND', 'LP_Rede', 'LP_Consultor', 'Simulador', 'LISTA', 'APEX', 'FORMS'];
+const aplPx = l => l.px || (l.o === 'rede' ? 'LP_Rede' : l.o === 'recrutamento' ? 'LP_Consultor' : 'Sem prefixo');
+function aplPrefixos(A) {
+  const s = new Set(A.leads.map(aplPx));
+  return APL_PX_ORD.filter(x => s.has(x)).concat([...s].filter(x => !APL_PX_ORD.includes(x) && x !== 'Sem prefixo').sort(), s.has('Sem prefixo') ? ['Sem prefixo'] : []);
+}
 const APL_MODELO = {consultor: 'Consultor', escritorio: 'Escritório Parceiro'};
 const APL_CARTEIRA = ['Não tenho carteira', 'Até R$ 10 milhões', 'Até R$ 20 milhões', 'Até R$ 50 milhões', 'Até R$ 100 milhões', 'Mais de R$ 100 milhões'];
-function aplCompute(A, de, ate) {
-  const L = A.leads.filter(l => l.e && l.e.slice(0, 10) >= de && l.e.slice(0, 10) <= ate);
+function aplCompute(A, de, ate, px) {
+  const L = A.leads.filter(l => l.e && l.e.slice(0, 10) >= de && l.e.slice(0, 10) <= ate && (!px || aplPx(l) === px));
   const st = A.stages || [], ix = id => st.findIndex(x => x.id === id);
   const iReu = st.findIndex(x => /reuni[aã]o agendada/i.test(x.nome)), cult = new Set(st.filter(x => /cultivo/i.test(x.nome)).map(x => x.id));
   const reuniao = L.filter(l => l.s === 'won' || (iReu >= 0 && ix(l.sg) >= iReu && !cult.has(l.sg) && l.s !== 'lost'));
   const M = (A.midia && A.midia.ativo) ? A.midia.dias.filter(r => r[0] >= de && r[0] <= ate) : null;
   const md = M ? {gasto: M.reduce((a, r) => a + r[1], 0), impr: M.reduce((a, r) => a + r[2], 0), cliques: M.reduce((a, r) => a + r[3], 0)} : null;
-  return {L, n: L.length, cons: L.filter(l => l.m === 'consultor').length, esc: L.filter(l => l.m === 'escritorio').length, reuniao: reuniao.length,
-    carteira: L.filter(l => l.p && l.p !== 'Não tenho carteira').length, perdidos: L.filter(l => l.s === 'lost').length, md};
+  return {L, n: L.length, cons: L.filter(l => l.m === 'consultor').length, esc: L.filter(l => l.m === 'escritorio').length, semModelo: L.filter(l => !l.m).length, reuniao: reuniao.length,
+    carteira: L.filter(l => !['Não informado', 'Não tem carteira'].includes(aplCart(l))).length, perdidos: L.filter(l => l.s === 'lost').length, md};
 }
 function aplChart(L, de, ate, width) {
   const n = diffDays(de, ate) + 1, mode = n <= 62 ? 'dia' : n <= 420 ? 'semana' : 'mes', monday = d => addDays(d, -((weekday(d) + 6) % 7));
   const key = d => mode === 'dia' ? d : mode === 'semana' ? monday(d) : d.slice(0, 7), bins = new Map();
-  for (let d = de; d <= ate; d = addDays(d, 1)) { const k = key(d); if (!bins.has(k)) bins.set(k, {k, from: d, to: d, c: 0, e: 0}); bins.get(k).to = d; }
-  for (const l of L) { const b = bins.get(key(l.e.slice(0, 10))); if (b) b[l.m === 'escritorio' ? 'e' : 'c']++; }
+  for (let d = de; d <= ate; d = addDays(d, 1)) { const k = key(d); if (!bins.has(k)) bins.set(k, {k, from: d, to: d, c: 0, e: 0, x: 0}); bins.get(k).to = d; }
+  for (const l of L) { const b = bins.get(key(l.e.slice(0, 10))); if (b) b[l.m === 'escritorio' ? 'e' : l.m === 'consultor' ? 'c' : 'x']++; }
   const bs = [...bins.values()], W = Math.max(300, width), H = 240, pl = 30, pr = 6, pt = 18, pb = 30, pw = W - pl - pr, ph = H - pt - pb;
-  const mx = niceMax(Math.max(1, ...bs.map(b => b.c + b.e))), bw = pw / Math.max(1, bs.length), w = Math.max(1.5, Math.min(bw * .62, 40)), y = v => pt + ph - ph * v / mx;
+  const mx = niceMax(Math.max(1, ...bs.map(b => b.c + b.e + b.x))), bw = pw / Math.max(1, bs.length), w = Math.max(1.5, Math.min(bw * .62, 40)), y = v => pt + ph - ph * v / mx;
   let g = '';
   for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mx * i / 4)}</text>`; }
   const step = Math.max(1, Math.ceil(bs.length / Math.max(1, Math.floor(pw / 48))));
   bs.forEach((b, i) => {
-    const cx = pl + i * bw + bw / 2, tot = b.c + b.e, r = Math.min(3, w / 4);
+    const cx = pl + i * bw + bw / 2, tot = b.c + b.e + b.x, ce = b.c + b.e, r = Math.min(3, w / 4);
     if (b.c) g += `<rect class="bar" x="${cx - w / 2}" y="${y(b.c)}" width="${w}" height="${y(0) - y(b.c)}" fill="#00503c" rx="${r}"/>`;
-    if (b.e) g += `<rect class="bar" x="${cx - w / 2}" y="${y(tot)}" width="${w}" height="${y(b.c) - y(tot) - (b.c ? 1 : 0)}" fill="#c98a1b" rx="${r}"/>`;
+    if (b.e) g += `<rect class="bar" x="${cx - w / 2}" y="${y(ce)}" width="${w}" height="${y(b.c) - y(ce) - (b.c ? 1 : 0)}" fill="#c98a1b" rx="${r}"/>`;
+    if (b.x) g += `<rect class="bar" x="${cx - w / 2}" y="${y(tot)}" width="${w}" height="${y(ce) - y(tot) - (ce ? 1 : 0)}" fill="#c2cbc7" rx="${r}"/>`;
     if (tot && bs.length <= 31 && bw > 16) g += `<text class="ax" x="${cx}" y="${y(tot) - 5}" text-anchor="middle" style="fill:#33413b;font-weight:600">${tot}</text>`;
     if (i % step === 0) g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${mode === 'mes' ? MESN(b.k) : fDM(b.from)}</text>`;
-    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)}\nLeads: ${tot}\nConsultor: ${b.c}\nEscritório Parceiro: ${b.e}`)}" data-range="${b.from}|${b.to}"/>`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)}\nLeads: ${tot}\nConsultor: ${b.c}\nEscritório Parceiro: ${b.e}\nModelo não informado: ${b.x}`)}" data-range="${b.from}|${b.to}"/>`;
   });
   return {svg: `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg></div>`, mode};
 }
 function viewAplicacao() {
   const A = D.aplicacao;
-  let h = viewHead('Aplicação Direta', `B2B - Análises · Candidaturas à Rede Meu Patrimônio · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
+  let h = viewHead('Aplicação Direta', `B2B - Análises · Todos os negócios do funil B2B - Alpha (Pipedrive), por prefixo · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
   if (!A || !A.leads) return h + `<div class="card">${emptyBox('Dados da Aplicação Direta indisponíveis', 'Os dados aparecem na próxima leitura do Pipedrive.')}</div>`;
   if (A.erro) h += `<div class="note">Não foi possível atualizar agora (${ESC(A.erro)}). Mostrando a leitura de ${fDT(A.atualizado_em)}.</div>`;
-  const c = aplCompute(A, S.de, S.ate), [pd, pa] = prevRange(), p = aplCompute(A, pd, pa), pct = (a, b) => fP(pctOf(a, b)), nd = diffDays(S.de, S.ate) + 1;
+  const pxs = aplPrefixos(A); if (S.aplPx && !pxs.includes(S.aplPx)) S.aplPx = '';
+  const c = aplCompute(A, S.de, S.ate, S.aplPx), [pd, pa] = prevRange(), p = aplCompute(A, pd, pa, S.aplPx), pct = (a, b) => fP(pctOf(a, b)), nd = diffDays(S.de, S.ate) + 1;
+  const nPx = x => aplCompute(A, S.de, S.ate, x).n;
+  h += `<div class="aplpx"><span>Prefixo do negócio</span><div class="seg">${[['', 'Todos']].concat(pxs.map(x => [x, x])).map(([k, t]) => `<button type="button" data-aplpx="${ESC(k)}" class="${(S.aplPx || '') === k ? 'on' : ''}">${ESC(t)}<small>${fN(nPx(k))}</small></button>`).join('')}</div></div>`;
   h += '<div class="kpis">' + [
-    kpiCard({label: 'Leads', cls: 'hero', v: fN(c.n), sub: `candidaturas no período · ${f1(c.n / nd)} por dia`, d: delta(c.n, p.n), tip: 'Formulários de candidatura recebidos no período (data em que o negócio entrou no Pipedrive). Testes excluídos.'}),
+    kpiCard({label: 'Leads', cls: 'hero', v: fN(c.n), sub: `${S.aplPx ? 'prefixo ' + ESC(S.aplPx) : 'todos os prefixos'} · ${f1(c.n / nd)} por dia`, d: delta(c.n, p.n), tip: 'Negócios do funil B2B - Alpha que entraram no Pipedrive no período (data de criação), no prefixo escolhido. Testes excluídos.'}),
     kpiCard({label: 'Consultor', v: fN(c.cons), sub: `${pct(c.cons, c.n)} dos leads`, d: delta(c.cons, p.cons), tip: 'Quer seguir carreira como consultor em um escritório da Rede'}),
     kpiCard({label: 'Escritório Parceiro', v: fN(c.esc), sub: `${pct(c.esc, c.n)} dos leads`, d: delta(c.esc, p.esc), tip: 'Quer abrir ou migrar um escritório próprio para a Rede'}),
     kpiCard({label: 'Com carteira de clientes', v: fN(c.carteira), sub: `${pct(c.carteira, c.n)} dos leads`, d: delta(c.carteira, p.carteira), tip: 'Informaram ter carteira de clientes (qualquer faixa)'}),
     kpiCard({label: 'Reunião agendada ou além', v: fN(c.reuniao), sub: `${pct(c.reuniao, c.n)} dos leads · etapa atual`, d: delta(c.reuniao, p.reuniao), tip: 'Leads do período que hoje estão em Reunião Agendada, Negociação ou Fechado no funil B2B - Alpha (ou ganhos). Cultivo e perdidos não contam.'})
   ].join('') + '</div>';
   // mídia paga: fica em branco até existir campanha vinculada
-  const md = c.md, off = !md, sub0 = 'sem campanhas no ar';
-  h += `<div class="ch mt"><div><h3>Mídia paga</h3><p>${off ? 'Nenhuma campanha de anúncios rodando para a Aplicação Direta. Os campos abaixo se preenchem sozinhos quando as campanhas começarem.' : `Campanhas: ${ESC(A.midia.campanhas.join(' · '))}`}</p></div></div>`;
+  const md = c.md && c.md.gasto ? c.md : null, off = !md, sub0 = (A.midia && A.midia.campanhas && A.midia.campanhas.length) ? 'sem gasto no período' : 'sem campanhas no ar';
+  h += `<div class="ch mt"><div><h3>Mídia paga (Meta Ads)</h3><p>${A.midia && A.midia.campanhas && A.midia.campanhas.length ? `Só as campanhas B2B de Aplicação Direta: ${ESC(A.midia.campanhas.join(' · '))}` : 'Nenhuma campanha B2B de Aplicação Direta encontrada na Meta.'} · leads contados no Pipedrive (${S.aplPx ? 'prefixo ' + ESC(S.aplPx) : 'todos os prefixos'}), não pela Meta</p></div></div>`;
   h += '<div class="kpis">' + [
     kpiCard({label: 'Investimento', cls: off ? 'off' : '', v: off ? '–' : fRc(md.gasto), sub: off ? sub0 : `${fRc(md.gasto / nd)} por dia`, tip: 'Valor gasto nas campanhas da Aplicação Direta no período (Meta Ads)'}),
-    kpiCard({label: 'Custo por lead', cls: off ? 'off' : '', v: off || !c.n ? '–' : fRc(md.gasto / c.n), sub: off ? sub0 : 'investimento ÷ leads', tip: 'Investimento do período dividido pelo número de leads'}),
+    kpiCard({label: 'Custo por lead', cls: off ? 'off' : '', v: off || !c.n ? '–' : fRc(md.gasto / c.n), sub: off ? sub0 : `investimento ÷ ${fN(c.n)} leads no Pipedrive`, tip: 'Investimento das campanhas B2B de Aplicação Direta ÷ leads que entraram no Pipedrive no período (prefixo escolhido no filtro)'}),
     kpiCard({label: 'Impressões', cls: off ? 'off' : '', v: off ? '–' : fN(md.impr), sub: off ? sub0 : 'vezes que os anúncios apareceram', tip: 'Impressões dos anúncios no período'}),
     kpiCard({label: 'Cliques no link', cls: off ? 'off' : '', v: off ? '–' : fN(md.cliques), sub: off ? sub0 : `taxa de cliques ${pct(md.cliques, md.impr)}`, tip: 'Cliques que levaram à página da Rede'}),
     kpiCard({label: 'Conversão do clique', cls: off ? 'off' : '', v: off ? '–' : pct(c.n, md.cliques), sub: off ? sub0 : 'leads ÷ cliques no link', tip: 'De cada 100 cliques no anúncio, quantos viraram candidatura'})
@@ -2998,26 +3015,26 @@ function viewAplicacao() {
     return arr.length ? hbars(arr.map(([k, v]) => ({label: k, v, extra: pct(v, c.n), tip: `${k}\n${fN(v)} leads (${pct(v, c.n)})`}))) : emptyBox('Sem resposta no período'); };
   const etapa = l => l.s === 'lost' ? 'Perdido' : l.s === 'won' ? 'Ganho' : ((A.stages.find(x => x.id === l.sg) || {}).nome || 'Etapa ' + l.sg);
   h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Leads por ${({dia: 'dia', semana: 'semana', mes: 'mês'})[ch.mode]}</h3><p>Pela data de entrada no Pipedrive</p></div>
-      <div class="lg"><span><i style="background:#00503c"></i>Consultor</span><span><i style="background:#c98a1b"></i>Escritório Parceiro</span></div></div>${ch.svg}</div>
+      <div class="lg"><span><i style="background:#00503c"></i>Consultor</span><span><i style="background:#c98a1b"></i>Escritório Parceiro</span><span><i style="background:#c2cbc7"></i>Não informado</span></div></div>${ch.svg}</div>
     <div class="card"><div class="ch"><div><h3>Onde estão hoje</h3><p>Etapa atual no funil B2B - Alpha</p></div></div>${cnt(etapa, A.stages.map(x => x.nome).concat(['Ganho', 'Perdido']))}</div></div>`;
   // perfil
-  h += `<div class="g g3 mt"><div class="card"><div class="ch"><div><h3>Carteira de clientes</h3><p>Faixa informada no formulário</p></div></div>${cnt(l => l.p || 'Não informado', APL_CARTEIRA.concat(['Não informado']))}</div>
+  h += `<div class="g g3 mt"><div class="card"><div class="ch"><div><h3>Carteira de clientes</h3><p>Faixa informada no formulário</p></div></div>${cnt(aplCart)}</div>
     <div class="card"><div class="ch"><div><h3>Atuação no mercado</h3><p>Tipo de atuação hoje</p></div></div>${cnt(l => l.mk === 'Não' ? 'Não atua no mercado' : l.r || 'Não informado')}</div>
-    <div class="card"><div class="ch"><div><h3>Certificações</h3><p>% dos leads que têm cada uma (pode marcar mais de uma)</p></div></div>${cnt(l => l.c.length ? l.c.map(x => x === 'Não' ? 'Nenhuma' : x) : 'Não informado')}</div></div>`;
+    <div class="card"><div class="ch"><div><h3>Certificações</h3><p>% dos leads que têm cada uma (pode marcar mais de uma)</p></div></div>${cnt(l => l.c.length ? [...new Set(l.c.map(aplCert))] : 'Não informado')}</div></div>`;
   h += `<div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Estado</h3><p>UF informada</p></div></div>${cnt(l => l.uf || 'Não informado')}</div>
-    <div class="card"><div class="ch"><div><h3>Formulário de origem</h3><p>Onde a candidatura foi enviada</p></div></div>${cnt(l => APL_ORIGEM[l.o] || l.o)}</div></div>`;
+    <div class="card"><div class="ch"><div><h3>Prefixo do negócio</h3><p>Origem pelo prefixo do título no Pipedrive</p></div></div>${cnt(aplPx)}</div></div>`;
   // lead a lead (sem e-mail e telefone)
-  const lin = c.L.slice().sort((a, b) => a.e < b.e ? 1 : -1);
-  h += `<div class="card np mt"><div class="ch"><div><h3>Candidaturas do período</h3><p>${fN(lin.length)} leads, do mais recente para o mais antigo · clique no nome para abrir no Pipedrive</p></div></div><div class="tw" style="max-height:560px"><table class="t stk"><thead><tr><th>Lead</th><th>Entrada</th><th>Modelo</th><th>Atuação</th><th>Carteira</th><th>Certificações</th><th>Cidade / UF</th><th>Etapa atual</th></tr></thead><tbody>` +
-    lin.map(l => `<tr><td style="max-width:215px">${leadCell(l)}<div class="mut">${ESC(APL_ORIGEM[l.o] || l.o)}${l.t ? ` · Tier ${ESC(l.t)}` : ''}</div></td><td>${fDMT(l.e)}<span class="wd">${WD[weekday(l.e.slice(0, 10))]}</span></td>
-      <td><span class="mpk ${l.m === 'escritorio' ? 'abe' : 'nov'}">${APL_MODELO[l.m]}</span></td><td class="wrap" style="max-width:160px">${ESC(l.mk === 'Não' ? 'Não atua no mercado' : l.r || '–')}</td>
-      <td class="wrap" style="max-width:120px">${ESC(l.p || '–')}</td><td class="wrap" style="max-width:150px">${ESC(l.c.join(', ') || '–')}</td><td class="wrap" style="max-width:150px">${ESC([l.cid, l.uf].filter(Boolean).join(' / ') || '–')}</td>
+  const linT = c.L.slice().sort((a, b) => a.e < b.e ? 1 : -1), LIM = 300, lin = linT.slice(0, LIM);
+  h += `<div class="card np mt"><div class="ch"><div><h3>Leads do período</h3><p>${fN(linT.length)} leads, do mais recente para o mais antigo${linT.length > LIM ? ` · mostrando os ${fN(LIM)} mais recentes (escolha um prefixo ou período menor para ver os demais)` : ''} · clique no nome para abrir no Pipedrive</p></div></div><div class="tw" style="max-height:560px"><table class="t stk"><thead><tr><th>Lead</th><th>Entrada</th><th>Modelo</th><th>Atuação</th><th>Carteira</th><th>Certificações</th><th>Cidade / UF</th><th>Etapa atual</th></tr></thead><tbody>` +
+    lin.map(l => `<tr><td style="max-width:215px">${leadCell(l)}<div class="mut">${ESC(aplPx(l))}${l.t ? ` · Tier ${ESC(l.t)}` : ''}</div></td><td>${fDMT(l.e)}<span class="wd">${WD[weekday(l.e.slice(0, 10))]}</span></td>
+      <td>${l.m ? `<span class="mpk ${l.m === 'escritorio' ? 'abe' : 'nov'}">${APL_MODELO[l.m]}</span>` : '<span class="muted">–</span>'}</td><td class="wrap" style="max-width:160px">${ESC(l.mk === 'Não' ? 'Não atua no mercado' : l.r || '–')}</td>
+      <td class="wrap" style="max-width:120px">${ESC(l.p ? aplCart(l) : '–')}</td><td class="wrap" style="max-width:150px">${ESC([...new Set(l.c.map(aplCert))].join(', ') || '–')}</td><td class="wrap" style="max-width:150px">${ESC([l.cid, l.uf].filter(Boolean).join(' / ') || '–')}</td>
       <td class="wrap" style="max-width:150px">${l.s === 'open' ? `<span class="pill" style="white-space:normal;line-height:1.3">${ESC(etapa(l))}</span>` : statusPill(l.s)}${l.lr ? `<div class="mut">${ESC(l.lr)}</div>` : ''}</td></tr>`).join('') + '</tbody></table></div></div>';
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
-    <li><b>Lead</b> = candidatura enviada por formulário e registrada no funil <b>B2B - Alpha</b> do Pipedrive: site <b>www.meupatrimonio.com/rede/</b> (negócio "LP_Rede") e a LP de recrutamento anterior (negócio "LP_Consultor", com Tier A/B/C). Cadastros feitos à mão no funil não entram. Testes excluídos.</li>
+    <li><b>Lead</b> = todo negócio do funil <b>B2B - Alpha</b> do Pipedrive, pela data de criação. O <b>prefixo</b> do título separa as origens: IND, LP_Rede (site /rede/), LP_Consultor (LP de recrutamento, Tier A/B/C), Simulador, LISTA, APEX, FORMS; negócios sem prefixo aparecem como "Sem prefixo". Testes excluídos.</li>
     <li><b>Perfil</b> (modelo, atuação, carteira, certificações, cidade) vem das respostas do formulário, gravadas na pessoa no Pipedrive. E-mail e telefone não aparecem no painel.</li>
     <li><b>Etapa atual</b> mostra onde cada lead está hoje, não onde estava no fim do período.</li>
-    <li><b>Mídia paga</b> fica em branco enquanto não há campanhas da Aplicação Direta. Quando começarem, investimento, custo por lead, impressões e cliques entram aqui pela Meta Ads.</li>
+    <li><b>Mídia paga</b> soma só as campanhas da Meta com "B2B" e "Aplicação" no nome. O custo por lead divide esse investimento pelos leads que caíram no Pipedrive (do prefixo escolhido), não pelos leads que a Meta registra.</li>
     <li>Dados do Pipedrive lidos de hora em hora, em dias úteis das 7h às 19h${A.atualizado_em ? ` · última leitura: ${fDT(A.atualizado_em)}` : ''}.</li></ul></details>`;
   return h;
 }
@@ -3064,6 +3081,8 @@ function bindEvents() {
     const pb = t.closest('[data-pop]');
     if (pb) { openPop(pb.dataset.pop, pb, pb.dataset.k); return; }
     if (POP) closePop();
+    const apx = t.closest('[data-aplpx]');
+    if (apx) { S.aplPx = apx.dataset.aplpx; update({anim: true}); return; }
     const mpm = t.closest('[data-mpmodo]');
     if (mpm) { S.mpModo = mpm.dataset.mpmodo; update({anim: true}); return; }
     const mpmes = t.closest('[data-mpmes]');
