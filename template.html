@@ -395,8 +395,14 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .hubc{width:16px;height:16px;flex:none;fill:none;stroke:#b3bfba;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .hubi:hover .hubc{stroke:var(--verde)}
 .facts b .mpk,.facts b .cad{display:inline-block;width:auto}
-.mpmodo{margin:0 0 16px}
-.mpmetas{margin-bottom:16px}.mpmetas.big .mt-g{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}@media(max-width:1280px){.mpmetas.big .mt-g{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.mpmetas.big .mt-g{grid-template-columns:1fr}}.mpmetas.big .mt-i{padding:16px 18px}.mpmetas.big .mt-h span{font-size:14px}.mpmetas.big .mt-h b{font-size:28px}.mpmetas.big .mt-f{font-size:13.5px}.mpmetas.big .mt-bar{height:9px}.mt-g{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.mpmodo{margin:0 0 18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media(max-width:760px){.mpmodo{grid-template-columns:1fr}}
+.mpmb{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;font:inherit;cursor:pointer;background:#fff;border:1px solid #dfe5e2;border-radius:12px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,40,30,.07),0 2px 8px rgba(0,40,30,.04);color:#4a5551;transition:border-color .15s,box-shadow .15s,transform .15s,background .15s}
+.mpmb:hover{border-color:var(--v200);box-shadow:0 4px 14px rgba(0,51,38,.10);transform:translateY(-1px)}
+.mpmb svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-bottom:6px;color:#7d8984}
+.mpmb b{font-size:14.5px;font-weight:700;color:#3e4b46}.mpmb small{font-size:12px;color:var(--cinza)}
+.mpmb.on{background:#f0f7f1;border-color:#7fc98f;box-shadow:0 1px 3px rgba(0,120,40,.10)}.mpmb.on svg,.mpmb.on b{color:#1f9d3a}.mpmb.on small{color:#4f8a5d}
+.mpmetas{margin-bottom:16px}.mpmetas.big .mt-g{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}@media(max-width:1280px){.mpmetas.big .mt-g{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.mpmetas.big .mt-g{grid-template-columns:1fr}}.mpmetas.big .mt-i{padding:16px 18px}.mpmetas.big .mt-h span{font-size:14px}.mpmetas.big .mt-h b{font-size:23px}.mpmetas.big .mt-f{font-size:13.5px}.mpmetas.big .mt-bar{height:9px}.mt-g{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 @media(max-width:1280px){.mt-g{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.mt-g{grid-template-columns:1fr 1fr}}
 .mt-i{border:1px solid var(--linha);border-radius:12px;padding:12px 14px;background:#fff;display:flex;flex-direction:column;gap:8px}
 .mt-i.main{background:linear-gradient(135deg,var(--verde),var(--prof));border-color:var(--verde);color:#fff}
@@ -2227,8 +2233,13 @@ function mpEvolChart(ev, width) {
   });
   return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pagamentos por mês">${g}</svg></div>`;
 }
+const MP_MODOS = [
+  ['periodo', 'Análise do período', 'Números do período escolhido no topo', '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>'],
+  ['mensal', 'Insights mensais', 'Mês fechado, mercado e prioridades', '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>'],
+  ['metas', 'Metas', `% atingido das metas até ${fDay(MP_METAS_ATE)}`, '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>']];
 function mpModoSeg() {
-  return `<div class="seg mpmodo">${[['periodo', 'Análise do período'], ['mensal', 'Insights mensais'], ['metas', 'Metas']].map(([k, t]) => `<button type="button" data-mpmodo="${k}" class="${S.mpModo === k ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+  return `<div class="mpmodo">${MP_MODOS.map(([k, t, sub, ic]) => `<button type="button" data-mpmodo="${k}" class="mpmb${S.mpModo === k ? ' on' : ''}" aria-pressed="${S.mpModo === k}">
+    <svg viewBox="0 0 24 24">${ic}</svg><b>${t}</b><small>${sub}</small></button>`).join('')}</div>`;
 }
 function viewMPPro() {
   if (S.mpModo === 'mensal') return viewMPProMensal();
