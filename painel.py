@@ -1017,6 +1017,26 @@ def _brt_min(ts):          # MP HUB: data/hora BRT sem segundos (NÃO confundir 
     return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(BRT).strftime("%Y-%m-%dT%H:%M")
 
 
+# ---------------------------------------------------------------- MP PRO · engajamento dos alunos (Kiwify, área de membros)
+# A Kiwify só mostra o progresso no painel (login). Fotografia manual e SÓ AGREGADA (sem nomes/e-mails), cifrada em fontes/.
+# `python painel.py alunos-import <agregado.json>`
+ALUNOS_ENC = ROOT / "fontes" / "mppro_alunos.enc.json"
+
+
+def alunos_import(arq):
+    d = json.loads(pathlib.Path(arq).read_text(encoding="utf-8"))
+    assert "@" not in json.dumps(d), "o agregado não pode ter e-mail"
+    ALUNOS_ENC.parent.mkdir(exist_ok=True)
+    ALUNOS_ENC.write_bytes(crypt("enc", json.dumps(d, ensure_ascii=False).encode("utf-8")))
+    return d.get("extraido_em")
+
+
+def alunos_payload():
+    if not ALUNOS_ENC.exists(): return None
+    try: return json.loads(crypt("dec", ALUNOS_ENC.read_bytes()))
+    except Exception: return {"erro": "não foi possível ler a fotografia dos alunos"}
+
+
 def mphub_payload():
     if not MPHUB_ENC.exists(): return None
     try:
@@ -1258,7 +1278,7 @@ def collect(full=False):
     tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]), "mphub": mphub_payload(), "youtube": youtube_payload(), "aplicacao": aplicacao_payload(cache),
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]), "mphub": mphub_payload(), "mppro_alunos": alunos_payload(), "youtube": youtube_payload(), "aplicacao": aplicacao_payload(cache),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
                      "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run"),
@@ -1423,6 +1443,7 @@ if __name__ == "__main__":
     elif cmd == "collect": print(stable_summary(collect(full="--full" in sys.argv)))
     elif cmd == "pages": build_pages(); print("ok", OUT)
     elif cmd == "mphub-import": print("ok", mphub_import(sys.argv[2]), "usuários")
+    elif cmd == "alunos-import": print("ok", alunos_import(sys.argv[2]))
     elif cmd == "youtube-import": print("ok", youtube_import(sys.argv[2]))
     elif cmd == "youtube-dias": print("ok", youtube_dias_import(sys.argv[2]))
     elif cmd == "dev": print("ok", build_dev(sys.argv[2] if len(sys.argv) > 2 else None))

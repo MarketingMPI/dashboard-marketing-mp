@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src https://api.github.com https://cxbgpbibbxfhvdfhyvpx.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.meupatrimonio.com; font-src 'self'; connect-src https://api.github.com https://cxbgpbibbxfhvdfhyvpx.supabase.co https://www.meupatrimonio.com; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Painel Operacional · Meu Patrimônio</title>
 <script>if (location.hostname === 'marketingmpi.github.io') location.replace('https://painelmkt.meupatrimonio.com/' + location.search + location.hash);</script>
@@ -396,6 +396,18 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .hubi:hover .hubc{stroke:var(--verde)}
 .facts b .mpk,.facts b .cad{display:inline-block;width:auto}
 .mpmodo{margin:0 0 16px}
+.mpmetas{margin-bottom:16px}.mt-g{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+@media(max-width:1280px){.mt-g{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.mt-g{grid-template-columns:1fr 1fr}}
+.mt-i{border:1px solid var(--linha);border-radius:12px;padding:12px 14px;background:#fff;display:flex;flex-direction:column;gap:8px}
+.mt-i.main{background:linear-gradient(135deg,var(--verde),var(--prof));border-color:var(--verde);color:#fff}
+.mt-h{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.mt-h span{font-size:12.5px;font-weight:600;color:var(--cinza);line-height:1.3}
+.mt-h b{font-size:22px;font-weight:700;line-height:1;white-space:nowrap}
+.mt-i.ok .mt-h b{color:#0b7a3b}.mt-i.quase .mt-h b{color:#a8701c}.mt-i.longe .mt-h b{color:#c0392b}.mt-i.na .mt-h b{color:var(--cinza)}
+.mt-bar{height:7px;border-radius:99px;background:#eef1f0;overflow:hidden}.mt-bar i{display:block;height:100%;border-radius:99px;background:#c0392b}
+.mt-i.ok .mt-bar i{background:#00a611}.mt-i.quase .mt-bar i{background:#d9a441}
+.mt-f{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:var(--cinza)}.mt-f b{color:var(--txt)}
+.mt-n{font-size:11px;color:var(--cinza)}
+.mt-i.main .mt-h span,.mt-i.main .mt-f,.mt-i.main .mt-n{color:#cfe6dc}.mt-i.main .mt-f b,.mt-i.main .mt-h b{color:#fff}.mt-i.main .mt-bar{background:rgba(255,255,255,.2)}.mt-i.main .mt-bar i{background:#61ce70}
 .aplperd{align-items:start}
 .kpi.gain .kv{color:#0b7a3b}
 .aplpx{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}.aplpx > span{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--cinza)}
@@ -531,6 +543,76 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
   .hb-r{grid-template-columns:minmax(80px,40%) minmax(0,1fr) auto}
 }
 .dates{display:inline-flex;gap:6px;align-items:center}
+/* ---------- Blog (publicação) ---------- */
+.blog .tbar .bl-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bl-busca{min-width:260px}
+.bl-note{margin:12px 16px}
+.bl-vazio{padding:48px 20px;text-align:center;color:var(--cinza)}
+.bl-tab td{vertical-align:middle}
+.bl-th{width:84px}.bl-th img,.bl-th span{display:block;width:72px;height:44px;border-radius:7px;object-fit:cover;background:var(--v50)}
+.bl-tt{display:block;color:var(--txt);font-weight:600;max-width:520px;line-height:1.35}
+.bl-tab small{color:var(--cinza)}
+.bl-st{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:600;background:#eef1f0;color:var(--cinza);margin-right:4px}
+.bl-st.ok{background:var(--v100);color:var(--verde)}
+.bl-st.warn{background:var(--fds);color:var(--amb)}
+.bl-ra{white-space:nowrap;text-align:right}.bl-ra .btn{height:30px;padding:0 11px;margin-left:6px}
+.bl-topo{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.bl-auto{font-size:12.5px;color:var(--cinza)}
+.bl-ed{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.bl-side{display:grid;gap:16px;position:sticky;top:16px}
+.bl-lb{display:block;font-size:12px;font-weight:600;color:var(--verde);letter-spacing:.02em;margin:14px 0 6px}
+.bl-lb:first-child{margin-top:0}.bl-lb small{font-weight:400;color:var(--cinza)}
+.bl-in{width:100%;border:1px solid #cfd9d4;border-radius:10px;padding:10px 12px;outline:none;background:#fff;font-size:14px}
+.bl-in:focus{border-color:var(--verde);box-shadow:0 0 0 3px rgba(0,80,60,.12)}
+textarea.bl-in{resize:vertical;line-height:1.5;font:inherit}
+.bl-tab th{text-align:left}
+.bl-in[hidden]{display:none}
+select.bl-in+.bl-in{margin-top:8px}
+.bl-tit{font-size:22px;font-weight:600;color:var(--verde);padding:12px 14px}
+.bl-bar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:14px 0 0;padding:6px;border:1px solid var(--linha);border-bottom:0;border-radius:10px 10px 0 0;background:var(--suave);position:sticky;top:0;z-index:2}
+.bl-bar button{border:0;background:none;padding:6px 9px;border-radius:7px;cursor:pointer;font-size:12.5px;color:#3e4b46}
+.bl-bar button:hover{background:#fff;color:var(--verde);box-shadow:0 1px 3px rgba(0,40,30,.1)}
+.bl-bar i{width:1px;height:18px;background:var(--linha);margin:0 4px}
+.bl-corpo{min-height:420px;border:1px solid var(--linha);border-radius:0 0 10px 10px;padding:18px 22px;outline:none;font-size:16px;line-height:1.7;color:#1f2b27;background:#fff}
+.bl-corpo:focus{border-color:var(--v300)}
+.bl-corpo:empty::before{content:attr(data-ph);color:#9aa7a2}
+.bl-corpo h2{font-size:23px;color:var(--verde);margin:26px 0 8px;line-height:1.25}
+.bl-corpo h3{font-size:19px;color:var(--verde);margin:20px 0 6px}
+.bl-corpo p{margin:0 0 12px}
+.bl-corpo blockquote{margin:12px 0;padding:10px 16px;border-left:4px solid var(--lima);background:var(--v50);border-radius:0 8px 8px 0}
+.bl-corpo a,.bl-prev-corpo a{color:var(--verde);text-decoration:underline}
+.bl-corpo .post-video,.bl-prev-corpo .post-video{position:relative;aspect-ratio:16/9;margin:14px 0;border-radius:10px;overflow:hidden;background:var(--prof)}
+.bl-corpo .post-video iframe,.bl-prev-corpo .post-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
+.bl-dica{font-size:12px;color:var(--cinza);margin:8px 0 0}
+.bl-pub{width:100%;justify-content:center;height:42px;font-size:14px}
+.bl-pub:disabled,.bl-row2 .btn:disabled{opacity:.55;cursor:wait}
+.bl-row2{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.bl-row2 .btn{flex:1;justify-content:center}
+.bl-msg{font-size:13px;margin-top:10px;line-height:1.45}.bl-msg.err{color:var(--verm)}.bl-msg.ok{color:var(--verde)}
+.bl-capa{display:grid;place-items:center;min-height:150px;border:1.5px dashed var(--v200);border-radius:12px;cursor:pointer;text-align:center;color:var(--cinza);font-size:13px;overflow:hidden;background:var(--v50)}
+.bl-capa:hover{border-color:var(--verde)}
+.bl-capa.tem{border-style:solid;padding:0}.bl-capa img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.bl-ok{text-align:center;padding:48px 24px;max-width:620px;margin:0 auto}
+.bl-ok-ic{width:58px;height:58px;margin:0 auto 14px;border-radius:50%;display:grid;place-items:center;background:var(--v100);color:var(--verde);font-size:28px;font-weight:700}
+.bl-ok h3{color:var(--verde);font-size:21px;margin:0 0 8px}.bl-ok p{color:#3e4b46;margin:0 0 18px}
+.bl-ok .bl-row2{justify-content:center}.bl-ok .bl-row2 .btn{flex:0 0 auto}
+.bl-modal{position:fixed;inset:0;z-index:300;background:rgba(0,30,22,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.bl-mbox{background:#fff;border-radius:16px;max-width:520px;width:100%;padding:24px 24px 20px;box-shadow:0 30px 80px rgba(0,0,0,.3);max-height:90vh;overflow:auto}
+.bl-mbox h3{margin:0 0 12px;color:var(--verde);font-size:19px}.bl-mbox p{margin:0 0 10px;color:#3e4b46}
+.bl-resumo{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0 0 14px;padding:12px 14px;background:var(--suave);border-radius:10px;font-size:13.5px}
+.bl-resumo dt{color:var(--cinza)}.bl-resumo dd{margin:0;font-weight:600;color:var(--txt)}
+.bl-mfim{justify-content:flex-end;margin-top:14px}.bl-mfim .btn{flex:0 0 auto}
+.btn.bl-perigo{background:var(--verm);border-color:var(--verm)}
+.bl-mbox:has(.bl-prev){max-width:820px;padding:0}
+.bl-prev{position:relative}
+.bl-x{position:absolute;right:12px;top:10px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:22px;cursor:pointer;z-index:1}
+.bl-prev-hero{background:radial-gradient(125% 125% at 10% 0%,var(--verde),var(--prof) 60%,#022119);color:#fff;padding:34px 34px 70px;border-radius:16px 16px 0 0}
+.bl-prev-hero small{color:var(--lima);font-weight:600}.bl-prev-hero h1{font-size:30px;line-height:1.12;margin:10px 0 12px;font-weight:500}.bl-prev-hero p{color:rgba(255,255,255,.75);margin:0}
+.bl-prev-capa{display:block;width:calc(100% - 68px);margin:-50px auto 0;border-radius:12px;aspect-ratio:2/1;object-fit:cover;box-shadow:0 18px 40px rgba(0,30,22,.25)}
+.bl-prev-corpo{padding:24px 34px 8px;font-size:16px;line-height:1.75;color:#1f2b27}
+.bl-prev-corpo h2{color:var(--verde);font-size:23px;margin:26px 0 8px;font-weight:500}.bl-prev-corpo h3{color:var(--verde);font-size:19px;margin:18px 0 6px;font-weight:500}
+.bl-prev-corpo blockquote{margin:12px 0;padding:10px 16px;border-left:4px solid var(--lima);background:var(--v50)}
+.bl-prev .bl-dica{padding:0 34px 24px}
+@media(max-width:1100px){.bl-ed{grid-template-columns:1fr}.bl-side{position:static}}
 </style>
 </head>
 <body class="locked">
@@ -1156,7 +1238,8 @@ async function abrePainel(x) {
   if (!r.ok || typeof r.j !== 'string') return r.status === 403 || r.status === 400 ? 'negado' : false;
   let data; try { data = await decrypt(r.j); } catch (e) { return 'chave'; }
   USUARIO = x.e; showApp(data);
-  setTimeout(() => location.reload(), 30 * 60 * 1000);  // quem deixa aberto recebe a versão nova
+  // quem deixa aberto recebe a versão nova (adiado enquanto há artigo do Blog sendo escrito)
+  setTimeout(function recarrega() { if (window.BLOG_SUJO && window.BLOG_SUJO()) return setTimeout(recarrega, 60000); location.reload(); }, 30 * 60 * 1000);
   return true;
 }
 function showApp(data) {
@@ -1304,6 +1387,7 @@ const ICONS = {
   youtube: '<svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
   instagram: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor"/></svg>',
   mphub: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="9.5" r="2.2"/><path d="M8.3 14.5c.6-1.6 2-2.5 3.7-2.5s3.1.9 3.7 2.5"/></svg>',
+  blog: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   aplicacao: '<svg viewBox="0 0 24 24"><circle cx="12" cy="6.5" r="3.5"/><path d="M4.5 21c.5-4.3 3.5-7 7.5-7s7 2.7 7.5 7"/><path d="M10.9 14.2h2.2l-.5 1.6h-1.2z"/><path d="M11.4 15.8l-.9 3.7 1.5 1.3 1.5-1.3-.9-3.7"/></svg>',
   performance: '<svg viewBox="0 0 24 24"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>',
   consultores: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .7 3.2 2.5 3.6 5.2"/></svg>'
@@ -1319,7 +1403,8 @@ const TABS = [
 // B2B: seções em construção (sem dados do Funil Alpha; filtros B2C ficam ocultos)
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
 const TABS_RS = [{id: 'instagram', nome: 'Instagram'}, {id: 'youtube', nome: 'YouTube', off: 'Em breve: aguardando a conexão com a API do YouTube do Gabriel'}];
-const isB2B = id => TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id);
+const TABS_CT = [{id: 'blog', nome: 'Blog'}];  // Conteúdo: publicação no blog do site
+const isB2B = id => TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id) || TABS_CT.some(t => t.id === id);
 const SO_PERIODO = new Set(['mppro', 'mphub', 'aplicacao', 'instagram', 'youtube']);
 const PRESETS = [['hoje', 'Hoje'], ['7d', 'Últimos 7 dias'], ['semana', 'Esta semana'], ['semana_ant', 'Semana passada'],
   ['28d', 'Últimos 28 dias'], ['30d', 'Últimos 30 dias'], ['mes', 'Este mês'], ['mes_ant', 'Mês passado'], ['tudo', 'Tudo']];
@@ -1395,7 +1480,7 @@ function writeHash() {
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const ok = /^\d{4}-\d{2}-\d{2}$/;
-  S.tab = TABS.concat(TABS_B2B, TABS_RS).some(t => t.id === p.get('aba') && !t.off) ? p.get('aba') : 'macro';
+  S.tab = TABS.concat(TABS_B2B, TABS_RS, TABS_CT).some(t => t.id === p.get('aba') && !t.off) ? p.get('aba') : 'macro';
   const pr = p.get('p');
   if (p.get('de') && ok.test(p.get('de')) && p.get('ate') && ok.test(p.get('ate'))) {
     S.preset = 'custom'; S.de = p.get('de'); S.ate = p.get('ate');
@@ -1891,6 +1976,41 @@ function mpFocoHtml(x, p) {
       ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div></details>`).join('')}</div>
     ${F.manter.length ? `<div class="fcok"><b>O que manter:</b> ${F.manter.join(' · ')}.</div>` : ''}</div>`;
 }
+
+/* ---- Metas fixas do MP PRO até dez/2026 (definidas pelo usuário em 22/10/2026). % = quanto da meta foi atingido. */
+const MP_METAS_ATE = '2026-12-31';
+const MP_METAS = [
+  {k: 'ativos', t: 'Assinantes ativos', meta: 100, bom: 'alto', fmt: v => fN(v), principal: true, nota: 'no fim do mês'},
+  {k: 'mrr', t: 'MRR', meta: 490000, bom: 'alto', fmt: v => fRc(v), nota: '100 assinantes × R$ 49'},
+  {k: 'novas', t: 'Novas assinaturas no mês', meta: 10, bom: 'alto', fmt: v => fN(v)},
+  {k: 'churn', t: 'Churn mensal', meta: 12, bom: 'baixo', fmt: v => fP(v), nota: 'no máximo'},
+  {k: 'renov', t: 'Taxa de renovação', meta: 92, bom: 'alto', fmt: v => fP(v)},
+  {k: 'engaj', t: 'Ativos que acessaram nas últimas 4 semanas', meta: 60, bom: 'alto', fmt: v => fP(v), nota: 'Kiwify, área de membros'},
+  {k: 'cac', t: 'CAC', meta: 12000, bom: 'baixo', fmt: v => fRc(v), nota: 'no máximo'},
+  {k: 'cpm', t: 'CPM', meta: 6000, bom: 'baixo', fmt: v => fRc(v), nota: 'no máximo'},
+  {k: 'reembPct', t: 'Reembolso das novas', meta: 10, bom: 'baixo', fmt: v => fP(v), nota: 'no máximo'},
+  {k: 'ltvCac', t: 'LTV ÷ CAC', meta: 1, bom: 'alto', fmt: v => fX(v) + 'x'}
+];
+function mpMetaPct(m, v) {
+  if (v == null) return null;
+  if (m.bom === 'alto') return m.meta ? v / m.meta * 100 : null;
+  return v <= 0 ? 100 : m.meta / v * 100;   // menor é melhor: na meta ou abaixo = 100% ou mais
+}
+function mpMetasHtml(x) {
+  const AL = D.mppro_alunos, mesDoAl = AL && AL.extraido_em && AL.extraido_em.slice(0, 7) === x.ym;
+  const engaj = mesDoAl && AL.assinatura_ativa && AL.assinatura_ativa.na_area ? AL.assinatura_ativa.acessaram_30d / AL.assinatura_ativa.na_area * 100 : null;
+  const val = m => m.k === 'engaj' ? engaj : x[m.k];
+  const cls = p => p == null ? 'na' : p >= 100 ? 'ok' : p >= 80 ? 'quase' : 'longe';
+  const card = m => { const v = val(m), p = mpMetaPct(m, v);
+    const sub = m.k === 'engaj' ? (v == null ? (AL && AL.extraido_em ? `fotografia de ${fDay(AL.extraido_em.slice(0, 10))}` : 'sem fotografia da Kiwify') : `${fN(AL.assinatura_ativa.acessaram_30d)} de ${fN(AL.assinatura_ativa.na_area)} na área · ${fDay(AL.extraido_em.slice(0, 10))}`) : '';
+    return `<div class="mt-i ${cls(p)}${m.principal ? ' main' : ''}"><div class="mt-h"><span>${m.t}</span><b>${p == null ? '–' : fP(p)}</b></div>
+      <div class="mt-bar"><i style="width:${Math.min(100, p || 0)}%"></i></div>
+      <div class="mt-f"><span>Realizado <b>${v == null ? '–' : m.fmt(v)}</b></span><span>Meta ${m.bom === 'baixo' ? 'até ' : ''}<b>${m.fmt(m.meta)}</b></span></div>
+      ${sub || m.nota ? `<div class="mt-n">${sub || m.nota}</div>` : ''}</div>`; };
+  return `<div class="card mt mpmetas"><div class="ch"><div><h3>Metas até ${fDay(MP_METAS_ATE)}</h3><p>Metas fixas · % = quanto da meta ${mesNome(x.ym)} atingiu${x.parcial ? ' (mês em andamento)' : ''} · nos indicadores em que menor é melhor (churn, CAC, CPM, reembolso), 100% = no limite ou abaixo</p></div>
+    <div class="lg"><span><i style="background:#00a611"></i>100% ou mais</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
+    <div class="mt-g">${MP_METAS.map(card).join('')}</div></div>`;
+}
 const FONTES_GRP = [['Fontes do Brasil', ['trafius_cpm', 'vtg', 'prosp', 'synchro', 'bcb']], ['Fontes internacionais', ['recurly', 'wordstream', 'baymard', 'skok']]];
 function viewMPProMensal() {
   let h = viewHead('MP PRO', 'B2B - Análises · insights mensais: cada mês do dia 1º ao último dia, comparado com o mês anterior e com referências de mercado');
@@ -1906,6 +2026,7 @@ function viewMPProMensal() {
   if (!x) return h + `<div class="card">${emptyBox('Sem dados neste mês')}</div>`;
   h += `<div class="mph"><span>${mesNome(ym).toUpperCase()}</span>${fDay(x.de)} a ${fDay(ymLast(ym))}${x.parcial ? ` · <b class="red">mês em andamento, dados até ${fDay(TODAY)}</b>` : ''}${p ? ` · comparado com ${mesNome(p.ym)}` : ''} · o filtro de datas do topo não se aplica aqui</div>`;
   const P = p || {};
+  h += mpMetasHtml(x);
   if (x.novas < 10 || (x.churnBase || 0) < 30) h += `<div class="note">Base ainda pequena (${fN(x.novas)} novas assinaturas e ${fN(x.ativos)} ativos): uma assinatura a mais ou a menos muda bastante os percentuais. Leia as variações junto com os números absolutos.</div>`;
   h += '<div class="kpis">' + [
     kpiCard({label: 'Receita líquida', cls: 'hero gold', v: fRc(x.liquido), sub: `${fRc(x.bruto)} bruto · ${fN(x.pagamentos)} pagamentos`, d: p ? delta(x.liquido, P.liquido, 1, fRc0) : '', tip: 'Pagamentos aprovados no mês (MP PRO + Formação), já sem a taxa da Kiwify'}),
@@ -2935,6 +3056,7 @@ function renderNav() {
   document.getElementById('nav').innerHTML = '<div class="nh">B2C - Análises</div>' + TABS.map(t => `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}">${ICONS[t.id]}<span>${t.nome}</span>${badge[t.id] != null ? `<span class="bd">${fN(badge[t.id])}</span>` : ''}</button>`).join('') +
     '<div class="nh nb">B2B - Análises</div>' + TABS_B2B.map(btn).join('') +
     '<div class="nh nb">Redes Sociais</div>' + TABS_RS.map(btn).join('') +
+    '<div class="nh nb">Conteúdo</div>' + TABS_CT.map(btn).join('') +
     (USUARIO ? `<div class="nu" title="${ESC(USUARIO)}"><span class="nua"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.2-3.6 4.1-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/></svg></span>` +
       `<div class="nut"><b>${ESC(nomeUsuario(USUARIO))}</b><small>${ESC(USUARIO)}</small></div><button type="button" class="nus" data-sair="1" title="Sair" aria-label="Sair"><svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg></button></div>` : '') +
     `<div class="nf"><img src="assets/favicon.png" alt="Meu Patrimônio"><span>Marketing</span></div>`;
@@ -3053,11 +3175,370 @@ function viewB2B() {
   const t = TABS_B2B.find(x => x.id === S.tab);
   return viewHead(ESC(t.nome), 'B2B - Análises') + `<div class="card"><div class="empty"><b>Seção em construção</b>Esta área vai reunir as análises de ${ESC(t.nome)}. Os filtros e dados do B2C Funil Alpha não se aplicam aqui.</div></div>`;
 }
-const VIEWS = {macro: viewMacro, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewMPPro, mphub: viewMPHub, instagram: viewInstagram, youtube: viewYouTube, aplicacao: viewAplicacao};
+/* =========================================================================
+   9b. BLOG (publicação de artigos em www.meupatrimonio.com/blog/)
+   A aba conversa com /api/blog do site (função na Vercel) usando o token da
+   sessão do Supabase. O servidor confere o login (@meupatrimonio.com), limpa o
+   HTML e grava o artigo no GitHub; o workflow do site gera as páginas e a
+   Vercel publica em ~2 a 3 minutos.
+   ========================================================================= */
+const BLOG_SITE = 'https://www.meupatrimonio.com';
+const BLOG_API = (() => { try { return localStorage.getItem('mp-blog-api') || BLOG_SITE + '/api/blog'; } catch (e) { return BLOG_SITE + '/api/blog'; } })();
+const BLOG_AUTOSAVE = 'mp-blog-rascunho-local';
+const BL = {modo: 'lista', posts: null, temas: [], carregando: false, erro: '', busca: '', filtro: 'todos', limite: 40,
+  form: null, capa: null, capaPreview: '', enviando: false, sujo: false, resultado: null};
+let BLOG_EL = null;
+window.BLOG_SUJO = () => BL.sujo && BL.modo === 'editor';
+
+async function blogToken() {
+  let x = lerSessao();
+  if (!x) return null;
+  if (x.a === 'dev') return 'dev';  // teste local (API local com BLOG_DEV_BYPASS)
+  if (Date.now() > x.x - 60000) x = await renova(x);
+  return x ? x.a : null;
+}
+async function blogApi(metodo, query, corpo) {
+  const tk = await blogToken();
+  if (!tk) return {ok: false, status: 401, j: {erros: ['Sua sessão expirou. Saia e entre de novo no Painel.']}};
+  try {
+    const r = await fetch(BLOG_API + (query ? '?' + new URLSearchParams(query) : ''), {method: metodo,
+      headers: Object.assign({Authorization: 'Bearer ' + tk}, corpo ? {'Content-Type': 'application/json'} : {}),
+      body: corpo ? JSON.stringify(corpo) : undefined});
+    let j = {}; try { j = await r.json(); } catch (e) { /* sem corpo */ }
+    return {ok: r.ok && j.ok !== false, status: r.status, j};
+  } catch (e) { return {ok: false, status: 0, j: {erros: ['Sem conexão com o site. Verifique a internet e tente de novo.']}}; }
+}
+const blErro = r => ((r.j && r.j.erros) || ['Não foi possível concluir agora.']).map(ESC).join('<br>');
+const blData = d => d ? d.split('-').reverse().join('/') : '–';
+
+function viewBlog() {
+  return viewHead('Blog', 'Artigos do blog do site · <a href="' + BLOG_SITE + '/blog/" target="_blank" rel="noopener">www.meupatrimonio.com/blog</a>') + '<div id="blogSlot"></div>';
+}
+function montaBlog() {
+  const slot = document.getElementById('blogSlot');
+  if (!slot) return;
+  if (!BLOG_EL) {
+    BLOG_EL = document.createElement('div');
+    BLOG_EL.className = 'blog';
+    BLOG_EL.addEventListener('click', blClique);
+    BLOG_EL.addEventListener('input', blInput);
+    BLOG_EL.addEventListener('change', blChange);
+    BLOG_EL.addEventListener('paste', blColar, true);
+    BLOG_EL.addEventListener('focusin', ev => { if (ev.target.id === 'blCorpo') document.execCommand('defaultParagraphSeparator', false, 'p'); });
+    blRender();
+  }
+  slot.replaceWith(BLOG_EL);
+  if (BL.posts === null && !BL.carregando) blCarregar();
+}
+async function blCarregar() {
+  BL.carregando = true; BL.erro = ''; blRender();
+  const r = await blogApi('GET', {acao: 'lista'});
+  BL.carregando = false;
+  if (r.ok) { BL.posts = r.j.posts || []; BL.temas = r.j.temas || []; } else { BL.posts = BL.posts || []; BL.erro = blErro(r); }
+  blRender();
+}
+
+/* ---------- lista ---------- */
+function blLista() {
+  const q = norm(BL.busca || '');
+  const ps = (BL.posts || []).filter(p => (BL.filtro === 'todos' || p.status === BL.filtro) && (!q || norm(`${p.title} ${p.author} ${p.category}`).includes(q)));
+  const n = s => (BL.posts || []).filter(p => s === 'todos' || p.status === s).length;
+  let h = `<div class="card bl-card0"><div class="tbar">
+    <div class="seg">${[['todos', 'Todos'], ['publicado', 'Publicados'], ['rascunho', 'Rascunhos']].map(([k, t]) => `<button type="button" data-b="filtro" data-v="${k}" class="${BL.filtro === k ? 'on' : ''}">${t}<small>${fN(n(k))}</small></button>`).join('')}</div>
+    <div class="bl-acts"><label class="search bl-busca"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" data-b="busca" placeholder="Buscar artigo, autor ou tema" value="${ESC(BL.busca)}"></label>
+    <button type="button" class="btn" data-b="novo"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Novo artigo</button></div></div>`;
+  if (BL.erro) h += `<div class="note bl-note">${BL.erro} <button type="button" class="btn gh" data-b="recarregar">Tentar de novo</button></div>`;
+  if (BL.carregando) h += '<div class="bl-vazio">Carregando artigos…</div>';
+  else if (!ps.length) h += `<div class="bl-vazio">${(BL.posts || []).length ? 'Nenhum artigo com esse filtro.' : 'Nenhum artigo carregado.'}</div>`;
+  else {
+    h += '<div class="tw"><table class="bl-tab"><thead><tr><th></th><th>Artigo</th><th>Autor</th><th>Publicação</th><th>Status</th><th></th></tr></thead><tbody>' +
+      ps.slice(0, BL.limite).map(p => `<tr>
+        <td class="bl-th">${p.cover ? `<img src="${BLOG_SITE}/blog/${ESC(p.cover)}" alt="" loading="lazy">` : '<span></span>'}</td>
+        <td><b class="bl-tt">${ESC(p.title)}</b><small>${ESC(p.category)}</small></td>
+        <td>${ESC(p.author)}</td><td class="tn">${blData(p.date)}</td>
+        <td><span class="bl-st ${p.status === 'publicado' ? 'ok' : ''}">${p.status === 'publicado' ? 'Publicado' : 'Rascunho'}</span>${(p.review_flags || []).includes('ativo-especifico') ? '<span class="bl-st warn" title="Fala de ativo específico: revisar com compliance antes de publicar">Compliance</span>' : ''}</td>
+        <td class="bl-ra"><button type="button" class="btn gh" data-b="editar" data-slug="${ESC(p.slug)}">Editar</button>${p.status === 'publicado' ? `<a class="btn gh" href="${BLOG_SITE}/blog/${ESC(p.slug)}/" target="_blank" rel="noopener">Ver</a>` : ''}</td></tr>`).join('') +
+      '</tbody></table></div>';
+    if (ps.length > BL.limite) h += `<div class="pg"><span>Mostrando ${fN(BL.limite)} de ${fN(ps.length)}</span><button type="button" data-b="mais">Mostrar mais</button></div>`;
+  }
+  return h + '</div>';
+}
+
+/* ---------- editor ---------- */
+const BL_VAZIO = () => ({original_slug: '', status_atual: '', title: '', author: '', category: '', categoria_nova: '', description: '', body_html: '', cover: ''});
+function blEditor() {
+  const f = BL.form, editando = !!f.original_slug;
+  const temas = BL.temas.map(t => t.nome);
+  const temaSel = f.category && !temas.includes(f.category) ? '__novo' : f.category;
+  const capa = BL.capaPreview || (f.cover ? `${BLOG_SITE}/blog/${f.cover}` : '');
+  const tb = (cmd, rot, tit, v = '') => `<button type="button" data-cmd="${cmd}" data-v="${v}" title="${tit}" aria-label="${tit}">${rot}</button>`;
+  return `<div class="bl-topo"><button type="button" class="btn gh" data-b="voltar"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>Voltar para a lista</button>
+    <span class="bl-auto" id="blAuto">${editando ? `Editando: <a href="${BLOG_SITE}/blog/${ESC(f.original_slug)}/" target="_blank" rel="noopener">/blog/${ESC(f.original_slug)}/</a>` : 'Artigo novo'}${f.status_atual ? ` · ${f.status_atual === 'publicado' ? 'publicado' : 'rascunho'} no site` : ''}</span></div>
+  <div class="bl-ed">
+    <div class="card bl-main">
+      <label class="bl-lb" for="blTit">Título</label>
+      <input id="blTit" class="bl-in bl-tit" data-f="title" maxlength="140" placeholder="Ex.: Como funciona a previdência privada" value="${ESC(f.title)}">
+      <div class="bl-bar" role="toolbar" aria-label="Formatação">
+        ${tb('formatBlock', 'Título de seção', 'Título de seção (H2)', 'h2')}${tb('formatBlock', 'Subtítulo', 'Subtítulo (H3)', 'h3')}${tb('formatBlock', 'Parágrafo', 'Texto normal', 'p')}<i></i>
+        ${tb('bold', '<b>N</b>', 'Negrito')}${tb('italic', '<em>I</em>', 'Itálico')}<i></i>
+        ${tb('insertUnorderedList', '• Lista', 'Lista com marcadores')}${tb('insertOrderedList', '1. Lista', 'Lista numerada')}${tb('formatBlock', '“ Citação', 'Citação', 'blockquote')}<i></i>
+        ${tb('link', 'Link', 'Inserir link')}${tb('unlink', 'Tirar link', 'Remover link')}${tb('video', 'Vídeo', 'Inserir vídeo do YouTube')}<i></i>
+        ${tb('removeFormat', 'Limpar', 'Limpar formatação do trecho')}
+      </div>
+      <div id="blCorpo" class="bl-corpo" contenteditable="true" data-ph="Escreva ou cole o texto do artigo aqui. Use “Título de seção” para dividir o artigo em partes: elas viram o índice “Neste artigo” no site.">${f.body_html}</div>
+      <p class="bl-dica" id="blConta"></p>
+    </div>
+    <aside class="bl-side">
+      <div class="card">
+        <p class="bl-lb">Publicação</p>
+        <button type="button" class="btn bl-pub" data-b="publicar" ${BL.enviando ? 'disabled' : ''}>${BL.enviando ? 'Enviando…' : editando && f.status_atual === 'publicado' ? 'Atualizar no site' : 'Publicar no site'}</button>
+        <div class="bl-row2"><button type="button" class="btn gh" data-b="previa">Pré-visualizar</button>
+        <button type="button" class="btn gh" data-b="rascunho" ${BL.enviando ? 'disabled' : ''}>${editando && f.status_atual === 'publicado' ? 'Despublicar' : 'Salvar rascunho'}</button></div>
+        <div class="bl-msg" id="blMsg"></div>
+      </div>
+      <div class="card">
+        <label class="bl-lb" for="blAut">Autor</label>
+        <input id="blAut" class="bl-in" data-f="author" maxlength="80" placeholder="Nome de quem assina o artigo" value="${ESC(f.author)}">
+        <label class="bl-lb" for="blTema">Tema</label>
+        <select id="blTema" class="bl-in" data-f="tema">
+          <option value="">Escolha o tema</option>${temas.map(t => `<option ${temaSel === t ? 'selected' : ''}>${ESC(t)}</option>`).join('')}<option value="__novo" ${temaSel === '__novo' ? 'selected' : ''}>Outro tema (digitar)</option>
+        </select>
+        <input class="bl-in" data-f="categoria_nova" maxlength="60" placeholder="Nome do novo tema" value="${ESC(temaSel === '__novo' ? f.category : f.categoria_nova)}" ${temaSel === '__novo' ? '' : 'hidden'}>
+        <label class="bl-lb" for="blRes">Resumo <small>opcional, aparece no Google e nos cards</small></label>
+        <textarea id="blRes" class="bl-in" data-f="description" rows="4" maxlength="300" placeholder="Se ficar em branco, usamos o primeiro parágrafo do texto.">${ESC(f.description)}</textarea>
+        <p class="bl-dica" id="blResN">${f.description.length}/155 caracteres ideais</p>
+      </div>
+      <div class="card">
+        <p class="bl-lb">Imagem de capa</p>
+        <label class="bl-capa ${capa ? 'tem' : ''}">${capa ? `<img src="${ESC(capa)}" alt="Capa">` : '<span>Clique para escolher a imagem<br><small>JPG, PNG ou WebP, de preferência na horizontal (16:9)</small></span>'}
+          <input type="file" accept="image/jpeg,image/png,image/webp" data-b="capa" hidden></label>
+        ${capa ? '<p class="bl-dica">Clique na imagem para trocar.</p>' : ''}
+      </div>
+    </aside>
+  </div>`;
+}
+function blResultado() {
+  const r = BL.resultado;
+  return `<div class="card bl-ok"><div class="bl-ok-ic">✓</div><h3>${r.status === 'publicado' ? 'Artigo enviado para publicação' : 'Rascunho salvo'}</h3>
+    <p>${r.status === 'publicado' ? `“${ESC(r.titulo)}” vai aparecer no site em cerca de <b>2 a 3 minutos</b>, já em “Últimas publicações”.` : `“${ESC(r.titulo)}” foi salvo como rascunho e <b>não</b> aparece no site.`}</p>
+    <div class="bl-row2">${r.status === 'publicado' ? `<a class="btn" href="${ESC(r.url)}" target="_blank" rel="noopener">Abrir o artigo no site</a>` : ''}<button type="button" class="btn gh" data-b="voltar">Voltar para a lista</button></div></div>`;
+}
+function blRender() {
+  if (!BLOG_EL) return;
+  BLOG_EL.innerHTML = BL.modo === 'lista' ? blLista() : BL.modo === 'ok' ? blResultado() : blEditor();
+  if (BL.modo === 'editor') blContador();
+}
+
+/* ---------- estado do formulário ---------- */
+function blLeForm() {
+  const f = BL.form, $ = s => BLOG_EL.querySelector(s);
+  if (!f || !$('#blTit')) return f;
+  f.title = $('#blTit').value; f.author = $('#blAut').value; f.description = $('#blRes').value;
+  const sel = $('#blTema').value; f.categoria_nova = $('[data-f="categoria_nova"]').value;
+  f.category = sel === '__novo' ? f.categoria_nova.trim() : sel;
+  f.body_html = $('#blCorpo').innerHTML;
+  return f;
+}
+function blContador() {
+  const c = BLOG_EL.querySelector('#blCorpo'); if (!c) return;
+  const n = (c.innerText.trim().match(/\S+/g) || []).length, h2 = c.querySelectorAll('h2').length;
+  BLOG_EL.querySelector('#blConta').textContent = `${fN(n)} palavras · ${Math.max(1, Math.round(n / 200))} min de leitura · ${h2} ${h2 === 1 ? 'seção' : 'seções'} no índice`;
+}
+let blTimer;
+function blAutosave() {
+  BL.sujo = true; clearTimeout(blTimer);
+  blTimer = setTimeout(() => {
+    const f = blLeForm(); if (!f) return;
+    try { localStorage.setItem(BLOG_AUTOSAVE, JSON.stringify({f, em: Date.now()})); } catch (e) { /* cota */ }
+    const a = BLOG_EL.querySelector('#blAuto'); if (a && !f.original_slug) a.textContent = 'Artigo novo · cópia salva neste navegador ' + new Date().toTimeString().slice(0, 5);
+  }, 1200);
+}
+function blMsg(html, ok) { const m = BLOG_EL.querySelector('#blMsg'); if (m) { m.className = 'bl-msg ' + (ok ? 'ok' : 'err'); m.innerHTML = html; } }
+
+/* ---------- capa: converte no navegador para WebP (1280 e 640 px) ---------- */
+function blLeImagem(file) {
+  return new Promise((ok, falha) => {
+    const fr = new FileReader();
+    fr.onload = () => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => falha(new Error('img')); im.src = fr.result; };
+    fr.onerror = () => falha(new Error('arquivo')); fr.readAsDataURL(file);
+  });
+}
+function blWebp(im, largura, limite) {
+  const w = Math.min(largura, im.naturalWidth), h = Math.round(im.naturalHeight * w / im.naturalWidth);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(im, 0, 0, w, h);
+  for (let q = 0.82; q >= 0.4; q -= 0.1) {
+    const d = cv.toDataURL('image/webp', q);
+    if (!d.startsWith('data:image/webp')) return null;
+    if (d.length * 0.75 < limite) return d;
+  }
+  return null;
+}
+async function blCapa(file) {
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) return blMsg('Imagem muito grande (máx. 15 MB).');
+  try {
+    const im = await blLeImagem(file);
+    if (im.naturalWidth < 600) return blMsg('A imagem precisa ter pelo menos 600 px de largura.');
+    const g = blWebp(im, 1280, 850000), m = blWebp(im, 640, 240000);
+    if (!g || !m) return blMsg('Este navegador não conseguiu converter a imagem. Use o Google Chrome ou o Edge.');
+    blLeForm(); BL.capa = {grande: g.split(',')[1], mini: m.split(',')[1]}; BL.capaPreview = g; BL.sujo = true;
+    blRender();
+  } catch (e) { blMsg('Não foi possível ler essa imagem. Tente outro arquivo (JPG ou PNG).'); }
+}
+
+/* ---------- colar de Word/Google Docs: só a estrutura, sem estilos ---------- */
+const BL_TAGS = {P: 'p', DIV: 'p', H1: 'h2', H2: 'h2', H3: 'h3', H4: 'h3', STRONG: 'strong', B: 'strong', EM: 'em', I: 'em', UL: 'ul', OL: 'ol', LI: 'li', BLOCKQUOTE: 'blockquote', A: 'a', BR: 'br'};
+function blLimpaHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const anda = n => {
+    if (n.nodeType === 3) return ESC(n.nodeValue);
+    if (n.nodeType !== 1 || /^(SCRIPT|STYLE|META|TITLE|NOSCRIPT|TEMPLATE|IFRAME|OBJECT|SVG)$/i.test(n.tagName)) return '';
+    const dentro = [...n.childNodes].map(anda).join('');
+    // Google Docs marca negrito/itálico por estilo
+    let t = BL_TAGS[n.tagName];
+    if (!t && n.tagName === 'SPAN') { const st = n.getAttribute('style') || ''; if (/font-weight:\s*(700|bold)/.test(st)) t = 'strong'; else if (/font-style:\s*italic/.test(st)) t = 'em'; }
+    if (!t) return dentro;
+    if (t === 'br') return '<br>';
+    if (t === 'p' && n.parentElement && n.parentElement.tagName === 'LI') return dentro;  // item de lista sem parágrafo dentro
+    if (t === 'a') { const href = n.getAttribute('href') || ''; return /^(https?:|mailto:|\/)/i.test(href) ? `<a href="${ESC(href)}">${dentro}</a>` : dentro; }
+    if (t === 'strong' && n.tagName === 'B' && /font-weight:\s*normal/.test(n.getAttribute('style') || '')) return dentro;  // <b> falso do Google Docs
+    return `<${t}>${dentro}</${t}>`;
+  };
+  return [...doc.body.childNodes].map(anda).join('').replace(/<p>\s*<\/p>/g, '');
+}
+function blColar(ev) {
+  if (!ev.target.closest('#blCorpo')) return;
+  ev.preventDefault();
+  const cd = ev.clipboardData, html = cd.getData('text/html'), txt = cd.getData('text/plain');
+  const limpo = html ? blLimpaHtml(html) : txt.split(/\n{2,}/).map(p => `<p>${ESC(p).replace(/\n/g, '<br>')}</p>`).join('');
+  document.execCommand('insertHTML', false, limpo);
+  blContador(); blAutosave();
+}
+
+/* ---------- pré-visualização e confirmação ---------- */
+function blModal(html) {
+  const m = document.createElement('div'); m.className = 'bl-modal'; m.innerHTML = `<div class="bl-mbox" role="dialog" aria-modal="true">${html}</div>`;
+  document.body.appendChild(m);
+  const fecha = () => m.remove();
+  m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-mfecha]')) fecha(); });
+  return {m, fecha};
+}
+function blPrevia() {
+  const f = blLeForm(), capa = BL.capaPreview || (f.cover ? `${BLOG_SITE}/blog/${f.cover}` : '');
+  blModal(`<div class="bl-prev"><button type="button" class="bl-x" data-mfecha aria-label="Fechar">×</button>
+    <div class="bl-prev-hero"><small>Blog / ${ESC(f.category || 'Tema')}</small><h1>${ESC(f.title || 'Título do artigo')}</h1><p>Por <b>${ESC(f.author || 'Autor')}</b></p></div>
+    ${capa ? `<img class="bl-prev-capa" src="${ESC(capa)}" alt="">` : ''}<article class="bl-prev-corpo">${f.body_html || '<p><i>Sem texto ainda.</i></p>'}</article>
+    <p class="bl-dica">Prévia aproximada. No site, o artigo ganha o visual completo do blog, o índice e os artigos relacionados.</p></div>`);
+}
+function blValida(f, publicar) {
+  const e = [];
+  if (f.title.trim().length < 8) e.push('Escreva um título (mínimo 8 caracteres).');
+  if (!f.author.trim()) e.push('Informe o autor.');
+  if (!f.category.trim()) e.push('Escolha o tema.');
+  const n = (BLOG_EL.querySelector('#blCorpo').innerText.trim().match(/\S+/g) || []).length;
+  if (publicar && n < 80) e.push('O texto precisa ter pelo menos 80 palavras para publicar.');
+  if (publicar && !BL.capa && !f.cover) e.push('Adicione a imagem de capa.');
+  return e;
+}
+function blConfirma(publicar) {
+  const f = blLeForm(), erros = blValida(f, publicar);
+  if (erros.length) return blMsg(erros.map(ESC).join('<br>'));
+  const desp = !publicar && f.status_atual === 'publicado';
+  if (!publicar && !desp) return blEnviar('rascunho');
+  const {m, fecha} = blModal(`<h3>${publicar ? (f.status_atual === 'publicado' ? 'Atualizar este artigo no site?' : 'Publicar este artigo no site?') : 'Tirar este artigo do site?'}</h3>
+    <dl class="bl-resumo"><dt>Título</dt><dd>${ESC(f.title)}</dd><dt>Autor</dt><dd>${ESC(f.author)}</dd><dt>Tema</dt><dd>${ESC(f.category)}</dd></dl>
+    <p>${publicar ? 'Ele fica visível para qualquer pessoa em <b>www.meupatrimonio.com/blog/</b> em cerca de 2 a 3 minutos e entra em “Últimas publicações”.' : 'Ele deixa de aparecer no blog e vira rascunho. Você pode publicar de novo depois.'}</p>
+    <p class="bl-dica">Lembrete de compliance: conteúdo educacional, sem recomendação de compra ou venda de ativo específico e sem promessa de rentabilidade.</p>
+    <div class="bl-row2 bl-mfim"><button type="button" class="btn gh" data-mfecha>Cancelar</button><button type="button" class="btn ${publicar ? '' : 'bl-perigo'}" data-mok>${publicar ? 'Sim, publicar' : 'Sim, despublicar'}</button></div>`);
+  m.querySelector('[data-mok]').addEventListener('click', () => { fecha(); blEnviar(publicar ? 'publicado' : 'rascunho'); });
+  m.querySelector('[data-mok]').focus();
+}
+async function blEnviar(status) {
+  const f = blLeForm();
+  BL.enviando = true; blRender(); blMsg('Enviando…', true);
+  const r = await blogApi('POST', null, {acao: 'salvar', capa: BL.capa || undefined, post: {
+    original_slug: f.original_slug, status, title: f.title, author: f.author, category: f.category, description: f.description, body_html: f.body_html}});
+  BL.enviando = false;
+  if (!r.ok) { blRender(); return blMsg(blErro(r)); }
+  try { localStorage.removeItem(BLOG_AUTOSAVE); } catch (e) { /* */ }
+  BL.sujo = false; BL.capa = null; BL.capaPreview = '';
+  BL.resultado = {status: r.j.status, url: r.j.url, titulo: f.title};
+  // a lista do site só reflete o artigo depois do build: atualiza localmente já
+  const item = {slug: r.j.slug, status: r.j.status, title: f.title, author: f.author, category: f.category,
+    date: (BL.posts || []).find(p => p.slug === r.j.slug)?.date || new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10), cover: f.cover ? f.cover.replace(/\.webp$/, '-640.webp') : null};
+  BL.posts = [item].concat((BL.posts || []).filter(p => p.slug !== r.j.slug));
+  BL.modo = 'ok'; blRender(); window.scrollTo({top: 0, behavior: 'smooth'});
+}
+async function blAbrir(slug) {
+  if (!slug) {
+    let f = BL_VAZIO();
+    try { const s = JSON.parse(localStorage.getItem(BLOG_AUTOSAVE) || 'null');
+      if (s && s.f && !s.f.original_slug && (s.f.title || s.f.body_html) && confirm('Existe um artigo novo não publicado salvo neste navegador (' + new Date(s.em).toLocaleString('pt-BR') + '). Quer continuar de onde parou?')) f = Object.assign(f, s.f);
+    } catch (e) { /* */ }
+    BL.form = f; BL.capa = null; BL.capaPreview = ''; BL.sujo = false; BL.modo = 'editor'; blRender(); return;
+  }
+  BLOG_EL.querySelectorAll('[data-b="editar"]').forEach(b => { if (b.dataset.slug === slug) b.textContent = 'Abrindo…'; });
+  const r = await blogApi('GET', {acao: 'post', slug});
+  if (!r.ok) { BL.erro = blErro(r); blRender(); return; }
+  const p = r.j.post;
+  BL.form = Object.assign(BL_VAZIO(), {original_slug: p.slug, status_atual: p.status, title: p.title, author: p.author, category: p.category, description: p.description && p.description !== p.excerpt ? p.description : '', body_html: p.body_html, cover: p.cover || ''});
+  // resumo gerado automaticamente não volta para o campo (só o que alguém escreveu)
+  const abertura = (p.body_html.match(/<p>([\s\S]*?)<\/p>/) || [])[1] || '';
+  if (BL.form.description && abertura.replace(/<[^>]+>/g, '').trim().startsWith(BL.form.description.replace(/…$/, '').trim().slice(0, 60))) BL.form.description = '';
+  BL.capa = null; BL.capaPreview = ''; BL.sujo = false; BL.modo = 'editor'; blRender(); window.scrollTo({top: 0});
+}
+
+/* ---------- eventos da aba ---------- */
+function blClique(ev) {
+  const t = ev.target, cmd = t.closest('[data-cmd]');
+  if (cmd) {
+    ev.preventDefault();
+    const c = cmd.dataset.cmd, corpo = BLOG_EL.querySelector('#blCorpo'); corpo.focus();
+    if (c === 'link') { const u = prompt('Endereço do link (comece com https://):', 'https://'); if (u && /^https?:\/\/\S+$/i.test(u.trim())) document.execCommand('createLink', false, u.trim()); }
+    else if (c === 'video') {
+      const u = prompt('Cole o link do vídeo do YouTube:'); const id = (/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/.exec(u || '') || [])[1];
+      if (id) document.execCommand('insertHTML', false, `<figure class="post-video"><iframe src="https://www.youtube-nocookie.com/embed/${id}" title="Vídeo do YouTube" allowfullscreen></iframe></figure><p><br></p>`);
+      else if (u) alert('Não reconheci esse link do YouTube.');
+    } else if (c === 'formatBlock') {
+      const atual = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+      document.execCommand('formatBlock', false, atual === cmd.dataset.v ? 'p' : cmd.dataset.v);
+    } else document.execCommand(c, false, null);
+    blContador(); blAutosave(); return;
+  }
+  const b = t.closest('[data-b]'); if (!b) return;
+  const a = b.dataset.b;
+  if (a === 'filtro') { BL.filtro = b.dataset.v; BL.limite = 40; blRender(); }
+  else if (a === 'mais') { BL.limite += 40; blRender(); }
+  else if (a === 'recarregar') blCarregar();
+  else if (a === 'novo') blAbrir('');
+  else if (a === 'editar') blAbrir(b.dataset.slug);
+  else if (a === 'voltar') { if (BL.modo === 'editor' && BL.sujo && !confirm('Sair sem publicar? O texto fica guardado neste navegador.')) return; BL.modo = 'lista'; BL.resultado = null; blRender(); }
+  else if (a === 'publicar') blConfirma(true);
+  else if (a === 'rascunho') blConfirma(false);
+  else if (a === 'previa') blPrevia();
+}
+function blInput(ev) {
+  const t = ev.target;
+  if (t.matches('[data-b="busca"]')) { BL.busca = t.value; const pos = t.selectionStart; blRender(); const i = BLOG_EL.querySelector('[data-b="busca"]'); i.focus(); i.setSelectionRange(pos, pos); return; }
+  if (BL.modo !== 'editor') return;
+  if (t.id === 'blRes') BLOG_EL.querySelector('#blResN').textContent = `${t.value.length}/155 caracteres ideais`;
+  if (t.id === 'blCorpo') blContador();
+  blAutosave();
+}
+function blChange(ev) {
+  const t = ev.target;
+  if (t.matches('[data-b="capa"]')) return blCapa(t.files[0]);
+  if (t.id === 'blTema') { const nv = BLOG_EL.querySelector('[data-f="categoria_nova"]'); nv.hidden = t.value !== '__novo'; if (!nv.hidden) nv.focus(); blAutosave(); }
+}
+window.addEventListener('beforeunload', ev => { if (window.BLOG_SUJO()) { ev.preventDefault(); ev.returnValue = ''; } });
+
+const VIEWS = {blog: viewBlog, macro: viewMacro, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewMPPro, mphub: viewMPHub, instagram: viewInstagram, youtube: viewYouTube, aplicacao: viewAplicacao};
 function renderView(anim) {
   const v = document.getElementById('view');
   document.getElementById('tip').classList.remove('on');
   v.innerHTML = VIEWS[S.tab]();
+  if (S.tab === 'blog') montaBlog();
   if (anim) { v.classList.remove('anim'); void v.offsetWidth; v.classList.add('anim'); }
 }
 function update(o = {}) {
