@@ -2942,16 +2942,13 @@ const APL_ORIGEM = {rede: 'Site /rede/', recrutamento: 'LP de recrutamento'};
 const aplCart = l => { const v = (l.p || '').trim(); if (!v) return 'Não informado'; if (/^n[aã]o/i.test(v)) return 'Não tem carteira';
   if (/^sim$/i.test(v)) return 'Tem (faixa não informada)'; return v.replace(/^sim\s*-\s*/i, ''); };
 const aplCert = c => /^n[aã]o$/i.test(c) ? 'Nenhuma' : c.replace(/^sim\s*-\s*/i, '');
-const APL_PX_ORD = ['IND', 'LP_Rede', 'LP_Consultor', 'Simulador', 'LISTA', 'APEX', 'FORMS'];
+const APL_PX_ORD = ['LP_Rede', 'LP_Consultor', 'IND'];   // prefixos analisados (decisão do usuário, 22/10/2026); os demais ficam fora
 const aplPx = l => l.px || (l.o === 'rede' ? 'LP_Rede' : l.o === 'recrutamento' ? 'LP_Consultor' : 'Sem prefixo');
-function aplPrefixos(A) {
-  const s = new Set(A.leads.map(aplPx));
-  return APL_PX_ORD.filter(x => s.has(x)).concat([...s].filter(x => !APL_PX_ORD.includes(x) && x !== 'Sem prefixo').sort(), s.has('Sem prefixo') ? ['Sem prefixo'] : []);
-}
+function aplPrefixos() { return APL_PX_ORD; }
 const APL_MODELO = {consultor: 'Consultor', escritorio: 'Escritório Parceiro'};
 const APL_CARTEIRA = ['Não tenho carteira', 'Até R$ 10 milhões', 'Até R$ 20 milhões', 'Até R$ 50 milhões', 'Até R$ 100 milhões', 'Mais de R$ 100 milhões'];
 function aplCompute(A, de, ate, px) {
-  const L = A.leads.filter(l => l.e && l.e.slice(0, 10) >= de && l.e.slice(0, 10) <= ate && (!px || aplPx(l) === px));
+  const L = A.leads.filter(l => l.e && l.e.slice(0, 10) >= de && l.e.slice(0, 10) <= ate && (px ? aplPx(l) === px : APL_PX_ORD.includes(aplPx(l))));
   const st = A.stages || [], ix = id => st.findIndex(x => x.id === id);
   const iReu = st.findIndex(x => /reuni[aã]o agendada/i.test(x.nome)), cult = new Set(st.filter(x => /cultivo/i.test(x.nome)).map(x => x.id));
   const reuniao = L.filter(l => l.s === 'won' || (iReu >= 0 && ix(l.sg) >= iReu && !cult.has(l.sg) && l.s !== 'lost'));
@@ -2983,7 +2980,7 @@ function aplChart(L, de, ate, width) {
 }
 function viewAplicacao() {
   const A = D.aplicacao;
-  let h = viewHead('Aplicação Direta', `B2B - Análises · Todos os negócios do funil B2B - Alpha (Pipedrive), por prefixo · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
+  let h = viewHead('Aplicação Direta', `B2B - Análises · Funil B2B - Alpha (Pipedrive): prefixos LP_Rede, LP_Consultor e IND · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
   if (!A || !A.leads) return h + `<div class="card">${emptyBox('Dados da Aplicação Direta indisponíveis', 'Os dados aparecem na próxima leitura do Pipedrive.')}</div>`;
   if (A.erro) h += `<div class="note">Não foi possível atualizar agora (${ESC(A.erro)}). Mostrando a leitura de ${fDT(A.atualizado_em)}.</div>`;
   const pxs = aplPrefixos(A); if (S.aplPx && !pxs.includes(S.aplPx)) S.aplPx = '';
@@ -2991,7 +2988,7 @@ function viewAplicacao() {
   const nPx = x => aplCompute(A, S.de, S.ate, x).n;
   h += `<div class="aplpx"><span>Prefixo do negócio</span><div class="seg">${[['', 'Todos']].concat(pxs.map(x => [x, x])).map(([k, t]) => `<button type="button" data-aplpx="${ESC(k)}" class="${(S.aplPx || '') === k ? 'on' : ''}">${ESC(t)}<small>${fN(nPx(k))}</small></button>`).join('')}</div></div>`;
   h += '<div class="kpis">' + [
-    kpiCard({label: 'Leads', cls: 'hero', v: fN(c.n), sub: `${S.aplPx ? 'prefixo ' + ESC(S.aplPx) : 'todos os prefixos'} · ${f1(c.n / nd)} por dia`, d: delta(c.n, p.n), tip: 'Negócios do funil B2B - Alpha que entraram no Pipedrive no período (data de criação), no prefixo escolhido. Testes excluídos.'}),
+    kpiCard({label: 'Leads', cls: 'hero', v: fN(c.n), sub: `${S.aplPx ? 'prefixo ' + ESC(S.aplPx) : 'LP_Rede, LP_Consultor e IND'} · ${f1(c.n / nd)} por dia`, d: delta(c.n, p.n), tip: 'Negócios do funil B2B - Alpha que entraram no Pipedrive no período (data de criação), no prefixo escolhido. Testes excluídos.'}),
     kpiCard({label: 'Consultor', v: fN(c.cons), sub: `${pct(c.cons, c.n)} dos leads`, d: delta(c.cons, p.cons), tip: 'Quer seguir carreira como consultor em um escritório da Rede'}),
     kpiCard({label: 'Escritório Parceiro', v: fN(c.esc), sub: `${pct(c.esc, c.n)} dos leads`, d: delta(c.esc, p.esc), tip: 'Quer abrir ou migrar um escritório próprio para a Rede'}),
     kpiCard({label: 'Com carteira de clientes', v: fN(c.carteira), sub: `${pct(c.carteira, c.n)} dos leads`, d: delta(c.carteira, p.carteira), tip: 'Informaram ter carteira de clientes (qualquer faixa)'}),
@@ -2999,7 +2996,7 @@ function viewAplicacao() {
   ].join('') + '</div>';
   // mídia paga: fica em branco até existir campanha vinculada
   const md = c.md && c.md.gasto ? c.md : null, off = !md, sub0 = (A.midia && A.midia.campanhas && A.midia.campanhas.length) ? 'sem gasto no período' : 'sem campanhas no ar';
-  h += `<div class="ch mt"><div><h3>Mídia paga (Meta Ads)</h3><p>${A.midia && A.midia.campanhas && A.midia.campanhas.length ? `Só as campanhas B2B de Aplicação Direta: ${ESC(A.midia.campanhas.join(' · '))}` : 'Nenhuma campanha B2B de Aplicação Direta encontrada na Meta.'} · leads contados no Pipedrive (${S.aplPx ? 'prefixo ' + ESC(S.aplPx) : 'todos os prefixos'}), não pela Meta</p></div></div>`;
+  h += `<div class="ch mt"><div><h3>Mídia paga (Meta Ads)</h3><p>${A.midia && A.midia.campanhas && A.midia.campanhas.length ? `Só as campanhas B2B de Aplicação Direta: ${ESC(A.midia.campanhas.join(' · '))}` : 'Nenhuma campanha B2B de Aplicação Direta encontrada na Meta.'} · leads contados no Pipedrive (${S.aplPx ? 'prefixo ' + ESC(S.aplPx) : 'LP_Rede, LP_Consultor e IND'}), não pela Meta</p></div></div>`;
   h += '<div class="kpis">' + [
     kpiCard({label: 'Investimento', cls: off ? 'off' : '', v: off ? '–' : fRc(md.gasto), sub: off ? sub0 : `${fRc(md.gasto / nd)} por dia`, tip: 'Valor gasto nas campanhas da Aplicação Direta no período (Meta Ads)'}),
     kpiCard({label: 'Custo por lead', cls: off ? 'off' : '', v: off || !c.n ? '–' : fRc(md.gasto / c.n), sub: off ? sub0 : `investimento ÷ ${fN(c.n)} leads no Pipedrive`, tip: 'Investimento das campanhas B2B de Aplicação Direta ÷ leads que entraram no Pipedrive no período (prefixo escolhido no filtro)'}),
@@ -3031,7 +3028,7 @@ function viewAplicacao() {
       <td class="wrap" style="max-width:120px">${ESC(l.p ? aplCart(l) : '–')}</td><td class="wrap" style="max-width:150px">${ESC([...new Set(l.c.map(aplCert))].join(', ') || '–')}</td><td class="wrap" style="max-width:150px">${ESC([l.cid, l.uf].filter(Boolean).join(' / ') || '–')}</td>
       <td class="wrap" style="max-width:150px">${l.s === 'open' ? `<span class="pill" style="white-space:normal;line-height:1.3">${ESC(etapa(l))}</span>` : statusPill(l.s)}${l.lr ? `<div class="mut">${ESC(l.lr)}</div>` : ''}</td></tr>`).join('') + '</tbody></table></div></div>';
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
-    <li><b>Lead</b> = todo negócio do funil <b>B2B - Alpha</b> do Pipedrive, pela data de criação. O <b>prefixo</b> do título separa as origens: IND, LP_Rede (site /rede/), LP_Consultor (LP de recrutamento, Tier A/B/C), Simulador, LISTA, APEX, FORMS; negócios sem prefixo aparecem como "Sem prefixo". Testes excluídos.</li>
+    <li><b>Lead</b> = todo negócio do funil <b>B2B - Alpha</b> do Pipedrive, pela data de criação. O <b>prefixo</b> do título separa as origens analisadas: LP_Rede (site /rede/), LP_Consultor (LP de recrutamento, Tier A/B/C) e IND. Negócios com outros prefixos (Simulador, LISTA, APEX, FORMS) ou sem prefixo ficam fora desta página. Testes excluídos.</li>
     <li><b>Perfil</b> (modelo, atuação, carteira, certificações, cidade) vem das respostas do formulário, gravadas na pessoa no Pipedrive. E-mail e telefone não aparecem no painel.</li>
     <li><b>Etapa atual</b> mostra onde cada lead está hoje, não onde estava no fim do período.</li>
     <li><b>Mídia paga</b> soma só as campanhas da Meta com "B2B" e "Aplicação" no nome. O custo por lead divide esse investimento pelos leads que caíram no Pipedrive (do prefixo escolhido), não pelos leads que a Meta registra.</li>
