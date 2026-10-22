@@ -1315,11 +1315,10 @@ def template():
 
 
 def build_pages(out=OUT):
-    """_site/ = index.html cifrado + assets. O token do botão "Atualizar agora" (DISPATCH_TOKEN, só Actions deste
-    repositório) vai DENTRO do conteúdo cifrado: só aparece depois da senha."""
+    """_site/ = index.html cifrado + assets. Sem botão "Atualizar agora" (atualização automática de hora em hora):
+    nenhum token vai mais para o site."""
     s = json.loads(SNAP.read_text(encoding="utf-8"))
-    tok = env("DISPATCH_TOKEN")
-    payload = dict(s, refresh={"repo": REPO, "workflow": WORKFLOW, "token": tok} if tok else None)
+    payload = dict(s, refresh=None)
     html = template().replace("/*__DATA__*/null", encrypt(payload))
     assert '"leads"' not in html and "gerado_em" not in html.split("/*__RAW__*/")[0], "dado em texto puro no HTML"
     out = pathlib.Path(out)

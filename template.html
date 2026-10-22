@@ -551,7 +551,7 @@ footer.howto .fm{margin-top:14px;font-size:12px;color:var(--cinza)}
 <div id="app">
 <header class="top">
   <div class="brand"><img src="assets/coruja-branca.png" alt="Meu Patrimônio"><div><h1>Painel Operacional</h1></div></div>
-  <div class="upd"><span>Última atualização em <b id="upd">–</b></span><div class="rf"><span class="live"><i></i>atualização automática a cada 1 hora</span><button type="button" class="rfb" id="rfbtn" hidden title="Atualiza Meta Ads, Kiwify e Instagram e republica o dashboard (cerca de 2 a 3 minutos). Os leads do Pipedrive são lidos de hora em hora, de segunda a sexta, das 7h às 19h."><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Atualizar agora</span></button></div><span class="rfst" id="rfst" aria-live="polite"></span><span class="usr" id="usr"></span></div>
+  <div class="upd"><span>Última atualização em <b id="upd">–</b></span><div class="rf"><span class="live"><i></i>atualização automática a cada 1 hora</span></div><span class="rfst" id="rfst" aria-live="polite"></span><span class="usr" id="usr"></span></div>
 </header>
 <div class="shell">
   <nav class="side" id="nav" aria-label="Abas do dashboard"></nav>
@@ -3185,62 +3185,6 @@ function bindEvents() {
 }
 
 /* =========================================================================
-   10b. ATUALIZAR AGORA  —  dispara o workflow do GitHub Actions (token só de Actions deste repositório,
-   que chega cifrado junto com os dados) e acompanha a execução até o site novo estar no ar.
-   ========================================================================= */
-const RF = {busy: false};
-function setupRefresh() {
-  const cfg = D.refresh, btn = document.getElementById('rfbtn');
-  if (!cfg || !cfg.token || !cfg.repo) return;
-  btn.hidden = false;
-  btn.addEventListener('click', runRefresh);
-}
-function ghApi(path, opt) {
-  const cfg = D.refresh;
-  return fetch(`https://api.github.com/repos/${cfg.repo}${path}`, Object.assign({cache: 'no-store'}, opt || {}, {
-    headers: {Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}}));
-}
-const pause = ms => new Promise(r => setTimeout(r, ms));
-async function runRefresh() {
-  if (RF.busy) return;
-  RF.busy = true;
-  const btn = document.getElementById('rfbtn'), st = document.getElementById('rfst'), lbl = btn.querySelector('span');
-  const say = (t, err) => { st.textContent = t; st.classList.toggle('err', !!err); };
-  btn.disabled = true; btn.classList.add('spin'); lbl.textContent = 'Atualizando…';
-  const wf = encodeURIComponent(D.refresh.workflow), t0 = Date.now() - 15000;
-  try {
-    const r = await ghApi(`/actions/workflows/${wf}/dispatches`, {method: 'POST', body: JSON.stringify({ref: 'main'})});
-    if (r.status !== 204) throw new Error(r.status === 401 || r.status === 403 ? 'acesso ao GitHub recusado (token do botão vencido?)' : `GitHub respondeu ${r.status}`);
-    say('Pedido enviado. Aguardando o início…');
-    const fim = Date.now() + 10 * 60 * 1000;
-    while (Date.now() < fim) {
-      await pause(5000);
-      const rr = await ghApi(`/actions/workflows/${wf}/runs?event=workflow_dispatch&per_page=5`);
-      if (!rr.ok) continue;
-      const run = ((await rr.json()).workflow_runs || []).find(x => Date.parse(x.created_at) >= t0);
-      if (!run) { say('Pedido enviado. Aguardando o início…'); continue; }
-      if (run.status !== 'completed') {
-        const seg = Math.max(0, Math.round((Date.now() - Date.parse(run.run_started_at || run.created_at)) / 1000));
-        say(run.status === 'queued' || run.status === 'waiting' || run.status === 'pending' ? 'Na fila (há uma atualização em andamento)…'
-          : `Buscando os dados e publicando… ${seg}s`);
-        continue;
-      }
-      if (run.conclusion === 'success') {
-        say('Pronto! Carregando a versão nova…');
-        await pause(3000);
-        location.replace(location.pathname + '?v=' + Date.now() + location.hash);
-        return;
-      }
-      throw new Error(`a execução terminou com "${run.conclusion}"`);
-    }
-    throw new Error('demorou mais de 10 minutos');
-  } catch (e) {
-    say('Não foi possível atualizar agora: ' + e.message + '. A atualização automática continua a cada 1 hora.', true);
-    btn.disabled = false; btn.classList.remove('spin'); lbl.textContent = 'Tentar de novo'; RF.busy = false;
-  }
-}
-
-/* =========================================================================
    11. BOOT
    ========================================================================= */
 function boot(data) {
@@ -3266,7 +3210,6 @@ function boot(data) {
     el.textContent = `Pipedrive: ${PDM.erro_pipedrive}. Leads e funil mostram a leitura de ${fDay(loc.slice(0, 10))} ${loc.slice(11, 16)}; Meta, Kiwify e Instagram estão atualizados.`;
     document.getElementById('upd').closest('.upd').appendChild(el);
   }
-  setupRefresh();
   const nt = D.meta && D.meta.excluidos_teste; if (nt) document.getElementById('nteste').textContent = ` (${nt} nesta base)`;
   readHash();
   bindEvents();
