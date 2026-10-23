@@ -121,6 +121,12 @@ def lead_metrics(l, agora):
 CAMPANHAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "rcon": r"^\s*RCON\b"}  # prefixo do título
 
 
+def retroativo(l):
+    """Lançamento retroativo: negócio criado direto em Reunião/Negociação/Fechamento ou ganho sem nenhuma atividade."""
+    h = l.get("h") or []
+    return bool(h and h[0][0] in AGENDADO_STAGES) or (l["s"] == "won" and not (l.get("k") or []))
+
+
 def filtra(leads, f):
     de, ate = f.get("de") or "0000-00-00", f.get("ate") or "9999-99-99"
     cons = set(f.get("consultores") or [])
@@ -132,8 +138,11 @@ def filtra(leads, f):
     out = []
     base = f.get("incluir_base") is not False   # padrão: funil inteiro
     camp = CAMPANHAS.get(f.get("campanha") or ("trd" if f.get("so_trd") else ""))
+    op = f.get("operacao") is True   # Insights: só a operação (sem base importada/reativada e sem lançamento retroativo)
     for l in leads:
         if l.get("b") and not base:
+            continue
+        if op and (l.get("b") or retroativo(l)):
             continue
         if camp and not re.match(camp, l.get("n") or "", re.I):
             continue
@@ -164,7 +173,7 @@ def eventos(leads, f):
     de, ate = f.get("de") or "0000-00-00", f.get("ate") or "9999-99-99"
     P = filtra(leads, dict(f, de=None, ate=None))
     dentro = lambda s: bool(s) and de <= str(s)[:10] <= ate
-    ag = reu = won = lost = cont = contL = 0
+    ag = reu = won = lost = cont = contL = faltas = 0
     motivos = Counter()
     for l in P:
         k, h = l["k"] or [], l["h"] or []
@@ -178,8 +187,9 @@ def eventos(leads, f):
             lost += 1; motivos[l.get("lr") or "Sem motivo informado"] += 1
         n = sum(1 for x in k if dentro(x[0]))
         cont += n; contL += 1 if n else 0
+        faltas += sum(1 for x in (l.get("ns") or []) if dentro(x))
     return {"agendamentos": ag, "reunioes": reu, "ganhos": won, "perdidos": lost, "contatos": cont,
-            "leads_contatados": contL, "motivos_perda": dict(motivos)}
+            "leads_contatados": contL, "faltas": faltas, "motivos_perda": dict(motivos)}
 
 
 # ----------------------------------------------------------------------------- performance (mídia × Pipedrive)
@@ -205,6 +215,7 @@ def performance(leads, f, agora, midia):
     for l in leads:
         day = (l.get("e") or "")[:10]
         if not day or (de and day < de) or (ate and day > ate): continue
+        if f.get("operacao") is True and (l.get("b") or retroativo(l)): continue
         gid = next((k for k in ("trd", "diag", "isca") if re.match(PAGAS[k], l.get("n") or "", re.I)), None)
         if not gid: continue
         m = lead_metrics(l, agora); g = G[gid]
@@ -723,9 +734,12 @@ def cenarios(D):
         ("mppro_julho_ate_hoje", filtros_base("2026-07-01", h)),
         ("ultimos_30_consultor_top_perf", filtros_base(d30, h, consultores=[top], campanha="trd")),
         ("mes_passado_diag", filtros_base(iso(hoje.replace(day=1) - timedelta(days=hoje.replace(day=1).day + 27)), iso(hoje.replace(day=1) - timedelta(days=1)), campanha="diag")),
-        ("insights_semana_fechada", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)))),
-        ("insights_semana_fechada_trd", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)), campanha="trd")),
-        ("insights_mes_fechado", filtros_base(iso((hoje.replace(day=1) - timedelta(days=1)).replace(day=1)), iso(hoje.replace(day=1) - timedelta(days=1)))),
+        ("insights_semana_fechada", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)), operacao=True)),
+        ("insights_semana_fechada_trd", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)), campanha="trd", operacao=True)),
+        ("insights_semana_atual", filtros_base(iso(hoje - timedelta(days=hoje.weekday())), iso(hoje), operacao=True)),
+        ("insights_semana_fechada_consultor_top", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)), consultores=[top], operacao=True)),
+        ("insights_mes_fechado", filtros_base(iso((hoje.replace(day=1) - timedelta(days=1)).replace(day=1)), iso(hoje.replace(day=1) - timedelta(days=1)), operacao=True)),
+        ("semana_fechada_funil_inteiro", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)))),
     ] + _meses_mppro(hoje)
 
 

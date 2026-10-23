@@ -157,6 +157,17 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .insk .kx{margin-top:4px}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
+.insexc{margin:0 0 14px;font-size:13px}.inscons td.num .mut{font-size:11px}.insfu td .dl{display:inline-block}.insag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px}@media(max-width:960px){.insag{grid-template-columns:1fr}}
+.insagd{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}.insagd span{font-size:12px;background:var(--v50);border-radius:8px;padding:5px 9px}.insagd b{display:block;font-size:16px;color:var(--verde)}
+@media print{
+  @page{size:A4 portrait;margin:10mm}
+  body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  nav.side,#fbar,footer.howto,.upd,.sabas,.persel,[data-act="ins-pdf"],#tip,#pop,#ovl{display:none!important}
+  .shell{display:block!important}.main{padding:0!important}header.top{padding:8px 0!important}
+  .card,.kpi,.mt-i,.fci,details{break-inside:avoid;box-shadow:none!important}
+  .tw{overflow:visible!important;max-height:none!important}.kpis.k6{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .g2{grid-template-columns:1fr 1fr!important}
+}
 .insok{border-top:3px solid #00a611}.insno{border-top:3px solid #c0392b}
 .mph{font-size:13px;color:var(--cinza);margin:4px 0 12px;display:flex;align-items:center;gap:10px}.mph.mt{margin-top:28px}
 .mph span{font-size:11px;letter-spacing:.1em;font-weight:700;color:#8f7a3e;background:#f6f0de;border-radius:6px;padding:3px 8px}
@@ -773,6 +784,8 @@ const FLOW = [345, 346, 348, 349, 350];  // ordem do funil; Cultivo (438) fica f
 const REF_PRU = {ag: 30, re: 15, ga: 5};
 const REF_VOL = {mensal: {mql: 100, ag: 30, re: 15, ga: 5}, semanal: {mql: 25, ag: 7.5, re: 3.75, ga: 1.25}};
 const MEETING_TYPES = new Set(['meeting', 'qualificacao']);
+// Lançamento retroativo: criado direto em Reunião/Negociação/Fechamento ou ganho sem nenhuma atividade (espelho: audit.retroativo)
+const isRetro = l => { const h = l.h || []; return (h.length > 0 && AGENDA_STAGES.has(Number(h[0][0]))) || (l.s === 'won' && !(l.k || []).length); };
 const DEFAULT_STAGES = [{id: 345, nome: 'MQL - 1º Contato'}, {id: 346, nome: 'Agendar'}, {id: 348, nome: 'Reunião'},
   {id: 349, nome: 'Negociação'}, {id: 350, nome: 'Fechamento'}, {id: 438, nome: 'Cultivo'}];
 const SEM_MOTIVO = 'Sem motivo informado';
@@ -858,9 +871,11 @@ function makePred(f, skip) {
   const q = skip === 'busca' ? '' : norm(f.busca || '');
   const ref = f.data_ref === 'l' ? 'l' : 'e', de = f.de || '', ate = f.ate || '';
   const base = f.incluir_base !== false;  // padrão: funil inteiro
+  const op = f.operacao === true;         // Insights: só a operação (sem base importada/reativada e sem lançamento retroativo)
   const camp = CAMPANHAS[f.campanha || (f.so_trd ? 'trd' : '')] || null;  // campanha = prefixo do título
   return l => {
     if (!base && l.b) return false;
+    if (op && (l.b || isRetro(l))) return false;
     if (camp && !camp.rx.test(l.n || '')) return false;
     if (skip !== 'periodo' && (de || ate)) {
       const v = l[ref];
@@ -999,7 +1014,7 @@ function computeEventos(leads, f) {
   f = f || {};
   const de = f.de || '0000-00-00', ate = f.ate || '9999-99-99', pred = makePred(f, 'periodo');
   const dentro = s => { if (!s) return false; const d = String(s).slice(0, 10); return d >= de && d <= ate; };
-  let ag = 0, reu = 0, won = 0, lost = 0, cont = 0, contL = 0;
+  let ag = 0, reu = 0, won = 0, lost = 0, cont = 0, contL = 0, faltas = 0;
   const motivos = {};
   for (const l of leads || []) {
     if (!pred(l)) continue;
@@ -1013,8 +1028,9 @@ function computeEventos(leads, f) {
     if (l.s === 'lost' && dentro(l.l)) { lost++; const m = l.lr || SEM_MOTIVO; motivos[m] = (motivos[m] || 0) + 1; }
     let n = 0; for (const x of k) if (dentro(x[0])) n++;
     cont += n; if (n) contL++;
+    for (const x of l.ns || []) if (dentro(x)) faltas++;
   }
-  return {agendamentos: ag, reunioes: reu, ganhos: won, perdidos: lost, contatos: cont, leads_contatados: contL, motivos_perda: motivos};
+  return {agendamentos: ag, reunioes: reu, ganhos: won, perdidos: lost, contatos: cont, leads_contatados: contL, faltas, motivos_perda: motivos};
 }
 function computePerf(leads, f, agora) {
   f = f || {};
@@ -1032,6 +1048,7 @@ function computePerf(leads, f, agora) {
   for (const l of leads || []) {
     const day = String(l.e || '').slice(0, 10);
     if (!day || (de && day < de) || (ate && day > ate)) continue;
+    if (f.operacao === true && (l.b || isRetro(l))) continue;
     let id = null; for (const k of ['trd', 'diag', 'isca']) if (PAGAS[k].rx.test(l.n || '')) { id = k; break; }
     if (!id) continue;
     const d = derive(l, agora), g = G[id];
@@ -2157,18 +2174,26 @@ function insSel() {   // período escolhido nos Insights (padrão: último fecha
   if (i < 0) { i = per.length - 1; if (i > 0 && per[i].parcial) i--; }
   return {per, i, P: per[i] || null};
 }
+/* Insights: toda conta usa só a OPERAÇÃO (filtros.operacao): ficam fora as importações de base/reativados (l.b) e os
+   lançamentos retroativos (isRetro). Eles continuam nas outras abas. Espelho: audit.filtra(operacao). */
+const insF = o => filtros(Object.assign({operacao: true}, o || {}));
 function insCalc(de, ate, camp) {
-  const R = run(filtros(camp === undefined ? {de, ate} : {de, ate, campanha: camp})), k = R.res.kpis, e = R.res.eventos, pf = R.res.performance.total;
+  const fx = insF(camp === undefined ? {de, ate} : {de, ate, campanha: camp});
+  const R = run(fx), k = R.res.kpis, e = R.res.eventos, pf = R.res.performance.total;
   const rap = R.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length;
-  const ori = new Map(); for (const {l, d} of R.rows) { const o = ori.get(l.o) || {n: 0, c: 0}; o.n++; if (d.cont) o.c++; ori.set(l.o, o); }
+  // perdidos no período (qualquer data de entrada): motivo e tentativas de contato até a perda
+  const pr = makePred(fx, 'periodo'), lostDet = [];
+  for (const l of LEADS) if (l.s === 'lost' && l.l && pr(l)) { const d = l.l.slice(0, 10);
+    if (d >= de && d <= ate) lostDet.push({m: l.lr || SEM_MOTIVO, tent: (l.k || []).filter(x => x[0] <= l.l).length}); }
   return {de, ate, leads: k.leads, cont: k.contatados, pctCont: k.pct_contatados, semCont: k.sem_contato, t1: k.media_dias_1o_contato,
     rap: pctOf(rap, k.leads), rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos, lost: e.perdidos, contatos: e.contatos,
-    kAg: k.agendados, kReu: k.reunioes, kWon: k.ganhos,
+    faltas: e.faltas, comp: e.reunioes + e.faltas ? e.reunioes / (e.reunioes + e.faltas) * 100 : null,
+    kAg: k.agendados, kReu: k.reunioes, kWon: k.ganhos, lostDet,
     motivos: e.motivos_perda, inv: pf.investimento, cpl: pf.custo_lead, pagos: pf.leads, grupos: R.res.performance.grupos,
-    consultores: R.res.consultores, ori};
+    consultores: R.res.consultores};
 }
-const INS_KEYS = ['leads', 'rap', 'ag', 'reu', 'won', 'lost', 'inv', 'cpl', 'pctCont', 't1', 'contatos'];
-const INS_TAXA = new Set(['rap', 'cpl', 'pctCont', 't1']);   // taxas/médias não se ajustam pelo ritmo do período parcial
+const INS_KEYS = ['leads', 'rap', 'ag', 'reu', 'won', 'lost', 'inv', 'cpl', 'pctCont', 't1', 'contatos', 'faltas', 'comp'];
+const INS_TAXA = new Set(['rap', 'cpl', 'pctCont', 't1', 'comp']);   // taxas/médias não se ajustam pelo ritmo do período parcial
 function insBase(list, frac) {
   const b = {}; for (const key of INS_KEYS) { const v = list.map(x => x[key]).filter(v => v != null);
     b[key] = v.length ? v.reduce((a, x) => a + x, 0) / v.length * (INS_TAXA.has(key) ? 1 : frac) : null; }
@@ -2193,12 +2218,23 @@ function insVar(c, p, good, fmt, rot, fmtD = fmt) {
   return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${pc == null ? 'novo' : nf1.format(Math.abs(pc)) + '%'} (${d > 0 ? '+' : '−'}${fmtD(Math.abs(d))})</span><span class="vs">${rot}: ${fmt(p)}</span>`;
 }
 const insN = v => v == null ? '–' : nf0.format(Math.round(v)), insN1 = v => v == null ? '–' : (Math.abs(v - Math.round(v)) < 0.05 ? nf0.format(Math.round(v)) : nf1.format(v));
+const INS_SEMC = /sem contato|não atend|nao atend|sem retorno|não respond|nao respond|abandono/i;
+// grupos de mídia e consultores comparáveis de um período (usado no período atual e no anterior)
+function insGrp(x, modo) {
+  const selG = S.camp ? new Set([S.camp]) : null;
+  const gs = (x.grupos || []).filter(g => g.id !== 'outros' && (!selG || selG.has(g.id)) && (g.investimento > 0 || g.leads > 0));
+  const comCpl = gs.filter(g => g.investimento > 0 && g.leads >= 3).sort((a, b) => a.custo_lead - b.custo_lead);
+  const cs = (x.consultores || []).filter(c => c.leads >= (modo === 'semanal' ? 3 : 5) && c.pct_contatados != null).sort((a, b) => b.pct_contatados - a.pct_contatados || a.media_dias_1o_contato - b.media_dias_1o_contato);
+  return {gs, comCpl, cs};
+}
+const insGap = (x, modo) => { const {cs} = insGrp(x, modo); return cs.length >= 2 ? cs[0].pct_contatados - cs[cs.length - 1].pct_contatados : null; };
 /* Sugestões de mudança (Insights B2C): regras sobre os números do período × média; ordem = prioridade.
-   Cada item: t (título), hoje (evidência), meta, acoes[], impacto (opcional). */
+   Cada item: t, hoje, meta, acoes[], impacto e chk (como medir na semana seguinte se melhorou). */
 function insSugestoes(c) {
   const {x, B, gs, comCpl, cs, modo, CP, rotMed, recente} = c, out = [];
   const fRs = v => v == null ? '–' : fR(v), quem = CP ? `leads ${CP}` : 'leads';
   const gn = g => (PAGAS[g.id] || {}).nome || g.id;
+  const pp = v => v == null ? '–' : nf1.format(v) + ' p.p.';
   // 1) mídia que gasta e não traz lead
   for (const g of gs) if (g.investimento >= 50 && !g.leads) out.push({t: `Destravar a campanha ${gn(g)}`,
     hoje: `${fRs(g.investimento)} investidos e nenhum lead com o prefixo no Pipedrive`, meta: 'todo lead do anúncio chegando ao Pipedrive com o prefixo certo',
@@ -2206,7 +2242,8 @@ function insSugestoes(c) {
       'Se o lead cai sem prefixo ou em outro funil, corrigir a integração (é ela que define o título do negócio)',
       'Se a integração estiver certa, revisar público e criativo ou pausar a campanha até corrigir',
       comCpl.length && comCpl[0].id !== g.id ? `Enquanto isso, avaliar levar a verba para ${gn(comCpl[0])}, hoje com o lead mais barato (${fRs(comCpl[0].custo_lead)})` : 'Acompanhar diariamente até o primeiro lead aparecer'],
-    impacto: `Evita ${fRs(g.investimento)} por ${INS_NOME[modo][0]} sem retorno mensurável.`});
+    impacto: `Evita ${fRs(g.investimento)} por ${INS_NOME[modo][0]} sem retorno mensurável.`,
+    chk: {lbl: `leads ${gn(g)}`, v: X => ((X.grupos || []).find(y => y.id === g.id) || {}).leads || 0, good: 1, fmt: insN1, conta: true}});
   // 2) velocidade do 1º contato
   if (x.leads >= 3 && x.rap != null && (x.rap < 50 || (B && insTom(x.rap, B.rap, 1, 0) === 'neg'))) out.push({t: 'Contatar o lead no mesmo dia',
     hoje: `${fP(x.rap)} dos ${quem} contatados em menos de 1 dia · 1º contato médio de ${fD(x.t1)}`, meta: '80% ou mais dos leads com contato em menos de 1 dia',
@@ -2214,50 +2251,66 @@ function insSugestoes(c) {
       'Leads de sábado, domingo e noite entram na fila da 1ª hora do próximo dia útil',
       'Cadência curta: tentativa no dia 0, no dia 1 e no dia 3 antes de espaçar',
       'Alerta de lead novo para o consultor (notificação do Pipedrive ou WhatsApp) em vez de depender de abrir o CRM'],
-    impacto: x.leads ? `Chegar a 80% significa contatar no mesmo dia cerca de ${fN(Math.max(0, Math.round(x.leads * 0.8) - x.rapN))} ${quem} a mais por ${INS_NOME[modo][0]}.` : ''});
+    impacto: x.leads ? `Chegar a 80% significa contatar no mesmo dia cerca de ${fN(Math.max(0, Math.round(x.leads * 0.8) - x.rapN))} ${quem} a mais por ${INS_NOME[modo][0]}.` : '',
+    chk: {lbl: 'contato em menos de 1 dia', v: X => X.rap, good: 1, fmt: fP}});
   // 3) leads do período ainda sem contato
   if (x.leads && x.semCont >= 3 && x.semCont / x.leads > 0.2) out.push({t: 'Zerar os leads sem nenhum contato',
     hoje: `${fN(x.semCont)} de ${fN(x.leads)} ${quem} do período (${fP(x.semCont / x.leads * 100)}) sem contato`, meta: 'nenhum lead com mais de 1 dia sem contato',
     acoes: ['Bloco fixo diário de ligações só para leads sem contato (filtro "Sem contato" no Lead a Lead)',
-      'Redistribuir os leads parados de quem estiver com a carteira mais cheia', 'Registrar toda tentativa como atividade no Pipedrive, mesmo sem resposta'], impacto: ''});
+      'Redistribuir os leads parados de quem estiver com a carteira mais cheia', 'Registrar toda tentativa como atividade no Pipedrive, mesmo sem resposta'], impacto: '',
+    chk: {lbl: '% sem contato', v: X => X.leads ? X.semCont / X.leads * 100 : null, good: -1, fmt: fP}});
   // 4) cadência (situação de hoje)
   if (recente && recente.leads_em_atraso) out.push({t: 'Colocar a cadência em dia',
     hoje: `${fN(recente.leads_em_atraso)} ${quem} em aberto com atividade vencida${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${recente.leads_sem_proxima ? ` · ${fN(recente.leads_sem_proxima)} sem próxima atividade` : ''}`,
     meta: 'zero atividade vencida e todo lead aberto com próxima atividade marcada',
     acoes: ['Resolver as atividades vencidas antes da reunião de terça (fazer, reagendar ou marcar o lead como perdido com motivo)',
-      'Regra: ao concluir uma atividade, já agendar a próxima', 'Lead sem resposta depois da cadência completa: marcar como perdido com o motivo, em vez de deixar aberto'], impacto: ''});
+      'Regra: ao concluir uma atividade, já agendar a próxima', 'Lead sem resposta depois da cadência completa: marcar como perdido com o motivo, em vez de deixar aberto'], impacto: '', chk: null});
   else if (recente && recente.leads_sem_proxima >= 5) out.push({t: 'Dar próxima atividade aos leads abertos',
     hoje: `${fN(recente.leads_sem_proxima)} ${quem} em aberto sem nenhuma atividade marcada`, meta: 'todo lead aberto com próxima atividade',
-    acoes: ['Revisar a lista e agendar a próxima ação de cada lead', 'Quem não tem mais o que fazer: marcar como perdido com o motivo'], impacto: ''});
+    acoes: ['Revisar a lista e agendar a próxima ação de cada lead', 'Quem não tem mais o que fazer: marcar como perdido com o motivo'], impacto: '', chk: null});
   // 5) agendamentos abaixo da média
   if (B && insTom(x.ag, B.ag, 1) === 'neg') out.push({t: 'Converter mais contatos em agendamento',
     hoje: `${fN(x.ag)} ${x.ag === 1 ? 'agendamento' : 'agendamentos'} (${rotMed}: ${insN1(B.ag)})`, meta: `voltar pelo menos à média (${insN1(B.ag)})`,
     acoes: ['Oferecer 2 horários concretos já na 1ª conversa, em vez de "quando fica bom para você?"',
-      'Enviar o link de agenda pelo WhatsApp logo após a ligação', 'Confirmação na véspera para reduzir falta na reunião'], impacto: ''});
+      'Enviar o link de agenda pelo WhatsApp logo após a ligação', 'Confirmação na véspera para reduzir falta na reunião'], impacto: '',
+    chk: {lbl: 'agendamentos', v: X => X.ag, good: 1, fmt: insN1, conta: true}});
   // 6) entrada de leads abaixo da média
   if (B && insTom(x.leads, B.leads, 1) === 'neg') out.push({t: 'Recuperar o volume de leads',
     hoje: `${fN(x.leads)} ${quem} novos (${rotMed}: ${insN1(B.leads)})`, meta: `voltar à média de ${insN1(B.leads)} por ${INS_NOME[modo][0]}`,
     acoes: [x.inv && B.inv && x.inv < B.inv * 0.85 ? `O investimento caiu (${fRs(x.inv)} contra média de ${fRs(B.inv)}): conferir orçamento e campanhas pausadas` : 'Conferir no Meta se alguma campanha ficou pausada, em análise ou sem orçamento',
-      'Renovar criativos com mais de 3 semanas no ar', 'Conferir se o formulário/site está entregando os leads ao Pipedrive'], impacto: ''});
+      'Renovar criativos com mais de 3 semanas no ar', 'Conferir se o formulário/site está entregando os leads ao Pipedrive'], impacto: '',
+    chk: {lbl: 'leads novos', v: X => X.leads, good: 1, fmt: insN1, conta: true}});
   // 7) custo por lead acima da média
   if (B && x.cpl != null && insTom(x.cpl, B.cpl, -1, 0) === 'neg') out.push({t: 'Baixar o custo por lead',
     hoje: `${fRs(x.cpl)} por lead (${rotMed}: ${fRs(B.cpl)})`, meta: `voltar a ${fRs(B.cpl)} ou menos`,
     acoes: [comCpl.length >= 2 ? `Levar verba para ${gn(comCpl[0])} (${fRs(comCpl[0].custo_lead)} por lead) e reduzir em ${gn(comCpl[comCpl.length - 1])} (${fRs(comCpl[comCpl.length - 1].custo_lead)})` : 'Pausar os anúncios com custo por lead mais alto e reforçar os mais baratos',
-      'Testar 2 ou 3 criativos novos por campanha', 'Evitar dividir verba pequena em muitos conjuntos de anúncio'], impacto: ''});
-  // 8) perdas: motivo principal
+      'Testar 2 ou 3 criativos novos por campanha', 'Evitar dividir verba pequena em muitos conjuntos de anúncio'], impacto: '',
+    chk: {lbl: 'custo por lead', v: X => X.cpl, good: -1, fmt: fRs}});
+  // 8) perdas: motivo principal (com as tentativas que já foram feitas)
   const mot = Object.entries(x.motivos || {}).sort((a, b) => b[1] - a[1]);
   if (x.lost >= 3 && mot.length) {
-    const [m, n] = mot[0], semC = /sem contato|não atend|nao atend|sem retorno|não respond/i.test(m);
-    out.push({t: semC ? 'Mais tentativas antes de dar o lead como perdido' : m === SEM_MOTIVO ? 'Registrar o motivo de cada perda' : `Atacar o principal motivo de perda: ${ESC(m)}`,
-      hoje: `${fN(x.lost)} perdidos no período · ${fN(n)} por "${ESC(m)}"`, meta: semC ? 'nenhum lead perdido por falta de contato antes de completar a cadência' : 'motivo de perda conhecido em 100% dos casos',
+    const [m, n] = mot[0], semC = INS_SEMC.test(m);
+    const tl = (x.lostDet || []).filter(d => d.m === m).map(d => d.tent), mt = tl.length ? tl.reduce((a, v) => a + v, 0) / tl.length : null, mn = tl.length ? Math.min(...tl) : null;
+    const chk = {lbl: `perdidos por "${m}"`, v: X => (X.motivos || {})[m] || 0, good: -1, fmt: insN1, conta: true};
+    if (semC && mt != null && mt >= 5) out.push({t: 'Mudar a abordagem de quem não responde',
+      hoje: `${fN(n)} perdidos por "${ESC(m)}" com média de ${f1(mt)} tentativas cada (mínimo ${fN(mn)}): a cadência foi cumprida`,
+      meta: 'menos leads perdidos sem conversa, com o mesmo número de tentativas',
+      acoes: ['Trocar a 1ª mensagem: curta, com o nome do lead e o motivo do contato ("vi que você pediu o diagnóstico…"), em vez de mensagem padrão',
+        'Áudio curto ou vídeo de 30 segundos do consultor no WhatsApp antes de ligar de novo',
+        'Ligar em horários e dias diferentes dos já tentados (início da manhã, almoço, depois das 18h)',
+        'Conferir se o telefone e o WhatsApp do formulário são válidos: dado errado nunca responde',
+        'Se uma campanha concentra esses perdidos, revisar o público e o formulário dela (lead pouco engajado)'], impacto: '', chk});
+    else out.push({t: semC ? 'Mais tentativas antes de dar o lead como perdido' : m === SEM_MOTIVO ? 'Registrar o motivo de cada perda' : `Atacar o principal motivo de perda: ${ESC(m)}`,
+      hoje: `${fN(x.lost)} perdidos no período · ${fN(n)} por "${ESC(m)}"${semC && mt != null ? ` com média de ${f1(mt)} tentativas` : ''}`, meta: semC ? 'pelo menos 5 tentativas em 10 dias antes de perder por falta de contato' : 'motivo de perda conhecido em 100% dos casos',
       acoes: semC ? ['Só marcar "sem contato" depois de pelo menos 5 tentativas em 10 dias, em canais diferentes (ligação, WhatsApp, e-mail)', 'Variar o horário das tentativas (manhã, almoço e fim do dia)', 'Mensagem final de "posso encerrar seu atendimento?" antes de perder: costuma gerar resposta']
-        : m === SEM_MOTIVO ? ['Tornar o motivo obrigatório ao marcar como perdido no Pipedrive', 'Usar uma lista curta e padronizada de motivos'] : ['Levar os casos para a reunião de terça e definir uma resposta padrão para essa objeção', 'Rever se esse perfil de lead deveria entrar na campanha (público do anúncio)'], impacto: ''});
+        : m === SEM_MOTIVO ? ['Tornar o motivo obrigatório ao marcar como perdido no Pipedrive', 'Usar uma lista curta e padronizada de motivos'] : ['Levar os casos para a reunião de terça e definir uma resposta padrão para essa objeção', 'Rever se esse perfil de lead deveria entrar na campanha (público do anúncio)'], impacto: '', chk});
   }
   // 9) diferença grande entre consultores
   if (cs.length >= 2 && cs[0].pct_contatados - cs[cs.length - 1].pct_contatados >= 20) {
     const a = cs[0], z = cs[cs.length - 1];
     out.push({t: `Nivelar o atendimento do time`, hoje: `${ESC(a.consultor)} contatou ${fP(a.pct_contatados)} dos leads; ${ESC(z.consultor)}, ${fP(z.pct_contatados)}`, meta: 'todos os consultores acima de 80% de leads contatados',
-      acoes: [`Revisar com ${ESC(z.consultor)} a carteira e a rotina de contato (volume de leads, horários, cadência)`, `Compartilhar na reunião o que ${ESC(a.consultor)} faz no 1º contato`, 'Se a carteira estiver grande demais, redistribuir os leads novos por alguns dias'], impacto: ''});
+      acoes: [`Revisar com ${ESC(z.consultor)} a carteira e a rotina de contato (volume de leads, horários, cadência)`, `Compartilhar na reunião o que ${ESC(a.consultor)} faz no 1º contato`, 'Se a carteira estiver grande demais, redistribuir os leads novos por alguns dias'], impacto: '',
+      chk: {lbl: 'diferença entre consultores', v: X => insGap(X, modo), good: -1, fmt: pp}});
   }
   return out;
 }
@@ -2269,37 +2322,50 @@ function insSugHtml(L, CP) {
       <ul>${f.acoes.map(a => `<li>${a}</li>`).join('')}</ul>
       ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div></details>`).join('')}</div></div>`;
 }
+// acompanhamento: as sugestões do período anterior melhoraram neste período?
+function insFollowHtml(L, xp, x, frac, modo, rotPrev) {
+  if (!L || !L.length) return '';
+  const rows = L.map(f => {
+    if (!f.chk) return `<tr><td class="wrap" style="max-width:280px"><b>${f.t}</b></td><td class="num">–</td><td class="num">–</td><td><span class="dl na">ver cadência de hoje</span></td></tr>`;
+    const a = f.chk.v(xp), raw = f.chk.v(x), b = raw != null && f.chk.conta && frac < 1 ? raw / frac : raw;
+    let st = '<span class="dl na">sem dado</span>';
+    if (a != null && b != null) { const d = b - a, rel = a ? Math.abs(d / a) : (d ? 1 : 0);
+      st = rel < 0.05 || Math.abs(d) < 1e-9 ? '<span class="dl neu">= sem mudança</span>' : ((d > 0) === (f.chk.good > 0) ? '<span class="dl pos">✔ melhorou</span>' : '<span class="dl neg">✖ não melhorou</span>'); }
+    return `<tr><td class="wrap" style="max-width:280px"><b>${f.t}</b><div class="mut">${ESC(f.chk.lbl)}</div></td><td class="num">${f.chk.fmt(a)}</td><td class="num">${f.chk.fmt(raw)}${f.chk.conta && frac < 1 && raw != null ? `<div class="mut">ritmo: ${f.chk.fmt(b)}</div>` : ''}</td><td>${st}</td></tr>`; }).join('');
+  return `<div class="card mt np insfu"><div class="ch" style="padding:16px 18px 0"><div><h3>↺ Acompanhamento das sugestões ${modo === 'semanal' ? 'da semana anterior' : 'do mês anterior'}</h3><p>O que foi sugerido em ${rotPrev} e como o indicador ficou agora${frac < 1 ? ' · período em andamento: contagens no ritmo do período inteiro' : ''}</p></div></div>
+    <div class="tw"><table class="t"><thead><tr><th>Sugestão</th><th class="num">Antes</th><th class="num">Agora</th><th>Resultado</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
 /* Metas de REFERÊNCIA dos Insights B2C (até a meta oficial ser definida pelo time). % = quanto da referência foi atingido.
    Funil sobre MQL (agendados 30%, reuniões 15%, ganhos 5%; etapa a etapa 30% → 50% → 33,3%) = REF_PRU; volume = REF_VOL.
-   Contato em menos de 1 dia 80% e cadência 100% = referência interna de boa prática comercial. */
+   Contato em menos de 1 dia 80% = referência interna de boa prática comercial. Na visão semanal as taxas etapa a etapa
+   (agendada → realizada → fechamento) ficam fora: a semana é recente demais para elas. */
 const INS_REF_FONTE = {pru: 'tabela de conversão de referência (base = MQL)', int: 'referência interna de boa prática comercial'};
-function insMetasHtml(x, cad, CP, parcial, modo, frac) {
+function insMetasHtml(x, CP, parcial, modo, frac) {
   const pc = (a, b) => b ? a / b * 100 : null, V = REF_VOL[modo] || REF_VOL.semanal, ff = frac || 1;
   const nv = v => v == null ? '–' : v.toLocaleString('pt-BR', {maximumFractionDigits: 2});
-  // volume de referência no período (proporcional aos dias, no período em andamento); só sem campanha selecionada
   const vol = CP ? [] : [
     {t: 'MQL (leads qualificados)', v: x.leads, meta: V.mql * ff, fmt: nv, sub: `referência de ${nv(V.mql)} por ${modo === 'mensal' ? 'mês' : 'semana'}`, f: 'pru'},
-    {t: 'Reuniões agendadas', v: x.ag, meta: V.ag * ff, fmt: nv, sub: 'agendadas no período, lead de qualquer data', f: 'pru'},
+    {t: 'Reuniões agendadas', v: x.ag, meta: V.ag * ff, fmt: nv, sub: 'agendadas no período', f: 'pru'},
     {t: 'Reuniões realizadas', v: x.reu, meta: V.re * ff, fmt: nv, sub: 'realizadas no período', f: 'pru'},
     {t: 'Fechamentos', v: x.won, meta: V.ga * ff, fmt: nv, sub: 'ganhos no período', f: 'pru'}];
   const itens = [
     {t: 'Contato em menos de 1 dia', v: x.rap, meta: 80, sub: `${fN(x.rapN)} de ${fN(x.leads)} leads`, f: 'int'},
-    {t: 'Leads com contato', v: x.pctCont, meta: 100, sub: `${fN(x.cont)} de ${fN(x.leads)} leads`, f: 'int'},
-    {t: 'MQL → reunião agendada', v: pc(x.kAg, x.leads), meta: REF_PRU.ag, sub: `${fN(x.kAg)} de ${fN(x.leads)} MQL do período`, f: 'pru'},
+    {t: 'MQL → reunião agendada', v: pc(x.kAg, x.leads), meta: REF_PRU.ag, sub: `${fN(x.kAg)} de ${fN(x.leads)} MQL do período`, f: 'pru'}];
+  if (modo === 'mensal') itens.push(
     {t: 'Agendada → realizada', v: pc(x.kReu, x.kAg), meta: REF_PRU.re / REF_PRU.ag * 100, sub: x.kAg ? `${fN(x.kReu)} de ${fN(x.kAg)} agendados` : 'nenhum MQL do período agendado', f: 'pru'},
-    {t: 'Realizada → fechamento', v: pc(x.kWon, x.kReu), meta: REF_PRU.ga / REF_PRU.re * 100, sub: x.kReu ? `${fN(x.kWon)} de ${fN(x.kReu)} com reunião` : `nenhuma reunião registrada entre os MQL do período${x.kWon ? ` (${fN(x.kWon)} ganhos sem reunião lançada)` : ''}`, f: 'pru'},
-    {t: 'MQL → fechamento', v: pc(x.kWon, x.leads), meta: REF_PRU.ga, sub: `${fN(x.kWon)} de ${fN(x.leads)} MQL do período`, f: 'pru'}];
+    {t: 'Realizada → fechamento', v: pc(x.kWon, x.kReu), meta: REF_PRU.ga / REF_PRU.re * 100, sub: x.kReu ? `${fN(x.kWon)} de ${fN(x.kReu)} com reunião` : 'nenhuma reunião registrada entre os MQL do período', f: 'pru'});
+  itens.push({t: 'MQL → fechamento', v: pc(x.kWon, x.leads), meta: REF_PRU.ga, sub: `${fN(x.kWon)} de ${fN(x.leads)} MQL do período`, f: 'pru'});
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
   const card = m => { const q = m.v == null || !m.meta ? null : m.v / m.meta * 100, F = m.fmt || fP;
     return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${q == null ? '–' : fP(q)}</b></div>
       <div class="mt-bar"><i style="width:${Math.min(100, q || 0)}%"></i></div>
       <div class="mt-f"><span>Realizado <b>${F(m.v)}</b></span><span>Referência <b>${F(m.meta)}</b></span></div>
       <div class="mt-n">${m.sub}</div></div>`; };
-  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas de referência${CP ? ` · ${ESC(CP)}` : ''}</h3><p>% = quanto da referência foi atingido · base = MQL (todo lead do Funil Alpha já é qualificado): 30% agendam, 50% dos agendados fazem a reunião e 33,3% das reuniões fecham${parcial ? ' · período em andamento: volume proporcional aos dias' : ''} · as metas oficiais do B2C substituem estas quando forem definidas</p></div>
+  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas de referência${CP ? ` · ${ESC(CP)}` : ''}</h3><p>% da referência atingido · base = MQL${parcial ? ' · volume proporcional aos dias do período' : ''}</p></div>
     <div class="lg"><span><i style="background:#00a611"></i>100% ou mais</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
     ${vol.length ? `<h4 class="insmh">Volume no período</h4><div class="mt-g">${vol.map(card).join('')}</div>` : ''}
     <h4 class="insmh">Conversão do funil e contato</h4><div class="mt-g mt-g3">${itens.map(card).join('')}</div>
-    <div class="mt-n" style="margin-top:10px">Volume = o que aconteceu no período${CP ? '' : ` (referência mensal: 100 MQL, 30 agendadas, 15 realizadas e 5 fechamentos; semanal: 25, 7,5, 3,75 e 1,25)`}. Conversão = MQL que entraram no período e já avançaram; em semanas recentes ainda sobe.${CP ? ' Volume de referência é do B2C inteiro: aparece em "Todos os leads".' : ''}</div></div>`;
+    <div class="mt-n" style="margin-top:10px">Conversão = MQL que entraram no período e já avançaram${modo === 'semanal' ? '; as taxas etapa a etapa ficam na visão Mensal' : ''}.${CP ? ' Volume de referência é do B2C inteiro: aparece em "Todos os leads".' : ''}</div></div>`;
 }
 /* Seletor de período suspenso (semanas/meses): ◀ [lista] ▶. itens = [[valor, rótulo, parcial]] do mais antigo ao mais novo;
    attr = data-* tratado no clique (setas) e no change do select. Padrão do Painel para escolher período (pedido do usuário). */
@@ -2310,41 +2376,69 @@ function perSelect(itens, atual, attr, rotulo) {
     <label class="persel-s"><select data-persel="${attr}" aria-label="${rotulo}">${itens.slice().reverse().map(([v, t, parc]) => `<option value="${v}"${v === atual ? ' selected' : ''}>${t}${parc ? ' (parcial)' : ''}</option>`).join('')}</select><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></label>
     <button type="button" class="persel-b" ${prx ? `data-${attr}="${prx[0]}"` : 'disabled'} aria-label="Próximo período">›</button></div>`;
 }
+// quantos negócios do período ficaram fora dos Insights (base importada/reativados e lançamentos retroativos)
+function insExcl(de, ate) {
+  const pr = makePred(filtros({de, ate}), 'periodo'), inW = s => { if (!s) return false; const d = String(s).slice(0, 10); return d >= de && d <= ate; };
+  let base = 0, retro = 0;
+  for (const l of LEADS) { if (!pr(l) || !(l.b || isRetro(l))) continue;
+    if (!(inW(l.e) || (l.s === 'won' && inW(l.w)) || (l.s === 'lost' && inW(l.l)))) continue;
+    if (l.b) base++; else retro++; }
+  return {base, retro};
+}
+// agenda: reuniões pendentes no Pipedrive para hoje e os próximos 6 dias (leads abertos da operação)
+function insAgenda() {
+  const pr = makePred(insF({de: '', ate: ''}), 'periodo'), fim = addDays(TODAY, 6), out = [];
+  for (const l of LEADS) { if (l.s !== 'open' || !pr(l)) continue;
+    for (const a of l.pv || []) if (MEETING_TYPES.has(a[2]) && a[0] >= TODAY && a[0] <= fim) out.push({l, dia: a[0]}); }
+  return out.sort((a, b) => a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0);
+}
+const DSEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+function insPrint() {
+  const v = document.getElementById('view'), fechados = [...v.querySelectorAll('details:not([open])')];
+  fechados.forEach(d => d.open = true);
+  const t0 = document.title, P = insSel().P;
+  document.title = `Insights B2C - ${S.insModo === 'mensal' ? mesNome(P.k).replace('/', '-') : `semana ${fDM(P.de).replace('/', '-')} a ${fDM(P.fim).replace('/', '-')}`}${S.camp ? ' - ' + S.camp.toUpperCase() : ''}`;
+  const volta = () => { fechados.forEach(d => d.open = false); document.title = t0; window.removeEventListener('afterprint', volta); };
+  window.addEventListener('afterprint', volta);
+  setTimeout(() => window.print(), 60);
+}
 function viewInsights() {
   const modo = S.insModo === 'mensal' ? 'mensal' : 'semanal', nm = INS_NOME[modo], nb = INS_BASE[modo];
   const {per, i, P} = insSel();
   const CN = S.camp && CAMPANHAS[S.camp] ? CAMPANHAS[S.camp].nome : '', CP = CN ? CN.split(' · ')[0] : '';
-  let h = viewHead(CN ? `Insights · ${CN}` : 'Insights', CN ? `B2C · somente os negócios com prefixo <b>${CP}</b> · para ver outra campanha, troque no seletor do topo` : `B2C · avaliação ${modo === 'semanal' ? 'semanal' : 'mensal'} de todos os leads · escolha TRD, DIAG ou RCON no topo para ver só uma campanha`);
+  let h = viewHead(CN ? `Insights · ${CN}` : 'Insights', CN ? `B2C · somente os negócios com prefixo <b>${CP}</b> · para ver outra campanha, troque no seletor do topo` : `B2C · avaliação ${modo === 'semanal' ? 'semanal' : 'mensal'} da operação · escolha TRD, DIAG ou RCON no topo para ver só uma campanha`,
+    `<button type="button" class="btn gh" data-act="ins-pdf" title="Gera um PDF desta página para a reunião">⤓ Exportar para a reunião (PDF)</button>`);
   h += subAbas(INS_MODOS, modo, 'insmodo');
   if (!P) return h + `<div class="card">${emptyBox('Sem dados')}</div>`;
   h += perSelect(per.map(p => [p.k, modo === 'semanal' ? `Semana ${fDM(p.de)} a ${fDM(p.fim)}/${p.fim.slice(0, 4)}` : mesNome(p.k), p.parcial]), P.k, 'insper', modo === 'semanal' ? 'Semana' : 'Mês');
   const x = insCalc(P.de, P.ate);
   const nDias = diffDays(P.de, P.fim) + 1, frac = P.parcial ? (diffDays(P.de, P.ate) + 1) / nDias : 1;
-  const ant = per[i - 1] ? insAjusta(insCalc(per[i - 1].de, per[i - 1].fim), frac) : null;
+  const xPrev = per[i - 1] ? insCalc(per[i - 1].de, per[i - 1].fim) : null, ant = xPrev ? insAjusta(xPrev, frac) : null;
   const ants = per.slice(Math.max(0, i - nb), i).map(p => insCalc(p.de, p.fim));
   const B = ants.length ? insBase(ants, frac) : null;
   const rotAnt = modo === 'semanal' ? 'sem. anterior' : (per[i - 1] ? mesCurto(per[i - 1].k) : 'anterior');
   const rotMed = `média ${ants.length} ${ants.length === 1 ? nm[0] : nm[1]}`;
-  h += `<div class="mph"><span>${modo === 'semanal' ? `SEMANA ${fDM(P.de)} A ${fDM(P.fim)}` : mesNome(P.k).toUpperCase()}</span>${CN ? `<span class="inscp">${ESC(CN)}</span>` : ''}${P.parcial ? `em andamento, dados até ${fDay(P.ate)} · comparação ajustada ao ritmo (${fN(diffDays(P.de, P.ate) + 1)} de ${fN(nDias)} dias)` : `comparado com ${rotAnt} e com a ${rotMed}`}</div>`;
-  // grandes números
-  const md = (key, fmt) => B && B[key] != null ? `<div class="kx">${rotMed}: <b>${fmt(B[key])}</b></div>` : '';
+  h += `<div class="mph"><span>${modo === 'semanal' ? `SEMANA ${fDM(P.de)} A ${fDM(P.fim)}` : mesNome(P.k).toUpperCase()}</span>${CN ? `<span class="inscp">${ESC(CN)}</span>` : ''}${P.parcial ? `em andamento, dados até ${fDay(P.ate)} · comparação ajustada ao ritmo (${fN(diffDays(P.de, P.ate) + 1)} de ${fN(nDias)} dias)` : `comparado com a ${rotMed} (cores) e com a ${rotAnt}`}</div>`;
+  const EX = insExcl(P.de, P.ate);
+  if (EX.base || EX.retro) h += `<div class="note insexc">Fora desta análise${modo === 'semanal' ? ' nesta semana' : ' neste mês'}: ${[EX.base ? `<b>${fN(EX.base)}</b> ${EX.base === 1 ? 'contato importado da base/reativado' : 'contatos importados da base/reativados'}` : '', EX.retro ? `<b>${fN(EX.retro)}</b> ${EX.retro === 1 ? 'lançamento retroativo' : 'lançamentos retroativos'} (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade registrada)` : ''].filter(Boolean).join(' e ')}. Eles continuam nas outras abas.</div>`;
+  // grandes números: cor/variação contra a média; período anterior em texto
   const fRs = v => v == null ? '–' : fR(v);
+  const pa = (key, fmt) => ant && ant[key] != null ? `<div class="kx">${rotAnt}: <b>${fmt(ant[key])}</b></div>` : '';
   h += '<div class="kpis k6 insk">' + [
-    kpiCard({label: 'Leads novos', cls: 'hero', v: fN(x.leads), sub: `${fN(x.cont)} com contato · ${fN(x.semCont)} sem contato`, extra: md('leads', insN1), d: insVar(x.leads, ant && ant.leads, 1, insN1, rotAnt),
-      tip: 'Leads que entraram no Funil Alpha no período (com os filtros do topo)'}),
-    kpiCard({label: 'Contato em menos de 1 dia', v: fP(x.rap), sub: `${fN(x.rapN)} de ${fN(x.leads)} · 1º contato médio ${fD(x.t1)}`, extra: md('rap', fP), d: insVar(x.rap, ant && ant.rap, 1, fP, rotAnt),
+    kpiCard({label: 'Leads novos', cls: 'hero', v: fN(x.leads), sub: `${fN(x.cont)} com contato · ${fN(x.semCont)} sem contato`, extra: pa('leads', insN1), d: insVar(x.leads, B && B.leads, 1, insN1, rotMed),
+      tip: 'Leads que entraram no Funil Alpha no período (sem base importada e sem lançamentos retroativos)'}),
+    kpiCard({label: 'Contato em menos de 1 dia', v: fP(x.rap), sub: `${fN(x.rapN)} de ${fN(x.leads)} · 1º contato médio ${fD(x.t1)}`, extra: pa('rap', fP), d: insVar(x.rap, B && B.rap, 1, fP, rotMed),
       tip: 'Dos leads que entraram no período, quantos tiveram o 1º contato (ou o agendamento) em menos de 24 horas'}),
-    kpiCard({label: 'Agendamentos', v: fN(x.ag), sub: `no período, lead de qualquer data`, extra: md('ag', insN1), d: insVar(x.ag, ant && ant.ag, 1, insN1, rotAnt),
+    kpiCard({label: 'Agendamentos', v: fN(x.ag), sub: `no período, lead de qualquer data`, extra: pa('ag', insN1), d: insVar(x.ag, B && B.ag, 1, insN1, rotMed),
       tip: 'Leads que chegaram à etapa de agendamento (ou foram ganhos) dentro do período, independentemente de quando entraram'}),
-    kpiCard({label: 'Reuniões realizadas', v: fN(x.reu), sub: `no período, lead de qualquer data`, extra: md('reu', insN1), d: insVar(x.reu, ant && ant.reu, 1, insN1, rotAnt),
-      tip: 'Leads com a 1ª reunião concluída dentro do período'}),
-    kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: md('won', insN1), d: insVar(x.won, ant && ant.won, 1, insN1, rotAnt),
-      tip: 'Negócios marcados como ganhos dentro do período'}),
-    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: md('cpl', fRs), d: insVar(x.cpl, ant && ant.cpl, -1, fRs, rotAnt),
-      tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período'})
+    kpiCard({label: 'Reuniões realizadas', v: fN(x.reu), sub: x.faltas ? `${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'} · comparecimento ${fP(x.comp)}` : 'nenhuma falta registrada', extra: pa('reu', insN1), d: insVar(x.reu, B && B.reu, 1, insN1, rotMed),
+      tip: 'Leads com a 1ª reunião concluída dentro do período. Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
+    kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: pa('won', insN1), d: insVar(x.won, B && B.won, 1, insN1, rotMed),
+      tip: 'Negócios marcados como ganhos dentro do período (sem lançamentos retroativos)'}),
+    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
+      tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período. Inclui a verba de campanhas que não trouxeram lead'})
   ].join('') + '</div>';
-  const KA = run(filtros({de: MIN_DAY, ate: TODAY})).res.kpis;
-  h += insMetasHtml(x, {abertos: KA.abertos, atraso: KA.leads_em_atraso, semProx: KA.leads_sem_proxima}, CP, P.parcial, modo, frac);
+  h += insMetasHtml(x, CP, P.parcial, modo, frac);
   // avaliação
   const pos = [], neg = [], neu = [];
   const put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);
@@ -2352,40 +2446,33 @@ function viewInsights() {
   if (B) {
     put(insTom(x.leads, B.leads, 1), 'Entrada de leads', `<b>${fN(x.leads)}</b> leads novos${vsB(x.leads, B.leads, insN1)}.`);
     const tr = insTom(x.rap, B.rap, 1, 0);
-    if (x.leads) put(x.rap != null && x.rap >= 80 && tr !== 'neg' ? 'pos' : x.rap != null && x.rap < 50 ? 'neg' : tr, 'Velocidade do 1º contato', `<b>${fP(x.rap)}</b> dos leads contatados em menos de 1 dia${B.rap != null ? ` (${rotMed}: ${fP(B.rap)})` : ''}; 1º contato médio de ${fD(x.t1)}.`);
+    if (x.leads) put(x.rap != null && x.rap >= 80 && tr !== 'neg' ? 'pos' : x.rap != null && x.rap < 50 ? 'neg' : tr, 'Velocidade do 1º contato', `<b>${fP(x.rap)}</b> dos leads contatados em menos de 1 dia${B.rap != null ? ` (${rotMed}: ${fP(B.rap)})` : ''}; 1º contato médio de ${fD(x.t1)}${x.rap != null && x.rap < 50 ? ' · abaixo de 50%, longe da referência de 80%' : ''}.`);
     put(insTom(x.ag, B.ag, 1), 'Agendamentos', `<b>${fN(x.ag)}</b> ${x.ag === 1 ? 'agendamento' : 'agendamentos'}${vsB(x.ag, B.ag, insN1)}${x.leads ? ` · ${nf1.format(x.ag / x.leads * 100)} para cada 100 leads novos` : ''}.`);
-    put(insTom(x.reu, B.reu, 1), 'Reuniões realizadas', `<b>${fN(x.reu)}</b> ${x.reu === 1 ? 'reunião' : 'reuniões'}${vsB(x.reu, B.reu, insN1)}.`);
+    put(insTom(x.reu, B.reu, 1), 'Reuniões realizadas', `<b>${fN(x.reu)}</b> ${x.reu === 1 ? 'reunião' : 'reuniões'}${vsB(x.reu, B.reu, insN1)}${x.faltas ? ` · ${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'}` : ''}.`);
     put(insTom(x.won, B.won, 1, 2), 'Ganhos', `<b>${fN(x.won)}</b> ${x.won === 1 ? 'negócio ganho' : 'negócios ganhos'}${vsB(x.won, B.won, insN1)}.`);
     if (x.inv && x.cpl != null) put(insTom(x.cpl, B.cpl, -1, 0), 'Custo por lead', `<b>${fRs(x.cpl)}</b> por lead de campanha${B.cpl != null ? ` (${rotMed}: ${fRs(B.cpl)})` : ''}, com ${fRs(x.inv)} investidos.`);
   }
-  // campanhas: custo por lead por campanha
-  const selG = S.camp ? new Set([S.camp]) : null;   // com campanha escolhida, só ela entra na leitura
-  const gs = (x.grupos || []).filter(g => g.id !== 'outros' && (!selG || selG.has(g.id)) && (g.investimento > 0 || g.leads > 0));
-  const comCpl = gs.filter(g => g.investimento > 0 && g.leads >= 3).sort((a, b) => a.custo_lead - b.custo_lead);
+  const {gs, comCpl, cs} = insGrp(x, modo);
   const gn = g => (PAGAS[g.id] || {}).nome || g.id;
   if (comCpl.length >= 2 && comCpl[comCpl.length - 1].custo_lead > comCpl[0].custo_lead * 1.3)
     put('pos', 'Campanha mais eficiente', `<b>${gn(comCpl[0])}</b> trouxe o lead mais barato: ${fRs(comCpl[0].custo_lead)} (${fN(comCpl[0].leads)} leads), contra ${fRs(comCpl[comCpl.length - 1].custo_lead)} em ${gn(comCpl[comCpl.length - 1])}.`);
   for (const g of gs) if (g.investimento >= 50 && !g.leads) put('neg', `Mídia sem resultado`, `<b>${gn(g)}</b>: ${fRs(g.investimento)} investidos e nenhum lead no Pipedrive no período.`);
-  // leads da semana ainda sem contato
   if (x.leads && x.semCont >= 3 && x.semCont / x.leads > 0.2) put('neg', 'Leads sem contato', `<b>${fN(x.semCont)}</b> dos ${fN(x.leads)} leads do período (${fP(x.semCont / x.leads * 100)}) ainda não tiveram nenhum contato.`);
-  // consultores (coorte do período): melhor e pior % de contato, com volume mínimo
-  const cs = (x.consultores || []).filter(c => c.leads >= (modo === 'semanal' ? 3 : 5) && c.pct_contatados != null).sort((a, b) => b.pct_contatados - a.pct_contatados || a.media_dias_1o_contato - b.media_dias_1o_contato);
   if (cs.length >= 2 && cs[0].pct_contatados - cs[cs.length - 1].pct_contatados >= 20) {
     const a = cs[0], z = cs[cs.length - 1];
     put('pos', 'Destaque do time', `<b>${ESC(a.consultor)}</b> contatou ${fP(a.pct_contatados)} dos ${fN(a.leads)} leads${a.media_dias_1o_contato != null ? `, 1º contato médio de ${fD(a.media_dias_1o_contato)}` : ''}.`);
     put('neg', 'Atenção no time', `<b>${ESC(z.consultor)}</b> contatou ${fP(z.pct_contatados)} dos ${fN(z.leads)} leads${z.media_dias_1o_contato != null ? `, 1º contato médio de ${fD(z.media_dias_1o_contato)}` : ''}.`);
   }
-  // perdas e motivo principal
   if (x.lost) { const mot = Object.entries(x.motivos || {}).sort((a, b) => b[1] - a[1]);
-    put(B ? (insTom(x.lost, B.lost, -1) === 'neg' ? 'neg' : 'neu') : 'neu', 'Perdas', `<b>${fN(x.lost)}</b> ${x.lost === 1 ? 'lead perdido' : 'leads perdidos'}${B ? vsB(x.lost, B.lost, insN1) : ''}${mot.length ? `; principal motivo: <b>${ESC(mot[0][0])}</b> (${fN(mot[0][1])})` : ''}.`); }
+    const tl = mot.length ? (x.lostDet || []).filter(d => d.m === mot[0][0]).map(d => d.tent) : [], mt = tl.length ? tl.reduce((a, v) => a + v, 0) / tl.length : null;
+    put(B ? (insTom(x.lost, B.lost, -1) === 'neg' ? 'neg' : 'neu') : 'neu', 'Perdas', `<b>${fN(x.lost)}</b> ${x.lost === 1 ? 'lead perdido' : 'leads perdidos'}${B ? vsB(x.lost, B.lost, insN1) : ''}${mot.length ? `; principal motivo: <b>${ESC(mot[0][0])}</b> (${fN(mot[0][1])}${mt != null ? `, média de ${f1(mt)} tentativas antes da perda` : ''})` : ''}.`); }
   // cadência hoje (só para o período mais recente)
-  let recente = null;
-  if (i >= per.length - 2) { const A = run(filtros({de: MIN_DAY, ate: TODAY})), ka = A.res.kpis;
+  let recente = null, A = null;
+  if (i >= per.length - 2) { A = run(insF({de: MIN_DAY, ate: TODAY})); const ka = A.res.kpis;
     recente = {leads_em_atraso: ka.leads_em_atraso, leads_sem_proxima: ka.leads_sem_proxima, top: A.res.consultores.filter(c => c.leads_em_atraso).sort((a, b) => b.leads_em_atraso - a.leads_em_atraso).slice(0, 3)};
-    if (ka.leads_em_atraso) { const top = recente.top;
-      put('neg', 'Cadência (situação de hoje)', `<b>${fN(ka.leads_em_atraso)}</b> ${ka.leads_em_atraso === 1 ? 'lead' : 'leads'}${CP ? ' ' + CP : ''} em aberto com atividade vencida${top.length ? ` (${top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${ka.leads_sem_proxima ? ` e ${fN(ka.leads_sem_proxima)} sem próxima atividade` : ''}.`); }
+    if (ka.leads_em_atraso) put('neg', 'Cadência (situação de hoje)', `<b>${fN(ka.leads_em_atraso)}</b> ${ka.leads_em_atraso === 1 ? 'lead' : 'leads'}${CP ? ' ' + CP : ''} em aberto com atividade vencida${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${ka.leads_sem_proxima ? ` e ${fN(ka.leads_sem_proxima)} sem próxima atividade` : ''}.`);
     else put('pos', 'Cadência (situação de hoje)', `Nenhum lead${CP ? ' ' + CP : ''} em aberto com atividade vencida.`); }
-  // por prefixo de campanha (TRD / DIAG / RCON / demais): só quando o seletor de campanha está em "Todos"
+  // por prefixo de campanha (TRD / DIAG / RCON / sem prefixo): só quando o seletor de campanha está em "Todos"
   let pxRows = null;
   if (!S.camp) {
     const PX = Object.keys(CAMPANHAS);
@@ -2393,11 +2480,10 @@ function viewInsights() {
     const outros = (T, L) => { const o = {leads: sub(T, L, 'leads'), rapN: sub(T, L, 'rapN'), ag: sub(T, L, 'ag'), reu: sub(T, L, 'reu'), won: sub(T, L, 'won'), lost: sub(T, L, 'lost'), inv: sub(T, L, 'inv'), cpl: null};
       o.rap = pctOf(o.rapN, o.leads); return o; };
     const cur = PX.map(c => insCalc(P.de, P.ate, c)); cur.push(outros(x, cur));
-    const antP = per[i - 1] ? (() => { const L = PX.map(c => insAjusta(insCalc(per[i - 1].de, per[i - 1].fim, c), frac)); L.push(outros(ant, L)); return L; })() : null;
     const baseP = ants.length ? (() => { const byP = PX.map(c => per.slice(Math.max(0, i - nb), i).map(q => insCalc(q.de, q.fim, c)));
       const oth = ants.map((T, j) => outros(T, byP.map(L => L[j]))); return byP.concat([oth]).map(L => insBase(L, frac)); })() : null;
-    const nomes = PX.map(c => CAMPANHAS[c].nome).concat(['Demais leads (sem prefixo de campanha)']);
-    pxRows = nomes.map((n, j) => ({n, x: cur[j], a: antP && antP[j], b: baseP && baseP[j], camp: PX[j] || null}));
+    const nomes = PX.map(c => CAMPANHAS[c].nome).concat(['Sem prefixo de campanha (indicações e cadastros manuais)']);
+    pxRows = nomes.map((n, j) => ({n, x: cur[j], b: baseP && baseP[j], camp: PX[j] || null}));
     for (const r of pxRows.slice(0, PX.length)) {
       if (!r.b) continue;
       const tl = insTom(r.x.leads, r.b.leads, 1), ta = insTom(r.x.ag, r.b.ag, 1);
@@ -2415,7 +2501,34 @@ function viewInsights() {
   h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ O que está funcionando</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
     <div class="card insno"><div class="ch"><div><h3>✖ O que não está funcionando</h3><p>Abaixo da média ou fora da referência</p></div></div>${lst(neg, 'neg')}</div></div>`;
   h += insSugHtml(insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), CP);
-  if (neu.length) h += `<div class="card mt"><div class="ch"><div><h3>Dentro do normal</h3><p>Sem variação relevante contra a ${rotMed}</p></div></div>${lst(neu, '')}</div>`;
+  // acompanhamento das sugestões do período anterior
+  if (xPrev && i >= 1) {
+    const antsP = per.slice(Math.max(0, i - 1 - nb), i - 1).map(p => insCalc(p.de, p.fim)), BP = antsP.length ? insBase(antsP, 1) : null;
+    const gp = insGrp(xPrev, modo), LP = insSugestoes({x: xPrev, B: BP, ...gp, modo, CP, rotMed: `média ${antsP.length} ${antsP.length === 1 ? nm[0] : nm[1]}`, recente: null});
+    h += insFollowHtml(LP, xPrev, x, frac, modo, modo === 'semanal' ? `${fDM(per[i - 1].de)} a ${fDM(per[i - 1].fim)}` : mesNome(per[i - 1].k));
+  }
+  // por consultor
+  {
+    const fc = S.consultores.length ? new Set(S.consultores) : null;
+    const nomes = [...new Set([...((D && D.equipe) || []), ...(x.consultores || []).filter(c => c.leads).map(c => c.consultor)])].filter(c => !fc || fc.has(c));
+    const linhas = nomes.map(c => { const Rc = run(insF({de: P.de, ate: P.ate, consultores: [c]})), k = Rc.res.kpis, e = Rc.res.eventos;
+      const rp = Rc.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length, at = A ? (A.res.consultores.find(y => y.consultor === c) || {}) : null;
+      return {c, leads: k.leads, rap: pctOf(rp, k.leads), t1: k.media_dias_1o_contato, ag: e.agendamentos, reu: e.reunioes, fal: e.faltas, won: e.ganhos, lost: e.perdidos, atr: at ? at.leads_em_atraso || 0 : null, sp: at ? at.leads_sem_proxima || 0 : null}; })
+      .filter(r => r.leads || r.ag || r.reu || r.won || r.lost || r.atr).sort((a, b) => b.leads - a.leads || b.ag - a.ag);
+    if (linhas.length) h += `<div class="card mt np inscons"><div class="ch" style="padding:16px 18px 0"><div><h3>Por consultor</h3><p>Leads novos e contato = leads que entraram no período · agendamentos, reuniões, ganhos e perdas = o que aconteceu no período${A ? ' · vencidas = situação de hoje' : ''}</p></div></div>
+      <div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">Leads novos</th><th class="num">Contato &lt; 1 dia</th><th class="num">1º contato médio</th><th class="num">Agendamentos</th><th class="num">Reuniões</th><th class="num">Faltas</th><th class="num">Ganhos</th><th class="num">Perdidos</th>${A ? '<th class="num">Atividades vencidas</th><th class="num">Sem próxima</th>' : ''}</tr></thead><tbody>` +
+      linhas.map(r => `<tr><td class="wrap"><b data-xf="consultores" data-v="${ESC(r.c)}" style="cursor:pointer">${ESC(r.c)}</b></td><td class="num"><b>${fN(r.leads)}</b></td><td class="num${r.rap != null && r.rap < 50 ? ' red' : ''}">${fP(r.rap)}</td><td class="num">${fD(r.t1)}</td><td class="num">${fN(r.ag)}</td><td class="num">${fN(r.reu)}</td><td class="num">${fN(r.fal)}</td><td class="num">${fN(r.won)}</td><td class="num">${fN(r.lost)}</td>${A ? `<td class="num${r.atr ? ' red' : ''}">${fN(r.atr)}</td><td class="num">${fN(r.sp)}</td>` : ''}</tr>`).join('') + `</tbody></table></div></div>`;
+  }
+  // agenda dos próximos 7 dias (situação de hoje)
+  if (i >= per.length - 2) {
+    const AG = insAgenda(), dias = Array.from({length: 7}, (_, j) => addDays(TODAY, j));
+    const porC = new Map(); for (const a of AG) porC.set(a.l.c, (porC.get(a.l.c) || 0) + 1);
+    h += `<div class="card mt insagc"><div class="ch"><div><h3>📅 Agenda: reuniões marcadas para os próximos 7 dias</h3><p>Atividades de reunião pendentes no Pipedrive, de ${fDM(TODAY)} a ${fDM(addDays(TODAY, 6))}</p></div></div>` +
+      (AG.length ? `<div class="insag"><div><div class="insagd">${dias.map(d => `<span>${DSEM[weekday(d)]} ${fDM(d)}<b>${fN(AG.filter(a => a.dia === d).length)}</b></span>`).join('')}</div>
+        <div class="mut" style="font-size:13px"><b>${fN(AG.length)}</b> ${AG.length === 1 ? 'reunião marcada' : 'reuniões marcadas'} · ${[...porC].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${ESC(c)} ${fN(n)}`).join(' · ')}</div></div>
+        <div class="tw" style="max-height:260px"><table class="t"><thead><tr><th>Dia</th><th>Lead</th><th>Consultor</th></tr></thead><tbody>${AG.map(a => `<tr><td>${DSEM[weekday(a.dia)]} ${fDM(a.dia)}</td><td style="max-width:240px">${leadCell(a.l)}</td><td>${ESC(a.l.c)}</td></tr>`).join('')}</tbody></table></div></div>`
+        : `<p class="mut" style="margin:4px 0 0">Nenhuma reunião marcada no Pipedrive para os próximos 7 dias${CP ? ` entre os leads ${ESC(CP)}` : ''}.</p>`) + `</div>`;
+  }
   // tabela por prefixo
   if (pxRows) {
     const vv = (c, b, good, fmt) => { if (c == null || b == null) return ''; const d = c - b; if (Math.abs(d) < 1e-9) return '<span class="dl neu">=</span>';
@@ -2427,9 +2540,9 @@ function viewInsights() {
   }
   // comparativo
   if (B) {
-    const rows = [['Leads novos', 'leads', 1, insN1], ['Contato em menos de 1 dia', 'rap', 1, fP], ['Com contato (leads do período)', 'pctCont', 1, fP], ['1º contato médio', 't1', -1, fD],
-      ['Contatos realizados', 'contatos', 1, insN1], ['Agendamentos', 'ag', 1, insN1], ['Reuniões realizadas', 'reu', 1, insN1], ['Ganhos', 'won', 1, insN1], ['Perdidos', 'lost', -1, insN1],
-      ['Investimento Meta', 'inv', 0, fRs], ['Custo por lead', 'cpl', -1, fRs]];
+    const rows = [['Leads novos', 'leads', 1, insN1], ['Contato em menos de 1 dia', 'rap', 1, fP], ['1º contato médio', 't1', -1, fD],
+      ['Contatos realizados', 'contatos', 1, insN1], ['Agendamentos', 'ag', 1, insN1], ['Reuniões realizadas', 'reu', 1, insN1], ['Faltas (no-show)', 'faltas', -1, insN1], ['Comparecimento', 'comp', 1, fP],
+      ['Ganhos', 'won', 1, insN1], ['Perdidos', 'lost', -1, insN1], ['Investimento Meta', 'inv', 0, fRs], ['Custo por lead', 'cpl', -1, fRs]];
     const vr = (c, b, good, fmt) => { if (c == null || b == null) return '–'; const d = c - b; if (Math.abs(d) < 1e-9) return '<span class="dl neu">=</span>';
       const tone = good === 0 ? 'neu' : ((d > 0) === (good > 0) ? 'pos' : 'neg'), pc = b ? nf1.format(Math.abs(d / b * 100)) + '%' : 'novo';
       if (fmt === fP) return `<span class="dl ${tone}">${d > 0 ? '▲ +' : '▼ −'}${nf1.format(Math.abs(d))} p.p.</span>`;
@@ -2440,9 +2553,11 @@ function viewInsights() {
   }
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Semanal</b> = semana de segunda a domingo; abre na última semana fechada (a da reunião de terça). <b>Mensal</b> = mês fechado.</li>
-    <li><b>Leads novos</b> e <b>contato</b> olham só os leads que entraram no período. <b>Agendamentos, reuniões, ganhos e perdas</b> contam o que aconteceu no período, com leads de qualquer data de entrada.</li>
-    <li>A <b>avaliação</b> compara com a média dos ${fN(nb)} ${nm[1]} anteriores: até 15% de diferença é normal; volumes muito pequenos (menos de 3) não são julgados.</li>
+    <li>Os Insights avaliam só a <b>operação</b>: ficam de fora os contatos importados da base/reativados e os lançamentos retroativos (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade registrada). Eles continuam nas outras abas.</li>
+    <li><b>Leads novos</b> e <b>contato</b> olham só os leads que entraram no período. <b>Agendamentos, reuniões, faltas, ganhos e perdas</b> contam o que aconteceu no período, com leads de qualquer data de entrada.</li>
+    <li>As cores e a <b>avaliação</b> comparam com a média dos ${fN(nb)} ${nm[1]} anteriores: até 15% de diferença é normal; volumes muito pequenos (menos de 3) não são julgados. O período anterior aparece em texto.</li>
     <li>Variações sempre em % e em número. Período em andamento: a comparação é ajustada ao mesmo número de dias.</li>
+    <li><b>Exportar para a reunião</b> gera um PDF da página (na janela de impressão, escolha "Salvar como PDF").</li>
     <li>O seletor de campanha (Todos/TRD/DIAG/RCON) e os filtros de consultor e origem valem aqui; o período do topo não.</li></ul></details>`;
   return h;
 }
@@ -3514,7 +3629,7 @@ function renderChips() {
   if (S.busca.trim()) { any = true; h += `<span class="chip"><small>Busca:</small>“${ESC(S.busca.trim())}”<button data-rm="busca" aria-label="Remover busca">✕</button></span>`; }
   if (any) h += '<button class="clr" data-act="clear">Limpar filtros</button>';
   const IP = S.tab === 'insights' ? insSel().P : null;
-  const nCamp = id => { const pr = makePred(filtros(IP ? {campanha: id, de: IP.de, ate: IP.ate} : {campanha: id})); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
+  const nCamp = id => { const pr = makePred(filtros(IP ? {campanha: id, de: IP.de, ate: IP.ate, operacao: true} : {campanha: id})); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
   h += '<span class="cps" role="radiogroup" aria-label="Campanha">' +
     `<button type="button" class="cp${S.camp ? '' : ' on'}" data-act="camp" data-v="" role="radio" aria-checked="${!S.camp}" title="Todos os negócios do Funil Alpha">Todos os leads (${fN(nCamp(null))})</button>` +
     Object.entries(CAMPANHAS).map(([id, c]) => `<button type="button" class="cp${S.camp === id ? ' on' : ''}" data-act="camp" data-v="${id}" role="radio" aria-checked="${S.camp === id}" title="${ESC(c.tip)}">${c.nome} (${fN(nCamp(id))})</button>`).join('') + '</span>';
@@ -4074,6 +4189,7 @@ function bindEvents() {
       else if (a === 'csv-lost') exportCsv(lostList(), 'perdidos');
       else if (a === 'camp') { S.camp = act.dataset.v || ''; resetPages(); update(); }
       else if (a === 'perda-data') { S.perdaData = !S.perdaData; S.lost.page = 0; update(); }
+      else if (a === 'ins-pdf') insPrint();
       else if (a === 'close') closeDrawer();
       else if (a === 'tl-all') { S.tlAll = true; openDrawer(act.dataset.id); }
       return;

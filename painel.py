@@ -408,6 +408,8 @@ def model(cache):
         # mesmo concluídas no mesmo minuto). Pendentes não contam.
         contacts = sorted([contact_time(a), a["type"]]
                           for a in info["acts"] if a["done"] and a["type"] in CONTACT_TYPES and contact_time(a))
+        # faltas (no-show) concluídas: base do comparecimento às reuniões (Insights)
+        noshow = sorted(contact_time(a) for a in info["acts"] if a["done"] and a["type"] == "no_show" and contact_time(a))
         crm = brt(d.get("add_time")); ent = info.get("ent")
         hist = stage_history(d, info["log"])
         reat = False
@@ -422,6 +424,7 @@ def model(cache):
             # e os contatos do ciclo anterior não contam para este ciclo.
             entry, fonte = moved[0], f"Entrou no Funil Alpha vindo de {moved[1]} (criado no CRM em {crm[8:10]}/{crm[5:7]}/{crm[:4]})"
             contacts = [x for x in contacts if x[0] >= entry]
+            noshow = [x for x in noshow if x >= entry]
             hist = [x for x in hist if x[1] >= entry[:19]]  # jornada do ciclo atual (etapas de antes da volta ficam fora)
             reat = "base de relacionamento" in moved[1].lower()
         else:
@@ -430,13 +433,13 @@ def model(cache):
                 entry, fonte = contacts[0][0], "1º contato registrado (anterior à criação no CRM)"
         pend = sorted(a["due"] for a in info["acts"] if not a["done"] and a.get("due"))
         # Cadência: atividades pendentes (data de vencimento + assunto) só dos abertos -> bloco "Atividades em atraso"
-        pv = sorted([a["due"], sem_pii(a.get("subj") or "")[:50]] for a in info["acts"]
+        pv = sorted([a["due"], sem_pii(a.get("subj") or "")[:50], a.get("type") or ""] for a in info["acts"]
                     if not a["done"] and not a.get("deleted") and a.get("due")) if d["status"] == "open" else []
         leads.append({
             "id": d["id"], "n": sem_pii(title), "s": d["status"], "sg": d["stage_id"], "c": owner, "o": origem(title, lb), "lb": lb,
             "e": entry, "ec": crm, "ef": fonte, "b": 1 if (d["id"] in base or reat) else 0, "pk": info.get("pk") or [], "w": brt(d.get("won_time")), "l": brt(d.get("lost_time")),
             "lr": (d.get("lost_reason") or "").strip() or ("Sem motivo informado" if d["status"] == "lost" else None),
-            "k": contacts,
+            "k": contacts, "ns": noshow,
             "pa": len(pend), "nx": pend[0] if pend else None, "pv": pv,
             "h": hist,
         })
@@ -475,6 +478,7 @@ def dedupe(leads, window_days=14):
                 c["e"] = first["e"]
                 c["ef"] = first["ef"] if first is cl_sorted[0] else f"{first['ef']} — negócio anterior #{first['id']}"
                 c["k"] = sorted(x for l in cl for x in l["k"])
+                c["ns"] = sorted(x for l in cl for x in (l.get("ns") or []))
                 c["b"] = min(l["b"] for l in cl)
                 c["dd"] = [l["id"] for l in cl_sorted[1:]]
                 if c["s"] == "open":
