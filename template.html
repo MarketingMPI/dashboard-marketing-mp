@@ -2237,10 +2237,6 @@ function insMetasHtml(x, cad, CP, parcial, modo, frac) {
     {t: 'Agendada → realizada', v: pc(x.kReu, x.kAg), meta: REF_PRU.re / REF_PRU.ag * 100, sub: x.kAg ? `${fN(x.kReu)} de ${fN(x.kAg)} agendados` : 'nenhum MQL do período agendado', f: 'pru'},
     {t: 'Realizada → fechamento', v: pc(x.kWon, x.kReu), meta: REF_PRU.ga / REF_PRU.re * 100, sub: x.kReu ? `${fN(x.kWon)} de ${fN(x.kReu)} com reunião` : `nenhuma reunião registrada entre os MQL do período${x.kWon ? ` (${fN(x.kWon)} ganhos sem reunião lançada)` : ''}`, f: 'pru'},
     {t: 'MQL → fechamento', v: pc(x.kWon, x.leads), meta: REF_PRU.ga, sub: `${fN(x.kWon)} de ${fN(x.leads)} MQL do período`, f: 'pru'}];
-  if (cad && cad.abertos) {
-    itens.push({t: 'Leads abertos em dia com a cadência', v: pc(cad.abertos - cad.atraso, cad.abertos), meta: 100, sub: `${fN(cad.atraso)} com atividade vencida · situação de hoje`, f: 'int'});
-    itens.push({t: 'Leads abertos com próxima atividade', v: pc(cad.abertos - cad.semProx, cad.abertos), meta: 100, sub: `${fN(cad.semProx)} sem nada agendado · situação de hoje`, f: 'int'});
-  }
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
   const card = m => { const q = m.v == null || !m.meta ? null : m.v / m.meta * 100, F = m.fmt || fP;
     return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${q == null ? '–' : fP(q)}</b></div>
@@ -2250,7 +2246,7 @@ function insMetasHtml(x, cad, CP, parcial, modo, frac) {
   return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas de referência${CP ? ` · ${ESC(CP)}` : ''}</h3><p>% = quanto da referência foi atingido · base = MQL (todo lead do Funil Alpha já é qualificado): 30% agendam, 50% dos agendados fazem a reunião e 33,3% das reuniões fecham${parcial ? ' · período em andamento: volume proporcional aos dias' : ''} · as metas oficiais do B2C substituem estas quando forem definidas</p></div>
     <div class="lg"><span><i style="background:#00a611"></i>100% ou mais</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
     ${vol.length ? `<h4 class="insmh">Volume no período</h4><div class="mt-g">${vol.map(card).join('')}</div>` : ''}
-    <h4 class="insmh">Conversão do funil e atendimento</h4><div class="mt-g">${itens.map(card).join('')}</div>
+    <h4 class="insmh">Conversão do funil e contato</h4><div class="mt-g">${itens.map(card).join('')}</div>
     <div class="mt-n" style="margin-top:10px">Volume = o que aconteceu no período${CP ? '' : ` (referência mensal: 100 MQL, 30 agendadas, 15 realizadas e 5 fechamentos; semanal: 25, 7,5, 3,75 e 1,25)`}. Conversão = MQL que entraram no período e já avançaram; em semanas recentes ainda sobe.${CP ? ' Volume de referência é do B2C inteiro: aparece em "Todos os leads".' : ''}</div></div>`;
 }
 function viewInsights() {
