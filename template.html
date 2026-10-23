@@ -428,6 +428,11 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .kpi.gain .kv{color:#0b7a3b}
 .aplpx{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}.aplpx > span{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--cinza)}
 .aplpx .seg button small{margin-left:6px;font-size:11px;color:var(--cinza);font-weight:500}
+.persel{display:inline-flex;align-items:center;gap:6px;margin:0 0 14px;flex-wrap:wrap}.persel-l{font-size:12px;font-weight:600;color:var(--cinza);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+.persel-b{width:34px;height:38px;border:1px solid #dfe5e2;background:#fff;border-radius:10px;font:inherit;font-size:20px;line-height:1;color:#3e4b46;cursor:pointer;box-shadow:0 1px 3px rgba(0,40,30,.07)}.persel-b:hover:not(:disabled){border-color:var(--v200)}.persel-b:disabled{opacity:.35;cursor:default}
+.persel-s{position:relative;display:inline-flex}.persel-s select{appearance:none;-webkit-appearance:none;font:inherit;font-size:14px;font-weight:600;color:var(--txt);background:#fff;border:1px solid #dfe5e2;border-radius:10px;padding:8px 38px 8px 14px;min-width:230px;height:38px;cursor:pointer;box-shadow:0 1px 3px rgba(0,40,30,.07)}
+.persel-s select:hover{border-color:var(--v200)}.persel-s select:focus{outline:2px solid var(--v200);outline-offset:1px}.persel-s svg{position:absolute;right:12px;top:50%;width:16px;height:16px;margin-top:-8px;fill:none;stroke:var(--cinza);stroke-width:2;pointer-events:none}
+@media(max-width:760px){.persel{display:flex;width:100%}.persel-l{width:100%}.persel-s{flex:1}.persel-s select{min-width:0;width:100%}}
 .mpmeses{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .mpmeses button{border:1px solid var(--linha);background:#fff;border-radius:99px;padding:6px 14px;font:inherit;font-size:12.5px;font-weight:600;color:#3e4b46;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .mpmeses button small{font-size:10px;font-weight:500;color:var(--cinza)}
@@ -2117,7 +2122,7 @@ function viewMPProMetas() {
   if (!meses.length) return h + `<div class="card">${emptyBox('Dados do MP PRO indisponíveis')}</div>`;
   if (!meses.includes(S.mpMes)) S.mpMes = meses[meses.length - 1];   // padrão: mês atual
   const ym = S.mpMes, x = mpMes(ym);
-  h += `<div class="mpmeses">${meses.map(m => `<button type="button" data-mpmes="${m}" class="${m === ym ? 'on' : ''}">${mesCurto(m)}${ymLast(m) >= TODAY ? '<small>parcial</small>' : ''}</button>`).join('')}</div>`;
+  h += perSelect(meses.map(m => [m, mesNome(m), ymLast(m) >= TODAY]), ym, 'mpmes', 'Mês');
   if (!x) return h + `<div class="card">${emptyBox('Sem dados neste mês')}</div>`;
   const faltam = Math.max(0, diffDays(TODAY, MP_METAS_ATE));
   h += `<div class="mph"><span>${mesNome(ym).toUpperCase()}</span>${x.parcial ? `mês em andamento, dados até ${fDay(TODAY)} · ` : ''}faltam ${fN(faltam)} dias para ${fDay(MP_METAS_ATE)}</div>`;
@@ -2296,6 +2301,15 @@ function insMetasHtml(x, cad, CP, parcial, modo, frac) {
     <h4 class="insmh">Conversão do funil e contato</h4><div class="mt-g mt-g3">${itens.map(card).join('')}</div>
     <div class="mt-n" style="margin-top:10px">Volume = o que aconteceu no período${CP ? '' : ` (referência mensal: 100 MQL, 30 agendadas, 15 realizadas e 5 fechamentos; semanal: 25, 7,5, 3,75 e 1,25)`}. Conversão = MQL que entraram no período e já avançaram; em semanas recentes ainda sobe.${CP ? ' Volume de referência é do B2C inteiro: aparece em "Todos os leads".' : ''}</div></div>`;
 }
+/* Seletor de período suspenso (semanas/meses): ◀ [lista] ▶. itens = [[valor, rótulo, parcial]] do mais antigo ao mais novo;
+   attr = data-* tratado no clique (setas) e no change do select. Padrão do Painel para escolher período (pedido do usuário). */
+function perSelect(itens, atual, attr, rotulo) {
+  const i = itens.findIndex(x => x[0] === atual), ant = itens[i - 1], prx = itens[i + 1];
+  return `<div class="persel"><span class="persel-l">${rotulo}</span>
+    <button type="button" class="persel-b" ${ant ? `data-${attr}="${ant[0]}"` : 'disabled'} aria-label="Período anterior">‹</button>
+    <label class="persel-s"><select data-persel="${attr}" aria-label="${rotulo}">${itens.slice().reverse().map(([v, t, parc]) => `<option value="${v}"${v === atual ? ' selected' : ''}>${t}${parc ? ' (parcial)' : ''}</option>`).join('')}</select><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></label>
+    <button type="button" class="persel-b" ${prx ? `data-${attr}="${prx[0]}"` : 'disabled'} aria-label="Próximo período">›</button></div>`;
+}
 function viewInsights() {
   const modo = S.insModo === 'mensal' ? 'mensal' : 'semanal', nm = INS_NOME[modo], nb = INS_BASE[modo];
   const {per, i, P} = insSel();
@@ -2303,7 +2317,7 @@ function viewInsights() {
   let h = viewHead(CN ? `Insights · ${CN}` : 'Insights', CN ? `B2C · somente os negócios com prefixo <b>${CP}</b> · para ver outra campanha, troque no seletor do topo` : `B2C · avaliação ${modo === 'semanal' ? 'semanal' : 'mensal'} de todos os leads · escolha TRD, DIAG ou RCON no topo para ver só uma campanha`);
   h += subAbas(INS_MODOS, modo, 'insmodo');
   if (!P) return h + `<div class="card">${emptyBox('Sem dados')}</div>`;
-  h += `<div class="mpmeses">${per.slice(-(modo === 'semanal' ? 10 : 12)).map(p => `<button type="button" data-insper="${p.k}" class="${p.k === P.k ? 'on' : ''}">${p.rot}${p.parcial ? '<small>parcial</small>' : ''}</button>`).join('')}</div>`;
+  h += perSelect(per.map(p => [p.k, modo === 'semanal' ? `Semana ${fDM(p.de)} a ${fDM(p.fim)}/${p.fim.slice(0, 4)}` : mesNome(p.k), p.parcial]), P.k, 'insper', modo === 'semanal' ? 'Semana' : 'Mês');
   const x = insCalc(P.de, P.ate);
   const nDias = diffDays(P.de, P.fim) + 1, frac = P.parcial ? (diffDays(P.de, P.ate) + 1) / nDias : 1;
   const ant = per[i - 1] ? insAjusta(insCalc(per[i - 1].de, per[i - 1].fim), frac) : null;
@@ -2443,7 +2457,7 @@ function viewMPProMensal() {
   if (!meses.includes(S.mpMes)) S.mpMes = fechados.length ? fechados[fechados.length - 1] : meses[meses.length - 1];
   const ym = S.mpMes, x = mpMes(ym), i = meses.indexOf(ym), p = i > 0 ? mpMes(meses[i - 1]) : null;
   h += mpModoSeg();
-  h += `<div class="mpmeses">${meses.map(m => `<button type="button" data-mpmes="${m}" class="${m === ym ? 'on' : ''}">${mesCurto(m)}${ymLast(m) >= TODAY ? '<small>parcial</small>' : ''}</button>`).join('')}</div>`;
+  h += perSelect(meses.map(m => [m, mesNome(m), ymLast(m) >= TODAY]), ym, 'mpmes', 'Mês');
   if (!x) return h + `<div class="card">${emptyBox('Sem dados neste mês')}</div>`;
   h += `<div class="mph"><span>${mesNome(ym).toUpperCase()}</span>${fDay(x.de)} a ${fDay(ymLast(ym))}${x.parcial ? ` · <b class="red">mês em andamento, dados até ${fDay(TODAY)}</b>` : ''}${p ? ` · comparado com ${mesNome(p.ym)}` : ''} · o filtro de datas do topo não se aplica aqui</div>`;
   const P = p || {};
@@ -4113,6 +4127,11 @@ function bindEvents() {
     for (const [p] of PRESETS) { const r = presetRange(p); if (r[0] === de && r[1] === ate) { S.preset = p; break; } }
     resetPages(); update();
   };
+  document.addEventListener('change', ev => {   // seletor de período suspenso (perSelect)
+    const sel = ev.target.closest && ev.target.closest('select[data-persel]'); if (!sel) return;
+    if (sel.dataset.persel === 'insper') S.insPer = sel.value; else if (sel.dataset.persel === 'mpmes') S.mpMes = sel.value;
+    update({anim: true});
+  });
   document.getElementById('de').addEventListener('change', onDate);
   document.getElementById('ate').addEventListener('change', onDate);
   document.getElementById('prevBtn').addEventListener('click', () => { shiftPeriod(-1); resetPages(); update(); });
