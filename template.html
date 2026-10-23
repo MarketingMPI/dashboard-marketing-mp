@@ -155,7 +155,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
 .insk .kx{margin-top:4px}.insmeta{margin:12px 0 0}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
-.insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.insok{border-top:3px solid #00a611}.insno{border-top:3px solid #c0392b}
+.insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.insok{border-top:3px solid #00a611}.insno{border-top:3px solid #c0392b}
 .mph{font-size:13px;color:var(--cinza);margin:4px 0 12px;display:flex;align-items:center;gap:10px}.mph.mt{margin-top:28px}
 .mph span{font-size:11px;letter-spacing:.1em;font-weight:700;color:#8f7a3e;background:#f6f0de;border-radius:6px;padding:3px 8px}
 .kpi.hero.gold{background:linear-gradient(135deg,#1d1a13,#12100c);border-color:#2b261b}.kpi.hero.gold .kv{color:#e4d6a7}.kpi.hero.gold .kl,.kpi.hero.gold .ks{color:#bfb48f}
@@ -2095,6 +2095,12 @@ function insPeriodos(modo) {
   }
   return out;
 }
+function insSel() {   // período escolhido nos Insights (padrão: último fechado)
+  const per = insPeriodos(S.insModo === 'mensal' ? 'mensal' : 'semanal');
+  let i = per.findIndex(p => p.k === S.insPer);
+  if (i < 0) { i = per.length - 1; if (i > 0 && per[i].parcial) i--; }
+  return {per, i, P: per[i] || null};
+}
 function insCalc(de, ate, camp) {
   const R = run(filtros(camp === undefined ? {de, ate} : {de, ate, campanha: camp})), k = R.res.kpis, e = R.res.eventos, pf = R.res.performance.total;
   const rap = R.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length;
@@ -2132,13 +2138,11 @@ function insVar(c, p, good, fmt, rot, fmtD = fmt) {
 const insN = v => v == null ? '–' : nf0.format(Math.round(v)), insN1 = v => v == null ? '–' : (Math.abs(v - Math.round(v)) < 0.05 ? nf0.format(Math.round(v)) : nf1.format(v));
 function viewInsights() {
   const modo = S.insModo === 'mensal' ? 'mensal' : 'semanal', nm = INS_NOME[modo], nb = INS_BASE[modo];
-  const per = insPeriodos(modo);
-  let h = viewHead('Insights', `B2C · avaliação ${modo === 'semanal' ? 'semanal' : 'mensal'}: grandes números e o que está funcionando e o que não está · os filtros de campanha, consultor e origem do topo valem aqui`);
+  const {per, i, P} = insSel();
+  const CN = S.camp && CAMPANHAS[S.camp] ? CAMPANHAS[S.camp].nome : '', CP = CN ? CN.split(' · ')[0] : '';
+  let h = viewHead(CN ? `Insights · ${CN}` : 'Insights', CN ? `B2C · somente os negócios com prefixo <b>${CP}</b> · para ver outra campanha, troque no seletor do topo` : `B2C · avaliação ${modo === 'semanal' ? 'semanal' : 'mensal'} de todos os leads · escolha TRD, DIAG ou RCON no topo para ver só uma campanha`);
   h += subAbas(INS_MODOS, modo, 'insmodo');
-  if (!per.length) return h + `<div class="card">${emptyBox('Sem dados')}</div>`;
-  let i = per.findIndex(p => p.k === S.insPer);
-  if (i < 0) { i = per.length - 1; if (per[i].parcial && i > 0) i--; }   // padrão: último período fechado
-  const P = per[i];
+  if (!P) return h + `<div class="card">${emptyBox('Sem dados')}</div>`;
   h += `<div class="mpmeses">${per.slice(-(modo === 'semanal' ? 10 : 12)).map(p => `<button type="button" data-insper="${p.k}" class="${p.k === P.k ? 'on' : ''}">${p.rot}${p.parcial ? '<small>parcial</small>' : ''}</button>`).join('')}</div>`;
   const x = insCalc(P.de, P.ate);
   const nDias = diffDays(P.de, P.fim) + 1, frac = P.parcial ? (diffDays(P.de, P.ate) + 1) / nDias : 1;
@@ -2147,7 +2151,7 @@ function viewInsights() {
   const B = ants.length ? insBase(ants, frac) : null;
   const rotAnt = modo === 'semanal' ? 'sem. anterior' : (per[i - 1] ? mesCurto(per[i - 1].k) : 'anterior');
   const rotMed = `média ${ants.length} ${ants.length === 1 ? nm[0] : nm[1]}`;
-  h += `<div class="mph"><span>${modo === 'semanal' ? `SEMANA ${fDM(P.de)} A ${fDM(P.fim)}` : mesNome(P.k).toUpperCase()}</span>${P.parcial ? `em andamento, dados até ${fDay(P.ate)} · comparação ajustada ao ritmo (${fN(diffDays(P.de, P.ate) + 1)} de ${fN(nDias)} dias)` : `comparado com ${rotAnt} e com a ${rotMed}`}</div>`;
+  h += `<div class="mph"><span>${modo === 'semanal' ? `SEMANA ${fDM(P.de)} A ${fDM(P.fim)}` : mesNome(P.k).toUpperCase()}</span>${CN ? `<span class="inscp">${ESC(CN)}</span>` : ''}${P.parcial ? `em andamento, dados até ${fDay(P.ate)} · comparação ajustada ao ritmo (${fN(diffDays(P.de, P.ate) + 1)} de ${fN(nDias)} dias)` : `comparado com ${rotAnt} e com a ${rotMed}`}</div>`;
   // grandes números
   const md = (key, fmt) => B && B[key] != null ? `<div class="kx">${rotMed}: <b>${fmt(B[key])}</b></div>` : '';
   const fRs = v => v == null ? '–' : fR(v);
@@ -2162,7 +2166,7 @@ function viewInsights() {
       tip: 'Leads com a 1ª reunião concluída dentro do período'}),
     kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: md('won', insN1), d: insVar(x.won, ant && ant.won, 1, insN1, rotAnt),
       tip: 'Negócios marcados como ganhos dentro do período'}),
-    kpiCard({label: 'Custo por lead (Meta)', v: fRs(x.cpl), sub: `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: md('cpl', fRs), d: insVar(x.cpl, ant && ant.cpl, -1, fRs, rotAnt),
+    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: md('cpl', fRs), d: insVar(x.cpl, ant && ant.cpl, -1, fRs, rotAnt),
       tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período'})
   ].join('') + '</div>';
   h += `<div class="note insmeta">Metas do B2C: entram aqui, com o % atingido, assim que os números forem definidos.</div>`;
@@ -2173,19 +2177,20 @@ function viewInsights() {
   if (B) {
     put(insTom(x.leads, B.leads, 1), 'Entrada de leads', `<b>${fN(x.leads)}</b> leads novos${vsB(x.leads, B.leads, insN1)}.`);
     const tr = insTom(x.rap, B.rap, 1, 0);
-    put(x.rap != null && x.rap >= 80 && tr !== 'neg' ? 'pos' : x.rap != null && x.rap < 50 ? 'neg' : tr, 'Velocidade do 1º contato', `<b>${fP(x.rap)}</b> dos leads contatados em menos de 1 dia${B.rap != null ? ` (${rotMed}: ${fP(B.rap)})` : ''}; 1º contato médio de ${fD(x.t1)}.`);
-    put(insTom(x.ag, B.ag, 1), 'Agendamentos', `<b>${fN(x.ag)}</b> agendamentos${vsB(x.ag, B.ag, insN1)}${x.leads ? ` · ${nf1.format(x.ag / x.leads * 100)} para cada 100 leads novos` : ''}.`);
-    put(insTom(x.reu, B.reu, 1), 'Reuniões realizadas', `<b>${fN(x.reu)}</b> reuniões${vsB(x.reu, B.reu, insN1)}.`);
+    if (x.leads) put(x.rap != null && x.rap >= 80 && tr !== 'neg' ? 'pos' : x.rap != null && x.rap < 50 ? 'neg' : tr, 'Velocidade do 1º contato', `<b>${fP(x.rap)}</b> dos leads contatados em menos de 1 dia${B.rap != null ? ` (${rotMed}: ${fP(B.rap)})` : ''}; 1º contato médio de ${fD(x.t1)}.`);
+    put(insTom(x.ag, B.ag, 1), 'Agendamentos', `<b>${fN(x.ag)}</b> ${x.ag === 1 ? 'agendamento' : 'agendamentos'}${vsB(x.ag, B.ag, insN1)}${x.leads ? ` · ${nf1.format(x.ag / x.leads * 100)} para cada 100 leads novos` : ''}.`);
+    put(insTom(x.reu, B.reu, 1), 'Reuniões realizadas', `<b>${fN(x.reu)}</b> ${x.reu === 1 ? 'reunião' : 'reuniões'}${vsB(x.reu, B.reu, insN1)}.`);
     put(insTom(x.won, B.won, 1, 2), 'Ganhos', `<b>${fN(x.won)}</b> ${x.won === 1 ? 'negócio ganho' : 'negócios ganhos'}${vsB(x.won, B.won, insN1)}.`);
-    if (x.inv) put(insTom(x.cpl, B.cpl, -1, 0), 'Custo por lead', `<b>${fRs(x.cpl)}</b> por lead de campanha${B.cpl != null ? ` (${rotMed}: ${fRs(B.cpl)})` : ''}, com ${fRs(x.inv)} investidos.`);
+    if (x.inv && x.cpl != null) put(insTom(x.cpl, B.cpl, -1, 0), 'Custo por lead', `<b>${fRs(x.cpl)}</b> por lead de campanha${B.cpl != null ? ` (${rotMed}: ${fRs(B.cpl)})` : ''}, com ${fRs(x.inv)} investidos.`);
   }
   // campanhas: custo por lead por campanha
-  const gs = (x.grupos || []).filter(g => g.id !== 'outros' && (g.investimento > 0 || g.leads > 0));
+  const selG = S.camp ? new Set([S.camp]) : null;   // com campanha escolhida, só ela entra na leitura
+  const gs = (x.grupos || []).filter(g => g.id !== 'outros' && (!selG || selG.has(g.id)) && (g.investimento > 0 || g.leads > 0));
   const comCpl = gs.filter(g => g.investimento > 0 && g.leads >= 3).sort((a, b) => a.custo_lead - b.custo_lead);
   const gn = g => (PAGAS[g.id] || {}).nome || g.id;
   if (comCpl.length >= 2 && comCpl[comCpl.length - 1].custo_lead > comCpl[0].custo_lead * 1.3)
     put('pos', 'Campanha mais eficiente', `<b>${gn(comCpl[0])}</b> trouxe o lead mais barato: ${fRs(comCpl[0].custo_lead)} (${fN(comCpl[0].leads)} leads), contra ${fRs(comCpl[comCpl.length - 1].custo_lead)} em ${gn(comCpl[comCpl.length - 1])}.`);
-  for (const g of gs) if (g.investimento >= 50 && !g.leads) put('neg', `Campanha sem resultado`, `<b>${gn(g)}</b>: ${fRs(g.investimento)} investidos e nenhum lead no Pipedrive no período.`);
+  for (const g of gs) if (g.investimento >= 50 && !g.leads) put('neg', `Mídia sem resultado`, `<b>${gn(g)}</b>: ${fRs(g.investimento)} investidos e nenhum lead no Pipedrive no período.`);
   // leads da semana ainda sem contato
   if (x.leads && x.semCont >= 3 && x.semCont / x.leads > 0.2) put('neg', 'Leads sem contato', `<b>${fN(x.semCont)}</b> dos ${fN(x.leads)} leads do período (${fP(x.semCont / x.leads * 100)}) ainda não tiveram nenhum contato.`);
   // consultores (coorte do período): melhor e pior % de contato, com volume mínimo
@@ -2201,8 +2206,8 @@ function viewInsights() {
   // cadência hoje (só para o período mais recente)
   if (i >= per.length - 2) { const A = run(filtros({de: MIN_DAY, ate: TODAY})), ka = A.res.kpis;
     if (ka.leads_em_atraso) { const top = A.res.consultores.filter(c => c.leads_em_atraso).sort((a, b) => b.leads_em_atraso - a.leads_em_atraso).slice(0, 3);
-      put('neg', 'Cadência (situação de hoje)', `<b>${fN(ka.leads_em_atraso)}</b> ${ka.leads_em_atraso === 1 ? 'lead em aberto' : 'leads em aberto'} com atividade vencida${top.length ? ` (${top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${ka.leads_sem_proxima ? ` e ${fN(ka.leads_sem_proxima)} sem próxima atividade` : ''}.`); }
-    else put('pos', 'Cadência (situação de hoje)', `Nenhum lead em aberto com atividade vencida.`); }
+      put('neg', 'Cadência (situação de hoje)', `<b>${fN(ka.leads_em_atraso)}</b> ${ka.leads_em_atraso === 1 ? 'lead' : 'leads'}${CP ? ' ' + CP : ''} em aberto com atividade vencida${top.length ? ` (${top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${ka.leads_sem_proxima ? ` e ${fN(ka.leads_sem_proxima)} sem próxima atividade` : ''}.`); }
+    else put('pos', 'Cadência (situação de hoje)', `Nenhum lead${CP ? ' ' + CP : ''} em aberto com atividade vencida.`); }
   // por prefixo de campanha (TRD / DIAG / RCON / demais): só quando o seletor de campanha está em "Todos"
   let pxRows = null;
   if (!S.camp) {
@@ -2225,8 +2230,9 @@ function viewInsights() {
     }
   }
   const nPos = pos.length, nNeg = neg.length;
-  const veredito = !B ? 'Sem histórico suficiente para comparar.' : nPos > nNeg ? `${modo === 'semanal' ? 'Semana' : 'Mês'} <b>acima do normal</b>: ${fN(nPos)} ${nPos === 1 ? 'ponto positivo' : 'pontos positivos'} e ${fN(nNeg)} de atenção.`
-    : nNeg > nPos ? `${modo === 'semanal' ? 'Semana' : 'Mês'} <b>abaixo do normal</b>: ${fN(nNeg)} ${nNeg === 1 ? 'ponto de atenção' : 'pontos de atenção'} e ${fN(nPos)} positivos.` : `${modo === 'semanal' ? 'Semana' : 'Mês'} <b>dentro do normal</b>: ${fN(nPos)} positivos e ${fN(nNeg)} de atenção.`;
+  const QM = (modo === 'semanal' ? 'Semana' : 'Mês') + (CP ? ' ' + CP : '');
+  const veredito = !B ? 'Sem histórico suficiente para comparar.' : nPos > nNeg ? `${QM} <b>acima do normal</b>: ${fN(nPos)} ${nPos === 1 ? 'ponto positivo' : 'pontos positivos'} e ${fN(nNeg)} de atenção.`
+    : nNeg > nPos ? `${QM} <b>abaixo do normal</b>: ${fN(nNeg)} ${nNeg === 1 ? 'ponto de atenção' : 'pontos de atenção'} e ${fN(nPos)} positivos.` : `${QM} <b>dentro do normal</b>: ${fN(nPos)} positivos e ${fN(nNeg)} de atenção.`;
   const lst = (L, cls) => L.length ? `<ul class="insl">${L.map(([t, s]) => `<li class="${cls}"><i></i><span><b class="inst">${t}</b> ${s}</span></li>`).join('')}</ul>` : `<p class="mut" style="margin:6px 0">Nada a destacar.</p>`;
   h += `<div class="mph mt"><span>AVALIAÇÃO</span><em class="insv">${veredito} <small>Normal = até 15% de diferença para a ${rotMed}.</small></em></div>`;
   h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ O que está funcionando</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
@@ -2240,7 +2246,7 @@ function viewInsights() {
     h += `<div class="card mt np"><div class="ch" style="padding:16px 18px 0"><div><h3>Por campanha (prefixo do negócio)</h3><p>TRD, DIAG e RCON pelo prefixo do título no Pipedrive · clique no nome para filtrar a página pela campanha · variação contra a ${rotMed}</p></div></div><div class="tw"><table class="t inspx"><thead><tr><th>Campanha</th><th class="num">Leads novos</th><th class="num">Contato &lt; 1 dia</th><th class="num">Agendamentos</th><th class="num">Reuniões</th><th class="num">Ganhos</th><th class="num">Investimento Meta</th><th class="num">Custo por lead</th></tr></thead><tbody>` +
       pxRows.map(r => `<tr><td class="wrap" style="max-width:220px">${r.camp ? `<b data-act="camp" data-v="${r.camp}" style="cursor:pointer">${ESC(r.n)}</b>` : `<b>${ESC(r.n)}</b>`}</td>${cel(r, 'leads', insN1, 1)}<td class="num"><b>${fP(r.x.rap)}</b>${r.b ? `<div class="mut">${rotMed}: ${fP(r.b.rap)}</div>` : ''}</td>${cel(r, 'ag', insN1, 1)}${cel(r, 'reu', insN1, 1)}${cel(r, 'won', insN1, 1)}<td class="num">${r.x.inv ? fRs(r.x.inv) : '–'}</td><td class="num">${r.x.cpl != null ? fRs(r.x.cpl) : '–'}</td></tr>`).join('') +
       `</tbody></table></div></div>`;
-  } else h += `<div class="note mt">Campanha selecionada no topo: <b>${ESC((CAMPANHAS[S.camp] || {}).nome || S.camp)}</b>. Para ver a separação por prefixo (TRD, DIAG, RCON e demais), volte o seletor para "Todos os leads".</div>`;
+  }
   // comparativo
   if (B) {
     const rows = [['Leads novos', 'leads', 1, insN1], ['Contato em menos de 1 dia', 'rap', 1, fP], ['Com contato (leads do período)', 'pctCont', 1, fP], ['1º contato médio', 't1', -1, fD],
@@ -3329,7 +3335,8 @@ function renderChips() {
   }
   if (S.busca.trim()) { any = true; h += `<span class="chip"><small>Busca:</small>“${ESC(S.busca.trim())}”<button data-rm="busca" aria-label="Remover busca">✕</button></span>`; }
   if (any) h += '<button class="clr" data-act="clear">Limpar filtros</button>';
-  const nCamp = id => { const pr = makePred(filtros({campanha: id})); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
+  const IP = S.tab === 'insights' ? insSel().P : null;
+  const nCamp = id => { const pr = makePred(filtros(IP ? {campanha: id, de: IP.de, ate: IP.ate} : {campanha: id})); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
   h += '<span class="cps" role="radiogroup" aria-label="Campanha">' +
     `<button type="button" class="cp${S.camp ? '' : ' on'}" data-act="camp" data-v="" role="radio" aria-checked="${!S.camp}" title="Todos os negócios do Funil Alpha">Todos os leads (${fN(nCamp(null))})</button>` +
     Object.entries(CAMPANHAS).map(([id, c]) => `<button type="button" class="cp${S.camp === id ? ' on' : ''}" data-act="camp" data-v="${id}" role="radio" aria-checked="${S.camp === id}" title="${ESC(c.tip)}">${c.nome} (${fN(nCamp(id))})</button>`).join('') + '</span>';
