@@ -154,7 +154,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .g{display:grid;gap:16px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
-.insk .kx{margin-top:4px}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
+.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
 .insexc{margin:0 0 14px;font-size:13px}.inscons td.num .mut{font-size:11px}.insfu td .dl{display:inline-block}.insag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px}@media(max-width:960px){.insag{grid-template-columns:1fr}}
@@ -2322,7 +2322,7 @@ function insSugHtml(L, CP) {
   return `<div class="card mt inssug"><div class="ch"><div><h3>💡 Sugestões de mudança para melhorar resultados</h3><p>${CP ? `Campanha ${ESC(CP)} · ` : ''}da maior para a menor prioridade · clique em cada uma para ver o diagnóstico e as ações</p></div></div>
     <div class="foco">${L.map((f, i) => `<details class="fci" name="inssug"${i === 0 ? ' open' : ''}><summary class="fch"><span class="fcn">${i + 1}</span><b>${f.t}</b><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="fcb">
       <div class="fcr"><div><span>Hoje</span>${f.hoje}</div><div><span>Meta</span>${f.meta}</div></div>
-      <ul>${f.acoes.map(a => `<li>${a}</li>`).join('')}</ul>
+      ${f.porque ? `<p class="fcw">${f.porque}</p>` : ''}<ul>${f.acoes.map(a => `<li>${a}</li>`).join('')}</ul>
       ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div></details>`).join('')}</div></div>`;
 }
 // acompanhamento: as sugestões do período anterior melhoraram neste período?
@@ -2399,8 +2399,9 @@ const DSEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 function insPrint() {
   const v = document.getElementById('view'), fechados = [...v.querySelectorAll('details:not([open])')];
   fechados.forEach(d => d.open = true);
-  const t0 = document.title, P = insSel().P;
-  document.title = `Insights B2C - ${S.insModo === 'mensal' ? mesNome(P.k).replace('/', '-') : `semana ${fDM(P.de).replace('/', '-')} a ${fDM(P.fim).replace('/', '-')}`}${S.camp ? ' - ' + S.camp.toUpperCase() : ''}`;
+  const t0 = document.title;
+  if (S.tab === 'mppro') document.title = `Insights MP PRO - ${mesNome(S.mpMes).replace('/', '-')}`;
+  else { const P = insSel().P; document.title = `Insights B2C - ${S.insModo === 'mensal' ? mesNome(P.k).replace('/', '-') : `semana ${fDM(P.de).replace('/', '-')} a ${fDM(P.fim).replace('/', '-')}`}${S.camp ? ' - ' + S.camp.toUpperCase() : ''}`; }
   const volta = () => { fechados.forEach(d => d.open = false); document.title = t0; window.removeEventListener('afterprint', volta); };
   window.addEventListener('afterprint', volta);
   setTimeout(() => window.print(), 60);
@@ -2543,41 +2544,101 @@ function viewInsights() {
   return h;
 }
 const FONTES_GRP = [['Fontes do Brasil', ['trafius_cpm', 'vtg', 'prosp', 'synchro', 'bcb']], ['Fontes internacionais', ['recurly', 'wordstream', 'baymard', 'skok']]];
+/* MP PRO · Insights mensais — mesmo padrão dos Insights do B2C: grandes números (cores contra a média dos 3 meses
+   anteriores, mês anterior em texto), metas, avaliação (✔/✖) com veredito, sugestões de mudança, acompanhamento das
+   sugestões do mês anterior, MP PRO × mercado, comparativo (fechado) e "Como ler". Mês em andamento: contagens da base
+   ajustadas ao ritmo (dias decorridos). */
+const MPI_CONT = new Set(['liquido', 'resultado', 'novas', 'investimento', 'renovacoes', 'pagamentos', 'reemb']);
+const MPI_KEYS = ['liquido', 'resultado', 'novas', 'ativos', 'mrr', 'churn', 'renov', 'investimento', 'cpm', 'cac', 'roas', 'ltvCac', 'reembPct', 'convVisita', 'renovacoes', 'pagamentos'];
+function mpiBase(list, frac) {
+  const b = {}; for (const k of MPI_KEYS) { const v = list.map(x => x[k]).filter(v => v != null);
+    b[k] = v.length ? v.reduce((a, y) => a + y, 0) / v.length * (MPI_CONT.has(k) ? frac : 1) : null; }
+  return b;
+}
+const mpiAjusta = (x, frac) => { if (!x || frac === 1) return x; const y = Object.assign({}, x); for (const k of MPI_CONT) if (y[k] != null) y[k] *= frac; return y; };
+const MPI_CHK = {ret: ['churn mensal', 'churn', -1, v => fP(v)], cpm: ['CPM', 'cpm', -1, v => fRc(v)], cob: ['taxa de renovação', 'renov', 1, v => fP(v)],
+  ree: ['reembolso das novas', 'reembPct', -1, v => fP(v)], chk: ['checkout → assinatura', 'convCheckout', 1, v => fP(v)], tic: ['LTV ÷ CAC', 'ltvCac', 1, v => fX(v) + 'x'],
+  vol: ['novas assinaturas', 'novas', 1, v => fN(v), true]};
 function viewMPProMensal() {
-  let h = viewHead('MP PRO', 'B2B - Análises · insights mensais: cada mês do dia 1º ao último dia, comparado com o mês anterior e com referências de mercado');
+  let h = viewHead('MP PRO', 'B2B - Análises · insights mensais: mês fechado, do dia 1º ao último dia, comparado com a média dos 3 meses anteriores e com o mercado',
+    `<button type="button" class="btn gh" data-act="ins-pdf" title="Gera um PDF desta página para a reunião">⤓ Exportar para a reunião (PDF)</button>`);
   const MP = D.mppro || {};
   if (MP.erro_kiwify) h += `<div class="note">Última leitura da Kiwify falhou (${ESC(MP.erro_kiwify)}). Os números são da leitura anterior.</div>`;
   const meses = mpMeses();
   if (!meses.length) return h + mpModoSeg() + `<div class="card">${emptyBox('Dados do MP PRO indisponíveis')}</div>`;
   const fechados = meses.filter(ym => ymLast(ym) < TODAY);
   if (!meses.includes(S.mpMes)) S.mpMes = fechados.length ? fechados[fechados.length - 1] : meses[meses.length - 1];
-  const ym = S.mpMes, x = mpMes(ym), i = meses.indexOf(ym), p = i > 0 ? mpMes(meses[i - 1]) : null;
+  const ym = S.mpMes, x = mpMes(ym), i = meses.indexOf(ym), pRaw = i > 0 ? mpMes(meses[i - 1]) : null;
   h += mpModoSeg();
   h += perSelect(meses.map(m => [m, mesNome(m), ymLast(m) >= TODAY]), ym, 'mpmes', 'Mês');
   if (!x) return h + `<div class="card">${emptyBox('Sem dados neste mês')}</div>`;
-  h += `<div class="mph"><span>${mesNome(ym).toUpperCase()}</span>${fDay(x.de)} a ${fDay(ymLast(ym))}${x.parcial ? ` · <b class="red">mês em andamento, dados até ${fDay(TODAY)}</b>` : ''}${p ? ` · comparado com ${mesNome(p.ym)}` : ''} · o filtro de datas do topo não se aplica aqui</div>`;
-  const P = p || {};
-  if (x.novas < 10 || (x.churnBase || 0) < 30) h += `<div class="note">Base ainda pequena (${fN(x.novas)} novas assinaturas e ${fN(x.ativos)} ativos): uma assinatura a mais ou a menos muda bastante os percentuais. Leia as variações junto com os números absolutos.</div>`;
-  h += '<div class="kpis">' + [
-    kpiCard({label: 'Receita líquida', cls: 'hero gold', v: fRc(x.liquido), sub: `${fRc(x.bruto)} bruto · ${fN(x.pagamentos)} pagamentos`, d: p ? delta(x.liquido, P.liquido, 1, fRc0) : '', tip: 'Pagamentos aprovados no mês (MP PRO + Formação), já sem a taxa da Kiwify'}),
-    kpiCard({label: 'Resultado do mês', cls: x.resultado < 0 ? 'red' : '', v: fRc(x.resultado), sub: `receita líquida − ${fRc(x.investimento)} de mídia`, d: p ? delta(x.resultado, P.resultado, 1, fRc0) : ''}),
-    kpiCard({label: 'Novas assinaturas', v: fN(x.novas), sub: x.reemb ? `${fN(x.reemb)} reembolsada${x.reemb > 1 ? 's' : ''}` : 'nenhuma reembolsada', d: p ? delta(x.novas, P.novas) : ''}),
-    kpiCard({label: 'Assinantes ativos', v: fN(x.ativos), sub: `no fim do mês · MRR ${fRc(x.mrr)}`, d: p ? delta(x.ativos, P.ativos) : '', tip: 'Cobrança confirmada nos últimos 40 dias, no último dia do mês'}),
-    kpiCard({label: 'Churn do mês', cls: x.churn != null && x.churn > 4.99 ? 'red' : '', v: x.churn == null ? '–' : fP(x.churn), sub: x.churn == null ? 'sem base no mês anterior' : `${fN(x.churnSairam)} de ${fN(x.churnBase)} não renovaram · mercado 4,99%`, d: p && P.churn != null && x.churn != null ? delta(x.churn, P.churn, -1, fP) : '',
-      tip: 'Assinantes que pagaram no mês anterior e não pagaram neste mês ÷ assinantes que pagaram no mês anterior.\nDiferente da taxa de renovação: quem paga com atraso, já no mês seguinte, conta aqui como saída.'}),
-    kpiCard({label: 'Taxa de renovação', tip: 'Cobranças com vencimento no mês (último pagamento + 1 mês) que foram pagas, mesmo com atraso', v: x.renov == null ? '–' : fP(x.renov), sub: x.previstas ? `${fN(x.renovacoes)} pagas de ${fN(x.previstas)} previstas` : 'nenhuma prevista', d: p && P.renov != null && x.renov != null ? delta(x.renov, P.renov, 1, fP) : ''}),
-    kpiCard({label: 'Investimento em mídia', v: fRc(x.investimento), sub: `${fN(x.imp)} impressões · ${fN(x.visitas)} visitas`, d: p ? delta(x.investimento, P.investimento, 0, fRc0) : ''}),
-    kpiCard({label: 'CAC', v: fRc(x.cac), sub: 'mídia ÷ novas assinaturas', d: p && P.cac != null && x.cac != null ? delta(x.cac, P.cac, -1, fRc) : ''}),
-    kpiCard({label: 'ROAS', cls: x.roas != null && x.roas < 1 ? 'red' : '', v: x.roas == null ? '–' : fX(x.roas) + '<small>x</small>', sub: 'receita líquida ÷ mídia', d: p && P.roas != null && x.roas != null ? delta(x.roas, P.roas, 1, v => fX(v) + 'x') : ''}),
-    kpiCard({label: 'LTV ÷ CAC', cls: x.ltvCac != null && x.ltvCac < 1 ? 'red' : '', v: x.ltvCac == null ? '–' : fX(x.ltvCac) + '<small>x</small>', sub: `LTV ${fRc(x.ltv)} · referência acima de 3x`, d: p && P.ltvCac != null && x.ltvCac != null ? delta(x.ltvCac, P.ltvCac, 1, v => fX(v) + 'x') : ''})
+  const nDias = diffDays(x.de, ymLast(ym)) + 1, frac = x.parcial ? (diffDays(x.de, TODAY) + 1) / nDias : 1;
+  const ants = meses.slice(Math.max(0, i - 3), i).map(mpMes).filter(Boolean);
+  const B = ants.length ? mpiBase(ants, frac) : null, ant = mpiAjusta(pRaw, frac);
+  const rotAnt = pRaw ? mesCurto(pRaw.ym) : 'mês anterior', rotMed = `média ${ants.length} ${ants.length === 1 ? 'mês' : 'meses'}`;
+  h += `<div class="mph"><span>${mesNome(ym).toUpperCase()}</span>${x.parcial ? `em andamento, dados até ${fDay(TODAY)} · comparação ajustada ao ritmo (${fN(diffDays(x.de, TODAY) + 1)} de ${fN(nDias)} dias)` : B ? `comparado com a ${rotMed} (cores) e com ${rotAnt}` : 'primeiro mês com dados: sem comparação'}</div>`;
+  if (x.novas < 10 || (x.churnBase || 0) < 30) h += `<div class="note insexc">Base ainda pequena (${fN(x.novas)} novas assinaturas e ${fN(x.ativos)} ativos): uma assinatura a mais ou a menos muda bastante os percentuais. Leia as variações junto com os números absolutos.</div>`;
+  // grandes números
+  const pa = (k, fmt) => ant && ant[k] != null ? `<div class="kx">${rotAnt}: <b>${fmt(ant[k])}</b></div>` : '';
+  const fX1 = v => v == null ? '–' : fX(v) + 'x';
+  h += '<div class="kpis k6 insk">' + [
+    kpiCard({label: 'Receita líquida', cls: 'hero gold', v: fRc(x.liquido), sub: `${fRc(x.bruto)} bruto · ${fN(x.pagamentos)} pagamentos`, extra: pa('liquido', fRc), d: insVar(x.liquido, B && B.liquido, 1, fRc, rotMed),
+      tip: 'Pagamentos aprovados no mês (MP PRO + Formação), já sem a taxa da Kiwify'}),
+    kpiCard({label: 'Novas assinaturas', v: fN(x.novas), sub: x.reemb ? `${fN(x.reemb)} reembolsada${x.reemb > 1 ? 's' : ''}` : 'nenhuma reembolsada', extra: pa('novas', insN1), d: insVar(x.novas, B && B.novas, 1, insN1, rotMed)}),
+    kpiCard({label: 'Assinantes ativos', v: fN(x.ativos), sub: `no fim do mês · MRR ${fRc(x.mrr)}`, extra: pa('ativos', insN1), d: insVar(x.ativos, B && B.ativos, 1, insN1, rotMed), tip: 'Cobrança confirmada nos últimos 40 dias, no último dia do mês'}),
+    kpiCard({label: 'Churn do mês', cls: x.churn != null && x.churn > 4.99 ? 'red' : '', v: x.churn == null ? '–' : fP(x.churn), sub: x.churn == null ? 'sem base no mês anterior' : `${fN(x.churnSairam)} de ${fN(x.churnBase)} não renovaram · mercado 4,99%`, extra: pa('churn', fP), d: insVar(x.churn, B && B.churn, -1, fP, rotMed),
+      tip: 'Assinantes que pagaram no mês anterior e não pagaram neste mês ÷ assinantes que pagaram no mês anterior'}),
+    kpiCard({label: 'CAC', v: fRc(x.cac), sub: `${fRc(x.investimento)} de mídia ÷ novas assinaturas`, extra: pa('cac', fRc), d: insVar(x.cac, B && B.cac, -1, fRc, rotMed)}),
+    kpiCard({label: 'Resultado do mês', cls: x.resultado < 0 ? 'red' : '', v: fRc(x.resultado), sub: `receita líquida − mídia · ROAS ${fX1(x.roas)}`, extra: pa('resultado', fRc), d: insVar(x.resultado, B && B.resultado, 1, fRc, rotMed)})
   ].join('') + '</div>';
-  // destaques
-  const ins = mpInsights(x, p);
-  h += `<div class="mt mpins"><div class="card"><div class="ch"><div><h3>Destaques de ${mesNome(ym)}</h3><p>Leitura automática dos números do mês · pronta para reunião</p></div></div>
-    <ul class="insl">${ins.map(([t, s]) => `<li class="${t}"><i></i><span>${s}</span></li>`).join('')}</ul></div></div>`;
-  h += mpFocoHtml(x, p);
+  h += mpMetasHtml(x);
+  // avaliação
+  const pos = [], neg = [], neu = [], put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);
+  const vsB = (c, b, fmt) => b == null ? '' : ` (${rotMed}: ${fmt(b)}${b ? `, ${c >= b ? '+' : '−'}${nf1.format(Math.abs((c - b) / b * 100))}%` : ''})`;
+  if (B) {
+    put(insTom(x.liquido, B.liquido, 1, 0), 'Receita líquida', `<b>${fRc(x.liquido)}</b>${vsB(x.liquido, B.liquido, fRc)}${x.pctRen != null ? `; ${fP(x.pctRen)} veio de renovações` : ''}.`);
+    put(insTom(x.novas, B.novas, 1), 'Novas assinaturas', `<b>${fN(x.novas)}</b> novas${vsB(x.novas, B.novas, insN1)}.`);
+    put(insTom(x.ativos, B.ativos, 1), 'Base ativa', `<b>${fN(x.ativos)}</b> assinantes no fim do mês${vsB(x.ativos, B.ativos, insN1)} · MRR de ${fRc(x.mrr)}.`);
+    if (x.cac != null) put(insTom(x.cac, B.cac, -1, 0), 'CAC', `<b>${fRc(x.cac)}</b> por assinatura${vsB(x.cac, B.cac, fRc)}.`);
+  }
+  if (x.churn != null) put(x.churn <= 4.99 ? 'pos' : 'neg', 'Retenção (churn)', `<b>${fP(x.churn)}</b> de churn: ${fN(x.churnSairam)} de ${fN(x.churnBase)} assinantes não renovaram${x.churn > 4.99 ? ` · ${fX(x.churn / 4.99)}x o mercado (4,99%)` : ' · dentro do mercado (4,99%)'}${B && B.churn != null ? `; ${rotMed}: ${fP(B.churn)}` : ''}.`);
+  if (x.previstas) put(x.renov >= 90 ? 'pos' : 'neg', 'Renovação', `<b>${fP(x.renov)}</b> das ${fN(x.previstas)} cobranças previstas foram pagas${x.inad ? `; ${fN(x.inad)} inadimplente${x.inad > 1 ? 's' : ''}` : ''}${x.recusas ? ` · ${fN(x.recusas)} recusas no cartão` : ''}.`);
+  if (x.investimento) put(x.resultado >= 0 ? 'pos' : 'neg', 'Resultado do mês', `<b>${fRc(x.resultado)}</b>: ${fRc(x.liquido)} líquidos para ${fRc(x.investimento)} de mídia (ROAS ${fX1(x.roas)})${x.resultado < 0 ? ' — a receita do mês não cobriu a mídia' : ''}.`);
+  if (x.cpm != null) put(x.cpm > 6000 ? 'neg' : 'pos', 'Custo da mídia (CPM)', `<b>${fRc(x.cpm)}</b> por mil impressões${x.cpm > 6000 ? ' · acima da faixa de finanças/investimentos (R$ 35–60)' : ' · dentro da faixa de finanças/investimentos (R$ 35–60)'}${B && B.cpm != null ? `; ${rotMed}: ${fRc(B.cpm)}` : ''}.`);
+  for (const b of mpBenchList()) { if (b.k === 'churn' || x[b.k] == null) continue; const [c, t] = mpBenchLeitura(b, x);
+    put(c === 'ruim' ? 'neg' : c === 'na' ? 'neu' : 'pos', b.t, `<b>${b.fmt(x[b.k])}</b> · ${t} (${b.base === 'br' ? 'ref. Brasil' : 'ref. global'}: ${b.base === 'br' ? b.br : b.gl}).`); }
+  const AL = D.mppro_alunos;
+  if (AL && AL.extraido_em && AL.extraido_em.slice(0, 7) === ym && AL.assinatura_ativa && AL.assinatura_ativa.na_area) {
+    const e = AL.assinatura_ativa, pe = e.acessaram_30d / e.na_area * 100;
+    put(pe >= 60 ? 'pos' : 'neg', 'Uso da área de membros', `<b>${fP(pe)}</b> dos assinantes ativos acessaram as aulas nos últimos 30 dias (${fN(e.acessaram_30d)} de ${fN(e.na_area)}); progresso médio de ${fP(e.progresso_medio)} · fotografia de ${fDay(AL.extraido_em.slice(0, 10))}.`); }
+  const nPos = pos.length, nNeg = neg.length;
+  const veredito = nPos > nNeg ? `Mês <b>acima do esperado</b>: ${fN(nPos)} ${nPos === 1 ? 'ponto positivo' : 'pontos positivos'} e ${fN(nNeg)} de atenção.`
+    : nNeg > nPos ? `Mês <b>abaixo do esperado</b>: ${fN(nNeg)} ${nNeg === 1 ? 'ponto de atenção' : 'pontos de atenção'} e ${fN(nPos)} positivos.` : `Mês <b>equilibrado</b>: ${fN(nPos)} positivos e ${fN(nNeg)} de atenção.`;
+  const lst = (L, cls) => L.length ? `<ul class="insl">${L.map(([t, s]) => `<li class="${cls}"><i></i><span><b class="inst">${t}</b> ${s}</span></li>`).join('')}</ul>` : `<p class="mut" style="margin:6px 0">Nada a destacar.</p>`;
+  h += `<div class="mph mt"><span>AVALIAÇÃO</span><em class="insv">${veredito} <small>Contra a ${B ? rotMed + ' (±15% = normal) e ' : ''}as referências de mercado.</small></em></div>`;
+  h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ O que está funcionando</h3><p>Acima da média ou dentro da referência de mercado</p></div></div>${lst(pos, 'pos')}</div>
+    <div class="card insno"><div class="ch"><div><h3>✖ O que não está funcionando</h3><p>Abaixo da média ou fora da referência de mercado</p></div></div>${lst(neg, 'neg')}</div></div>`;
+  // sugestões de mudança (mesmo formato dos Insights do B2C)
+  const F = mpFoco(x, pRaw);
+  h += insSugHtml(F.itens, '');
+  if (F.manter.length) h += `<div class="fcok mt"><b>O que manter:</b> ${F.manter.join(' · ')}.</div>`;
+  // acompanhamento das sugestões do mês anterior
+  if (pRaw) {
+    const LP = mpFoco(pRaw, i > 1 ? mpMes(meses[i - 2]) : null).itens;
+    if (LP.length) {
+      const rows = LP.map(f => { const c = MPI_CHK[f.k];
+        if (!c) return `<tr><td class="wrap" style="max-width:280px"><b>${f.t}</b></td><td class="num">–</td><td class="num">–</td><td><span class="dl na">sem indicador</span></td></tr>`;
+        const a = pRaw[c[1]], raw = x[c[1]], b = raw != null && c[4] && frac < 1 ? raw / frac : raw;
+        let st = '<span class="dl na">sem dado</span>';
+        if (a != null && b != null) { const d = b - a, rel = a ? Math.abs(d / a) : (d ? 1 : 0);
+          st = rel < 0.05 ? '<span class="dl neu">= sem mudança</span>' : ((d > 0) === (c[2] > 0) ? '<span class="dl pos">✔ melhorou</span>' : '<span class="dl neg">✖ não melhorou</span>'); }
+        return `<tr><td class="wrap" style="max-width:280px"><b>${f.t}</b><div class="mut">${c[0]}</div></td><td class="num">${c[3](a)}</td><td class="num">${raw == null ? '–' : c[3](raw)}${c[4] && frac < 1 && raw != null ? `<div class="mut">ritmo: ${c[3](Math.round(b))}</div>` : ''}</td><td>${st}</td></tr>`; }).join('');
+      h += `<div class="card mt np insfu"><div class="ch" style="padding:16px 18px 0"><div><h3>↺ Acompanhamento das sugestões do mês anterior</h3><p>O que foi sugerido em ${mesNome(pRaw.ym)} e como o indicador ficou agora${frac < 1 ? ' · mês em andamento: contagens no ritmo do mês inteiro' : ''}</p></div></div>
+        <div class="tw"><table class="t"><thead><tr><th>Sugestão</th><th class="num">${mesCurto(pRaw.ym)}</th><th class="num">${mesCurto(ym)}</th><th>Resultado</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    }
+  }
   // mercado
-  h += `<div class="card mt"><div class="ch"><div><h3>MP PRO × mercado em ${mesNome(ym)}</h3><p>Assinatura mensal de educação para profissionais de finanças · ticket de ${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · referência do Brasil sempre que existe estudo público; senão, a global · clique em cada indicador para ver as duas e a fonte</p></div></div>
+  h += `<div class="card mt"><div class="ch"><div><h3>MP PRO × mercado em ${mesNome(ym)}</h3><p>Assinatura mensal de educação para profissionais de finanças · ticket de ${fRc(x.ticket)} por pagamento (≈ US$ ${fX(x.ticket / 100 / USD_BRL)}) · referência do Brasil sempre que existe estudo público; senão, a global · clique em cada indicador</p></div></div>
     <div class="foco bmk">${mpBenchList().map(b => { const [c, t] = mpBenchLeitura(b, x), fo = MP_FONTES[b.f];
       const fo2 = b.f2 ? MP_FONTES[b.f2] : null;
       return `<details class="fci" name="mpbench"><summary class="fch"><b>${b.t}</b><span class="bmo ${b.base}">${b.base === 'br' ? 'ref. Brasil' : 'ref. global'}</span><span class="bmv">${x[b.k] == null ? '–' : b.fmt(x[b.k])}</span><span class="bml ${c}">${t}</span><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
@@ -2587,7 +2648,25 @@ function viewMPProMensal() {
         <p class="fcw">${ESC(b.nota)}</p><div class="bmf">Fonte: <a href="${fo.url}" target="_blank" rel="noopener">${ESC(fo.nome)}</a>${fo2 ? ` · <a href="${fo2.url}" target="_blank" rel="noopener">${ESC(fo2.nome)}</a>` : ''}</div></div></details>`; }).join('')}</div>
     <details class="fci mpfx"><summary class="fch"><b>Fontes de referência</b><span class="mpfxn">${FONTES_GRP.reduce((a, g) => a + g[1].length, 0)} fontes · Brasil e internacionais</span><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
     <div class="mpfontes bmx">${FONTES_GRP.map(([tt, ks]) => `<b>${tt}</b><ol>${ks.map(k => MP_FONTES[k]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${ESC(f.nome)}</a></li>`).join('')}</ol>`).join('')}
-    <p>Referências consultadas em ${fDay(USD_BRL_DATA)}. São médias de mercado, com amostras e definições próprias (a maioria internacional): use como ordem de grandeza, não como meta exata. Os números do MP PRO atribuem 100% das novas assinaturas à campanha Perpétuo, porque os pedidos da Kiwify não trazem a origem. Material interno, não é recomendação de investimento.</p></div></details></div>`;
+    <p>Referências consultadas em ${fDay(USD_BRL_DATA)}. São médias de mercado, com amostras e definições próprias: use como ordem de grandeza, não como meta exata. Os números do MP PRO atribuem 100% das novas assinaturas à campanha Perpétuo, porque os pedidos da Kiwify não trazem a origem.</p></div></details></div>`;
+  // comparativo
+  if (B) {
+    const rows = [['Receita líquida', 'liquido', 1, fRc], ['Resultado do mês', 'resultado', 1, fRc], ['Novas assinaturas', 'novas', 1, insN1], ['Assinantes ativos (fim do mês)', 'ativos', 1, insN1], ['MRR', 'mrr', 1, fRc],
+      ['Churn mensal', 'churn', -1, fP], ['Taxa de renovação', 'renov', 1, fP], ['Investimento em mídia', 'investimento', 0, fRc], ['CPM', 'cpm', -1, fRc], ['CAC', 'cac', -1, fRc], ['ROAS', 'roas', 1, fX1],
+      ['LTV ÷ CAC', 'ltvCac', 1, fX1], ['Reembolso das novas', 'reembPct', -1, fP], ['Conversão da página', 'convVisita', 1, fP]];
+    const vr = (c, b, good, fmt) => { if (c == null || b == null) return '–'; const d = c - b; if (Math.abs(d) < 1e-9) return '<span class="dl neu">=</span>';
+      const tone = good === 0 ? 'neu' : ((d > 0) === (good > 0) ? 'pos' : 'neg');
+      if (fmt === fP) return `<span class="dl ${tone}">${d > 0 ? '▲ +' : '▼ −'}${nf1.format(Math.abs(d))} p.p.</span>`;
+      return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${b ? nf1.format(Math.abs(d / b * 100)) + '%' : 'novo'} (${d > 0 ? '+' : '−'}${fmt(Math.abs(d))})</span>`; };
+    h += `<details class="card mt np inscmp"><summary class="ch"><div><h3>Comparativo</h3><p>${x.parcial ? 'Mês em andamento: anterior e média ajustados ao mesmo número de dias' : 'Mês fechado'} · clique para abrir a tabela</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="tw"><table class="t"><thead><tr><th>Indicador</th><th class="num">${mesCurto(ym)}</th><th class="num">${rotAnt}</th><th class="num">${rotMed[0].toUpperCase() + rotMed.slice(1)}</th><th class="num">Variação × média</th></tr></thead><tbody>` +
+      rows.map(([t, k, good, fmt]) => `<tr><td>${t}</td><td class="num"><b>${fmt(x[k])}</b></td><td class="num">${ant ? fmt(ant[k]) : '–'}</td><td class="num">${fmt(B[k])}</td><td class="num">${vr(x[k], B[k], good, fmt)}</td></tr>`).join('') + `</tbody></table></div></details>`;
+  }
+  h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
+    <li>Cada mês vai do dia 1º ao último dia; abre no último mês fechado. O filtro de datas do topo não se aplica aqui.</li>
+    <li>As cores e a <b>avaliação</b> comparam com a média dos 3 meses anteriores (até 15% de diferença é normal) e com as referências de mercado; o mês anterior aparece em texto.</li>
+    <li>Variações sempre em % e em número. Mês em andamento: a comparação é ajustada ao mesmo número de dias.</li>
+    <li>Receita = MP PRO + Formação (mesmo produto, valor fixo), já sem a taxa da Kiwify. Mídia = campanhas "MP PRO … Perpétuo" na Meta. As metas são as fixas até 31/12/2026 (também na seção Metas).</li>
+    <li><b>Exportar para a reunião</b> gera um PDF da página (na janela de impressão, escolha "Salvar como PDF").</li></ul></details>`;
   return h;
 }
 const ymPrev = ym => { let y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1; if (!m) { m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
@@ -4116,7 +4195,7 @@ function renderView(anim) {
 }
 function update(o = {}) {
   writeHash(); renderNav(); renderFilterBar(); renderChips(); renderView(o.anim);
-  document.getElementById('fbar').hidden = isB2B(S.tab) && !SO_PERIODO.has(S.tab);
+  document.getElementById('fbar').hidden = (isB2B(S.tab) && !SO_PERIODO.has(S.tab)) || (S.tab === 'mppro' && S.mpModo !== 'periodo');   // MP PRO Insights/Metas: seletor próprio de mês
   document.getElementById('fbar').classList.toggle('so-periodo', SO_PERIODO.has(S.tab));
   document.getElementById('fbar').classList.toggle('sem-periodo', S.tab === 'insights');   // Insights: seletor próprio de semana/mês  // MP PRO: só o período vale
   document.querySelector('footer.howto').hidden = isB2B(S.tab);
