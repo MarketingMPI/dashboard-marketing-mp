@@ -1712,7 +1712,7 @@ function miniFunnel(k) {
   const cols = ['#003326', '#00503c', '#1f7a58', '#3d9a6f', '#00a611'];
   let h = '<div class="fun">';
   steps.forEach(([nome, v, ref], i) => {
-    if (i) h += `<div class="fconv"><span></span><span>↓ ${fP(pctOf(v, steps[i - 1][1]))} da etapa anterior</span><span></span></div>`;
+    if (i) { const c = convEtapa(v, steps[i - 1][1]); h += `<div class="fconv"><span></span><span${c.acima ? ` data-tip="${ESC(`${fN(v)} ${steps[i][0].toLowerCase()} contra ${fN(steps[i - 1][1])} na etapa anterior: há negócios que pularam etapas no Pipedrive (ex.: ganho sem reunião registrada)`)}"` : ''}>↓ ${c.t} da etapa anterior${c.acima ? ' <b class="red">⚠ etapas puladas</b>' : ''}</span><span></span></div>`; }
     const tip = `${nome}: ${fN(v)}\n${fP(pctOf(v, k.leads))} dos leads do período` + (i ? `\n${fP(pctOf(v, steps[i - 1][1]))} de ${steps[i - 1][0].toLowerCase()}` : '')
       + (ref ? `\nReferência: ${fP(ref)} dos leads (${fN(Math.round(k.leads * ref / 100))} esperados)` : '');
     h += `<div class="fs" data-tip="${ESC(tip)}"><span class="fl">${nome}</span><span class="ft"><i style="width:${Math.max(1.5, 100 * v / k.leads)}%;background:${cols[i]};animation-delay:${i * 70}ms"></i>${ref ? `<em style="width:${ref}%"></em>` : ''}</span>
@@ -1818,6 +1818,9 @@ function periodCaption(ref = 'entrada') {
   const fx = n > 31 || pd.slice(0, 4) !== S.ate.slice(0, 4) ? fDay : fDM;
   return `Leads por data de ${ref} ${per} (${fN(n)} ${n === 1 ? 'dia' : 'dias'}) · comparação com ${pd === pa ? fx(pd) : fx(pd) + ' a ' + fx(pa)}`;
 }
+// conversão de uma etapa para a próxima: no máximo 100%. Se a etapa tem MAIS que a anterior (ex.: ganhos sem reunião
+// registrada no Pipedrive), mostra 100% com aviso em vez de 1.100%.
+const convEtapa = (v, ant) => { if (!ant) return {t: '–', acima: false}; const r = v / ant * 100; return {t: fP(Math.min(100, r)), acima: r > 100.05, r}; };
 const viewHead = (t, sub, right = '') => `<div class="vh"><div><h2>${t}</h2><p>${sub}</p></div>${right}</div>`;
 
 /* ---- Visão Macro ---- */
@@ -3306,7 +3309,7 @@ function refPrudential(k) {
     if (!i) return `<tr><td data-tip="${ESC(tip)}"><b>${nome}</b></td><td class="num b">${fN(v)}</td><td class="num">100%</td><td class="num muted">100%</td><td class="num muted">${fN(L)}</td><td class="num muted">–</td><td class="num muted">–</td><td class="muted">base</td></tr>`;
     const esp = Math.round(L * ref / 100), dif = v - esp, [, pv, pref] = R[i - 1];
     return `<tr><td data-tip="${ESC(tip)}"><b>${nome}</b></td><td class="num b">${fN(v)}</td><td class="num">${fP(real)}</td><td class="num">${fP(ref)}</td><td class="num">${fN(esp)}</td>` +
-      `<td class="num${dif < 0 ? ' red' : ''} b">${dif > 0 ? '+' : ''}${fN(dif)}</td><td class="num">${fP(pctOf(v, pv))} <span class="muted">/ ${fP(ref / pref * 100)}</span></td><td>${st(real, ref)}</td></tr>`;
+      `<td class="num${dif < 0 ? ' red' : ''} b">${dif > 0 ? '+' : ''}${fN(dif)}</td><td class="num"${convEtapa(v, pv).acima ? ` data-tip="${ESC(`${fN(v)} nesta etapa contra ${fN(pv)} na anterior: há negócios que pularam etapas no Pipedrive (ex.: ganho sem reunião registrada)`)}"` : ''}>${convEtapa(v, pv).t}${convEtapa(v, pv).acima ? ' <b class="red">⚠</b>' : ''} <span class="muted">/ ${fP(ref / pref * 100)}</span></td><td>${st(real, ref)}</td></tr>`;
   }).join('');
   const th = [['Etapa', 'Etapa do funil'], ['Real', 'Leads do período que chegaram à etapa'], ['% dos leads', 'Real ÷ leads qualificados do período'], ['Referência', 'Taxa de referência sobre os qualificados (MQL)'],
     ['Esperado', 'Leads do período × referência'], ['Diferença', 'Real − esperado'], ['Etapa anterior real / ref.', 'Real ÷ etapa anterior / taxa de referência sobre a etapa anterior'], ['Situação', 'Real ÷ referência: verde = atingiu, amarelo = 70% a 99%, vermelho = abaixo de 70%']];
