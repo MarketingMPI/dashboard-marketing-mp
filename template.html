@@ -154,7 +154,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .g{display:grid;gap:16px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
-.insk .kx{margin-top:4px}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
+.insk .kx{margin-top:4px}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
 .insok{border-top:3px solid #00a611}.insno{border-top:3px solid #c0392b}
@@ -689,7 +689,7 @@ select.bl-in+.bl-in{margin-top:8px}
         <div><dt>Agendado e Reunião</dt><dd><b>Agendado</b>: o lead chegou à etapa Reunião, Negociação ou Fechamento (ou foi ganho). <b>Reunião</b>: existe uma reunião (ou reunião de qualificação) concluída.</dd></div>
         <div><dt>Dias sem contato e parados</dt><dd>Só para leads abertos: dias desde o último contato (ou desde a entrada, se nunca houve contato). <b>Parado</b> = mais de 7 dias sem contato.</dd></div>
         <div><dt>Funil / Mapa do CRM</dt><dd>Etapas do funil sem o Cultivo. <b>Entraram</b>: leads que estiveram na etapa. <b>Avançaram</b>: chegaram a uma etapa seguinte (em Fechamento: ganhos). <b>Ainda estão</b>: abertos na etapa hoje. <b>Saíram sem avançar</b>: perdidos na etapa, enviados ao Cultivo ou que voltaram de etapa. Entraram = avançaram + ainda estão + saíram sem avançar. <b>Média até avançar</b>: dias da entrada na etapa até chegar à próxima (só quem avançou).</dd></div>
-        <div><dt>Referência Prudential</dt><dd>Taxas ideais da coluna Prudential da planilha de taxas de conversão, recalculadas sobre os leads qualificados (todo lead do Funil Alpha já chega qualificado pelo formulário): <b>60%</b> agendam, <b>30%</b> fazem a reunião e <b>10%</b> fecham. Aparecem como contorno tracejado no Funil do período (Visão Macro) e na tabela Funil × referência ideal (aba Funil / Mapa do CRM).</dd></div>
+        <div><dt>Referência do funil</dt><dd>Tabela de conversão de referência, com base nos leads qualificados (MQL), porque todo lead do Funil Alpha já chega qualificado: <b>30%</b> agendam, <b>15%</b> fazem a reunião e <b>5%</b> fecham (etapa a etapa: 30% → 50% → 33,3%). Aparecem como contorno tracejado no Funil do período (Visão Macro) e na tabela Funil × referência ideal (aba Funil / Mapa do CRM).</dd></div>
         <div><dt>Performance</dt><dd>Investimento na Meta Ads das campanhas B2C (Tríade, Diagnóstico Financeiro e Iscas) dividido pelo que aconteceu <b>no Pipedrive</b> com os leads que entraram no período: custo por lead, por agendamento, por reunião e por fechamento. Os leads contados pela Meta são ignorados. TRD = campanhas Tríade; DIAG = campanhas Diagnóstico Financeiro; RCON não tem mídia paga. Só o período e a campanha valem nesta aba.</dd></div>
         <div><dt>Perdidos</dt><dd>Lead-time até a perda = dias da entrada até a perda. Contatos até a perda = contatos concluídos até o momento da perda. Opcionalmente, a aba Perdidos pode recortar o período pela data da perda.</dd></div>
       </dl>
@@ -714,10 +714,12 @@ const RAW = /*__RAW__*/null;
 const DAY = 86400000;
 const AGENDA_STAGES = new Set([348, 349, 350]);
 const FLOW = [345, 346, 348, 349, 350];  // ordem do funil; Cultivo (438) fica fora do fluxo
-// Referência ideal (planilha TAXA DE CONVERSÃO, coluna Prudential): % sobre os leads QUALIFICADOS.
-// Todo lead do Funil Alpha já chega qualificado pelo formulário; na Prudential qualificados = 50% dos leads brutos,
-// então agendadas 30% → 60%, realizadas 15% → 30%, fechamento 5% → 10%.
-const REF_PRU = {ag: 60, re: 30, ga: 10};
+// Referência ideal (tabela de conversão do funil, enviada pelo usuário em 23/10/2026): Leads 100% → Qualificados 10%
+// → Reuniões agendadas 3% → Reuniões realizadas 1,5% → Fechamento 0,5%. Todo lead do Funil Alpha já é MQL (qualificado),
+// então a base é o Qualificado: agendadas 30%, realizadas 15%, fechamento 5% (etapa a etapa: 30% → 50% → 33,3%).
+// Volume de referência por MQL: 100/mês (25/semana) → 30 agendadas, 15 realizadas, 5 fechamentos (7,5 / 3,75 / 1,25 por semana).
+const REF_PRU = {ag: 30, re: 15, ga: 5};
+const REF_VOL = {mensal: {mql: 100, ag: 30, re: 15, ga: 5}, semanal: {mql: 25, ag: 7.5, re: 3.75, ga: 1.25}};
 const MEETING_TYPES = new Set(['meeting', 'qualificacao']);
 const DEFAULT_STAGES = [{id: 345, nome: 'MQL - 1º Contato'}, {id: 346, nome: 'Agendar'}, {id: 348, nome: 'Reunião'},
   {id: 349, nome: 'Negociação'}, {id: 350, nome: 'Fechamento'}, {id: 438, nome: 'Cultivo'}];
@@ -1643,7 +1645,7 @@ function miniFunnel(k) {
   steps.forEach(([nome, v, ref], i) => {
     if (i) h += `<div class="fconv"><span></span><span>↓ ${fP(pctOf(v, steps[i - 1][1]))} da etapa anterior</span><span></span></div>`;
     const tip = `${nome}: ${fN(v)}\n${fP(pctOf(v, k.leads))} dos leads do período` + (i ? `\n${fP(pctOf(v, steps[i - 1][1]))} de ${steps[i - 1][0].toLowerCase()}` : '')
-      + (ref ? `\nReferência Prudential: ${fP(ref)} dos leads (${fN(Math.round(k.leads * ref / 100))} esperados)` : '');
+      + (ref ? `\nReferência: ${fP(ref)} dos leads (${fN(Math.round(k.leads * ref / 100))} esperados)` : '');
     h += `<div class="fs" data-tip="${ESC(tip)}"><span class="fl">${nome}</span><span class="ft"><i style="width:${Math.max(1.5, 100 * v / k.leads)}%;background:${cols[i]};animation-delay:${i * 70}ms"></i>${ref ? `<em style="width:${ref}%"></em>` : ''}</span>
       <span class="fv"><b>${fN(v)}</b><small>${fP(pctOf(v, k.leads))}</small>${ref ? `<small class="rf">ref. ${fP(ref)}</small>` : ''}</span></div>`;
   });
@@ -1780,7 +1782,7 @@ function viewMacro() {
       <div class="lg"><span><i style="background:#00503c"></i>Contatados</span><span><i style="background:#c2d3cb"></i>Sem contato</span><span><i style="background:#f6e7c8"></i>Fim de semana</span></div></div>
       ${C.rows.length ? ch.svg : emptyBox()}</div>
     <div class="card"><div class="ch"><div><h3>Funil do período</h3><p>Leads → Contatados → Agendados → Reuniões → Ganhos</p></div>
-      <div class="lg"><span data-tip="Taxas ideais da Prudential sobre leads qualificados: agendados 60%, reuniões 30%, ganhos 10%"><i class="rfk"></i>Referência Prudential</span></div></div>${miniFunnel(k)}</div></div>`;
+      <div class="lg"><span data-tip="Referência sobre os leads qualificados (MQL): agendados 30%, reuniões 15%, ganhos 5%"><i class="rfk"></i>Referência do funil</span></div></div>${miniFunnel(k)}</div></div>`;
   // distribuição 1º contato
   const B = [['< 1 dia', 0, '#003326', 'Mesmo dia (menos de 1 dia)'], ['1–2 dias', 0, '#00503c'], ['2–3 dias', 0, '#3d8a6b'], ['3–7 dias', 0, '#7db59c'], ['> 7 dias', 0, '#b4d6c6', 'Mais de 7 dias'], ['Sem contato', 0, '#d5ddd9']];
   for (const {d} of C.rows) { const v = d.d1; B[v == null ? 5 : v < 1 ? 0 : v < 2 ? 1 : v < 3 ? 2 : v <= 7 ? 3 : 4][1]++; }
@@ -2216,31 +2218,40 @@ function insSugHtml(L, CP) {
       ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div></details>`).join('')}</div></div>`;
 }
 /* Metas de REFERÊNCIA dos Insights B2C (até a meta oficial ser definida pelo time). % = quanto da referência foi atingido.
-   Funil (agendados 60%, reuniões 30%, ganhos 10% dos leads) = REF_PRU (Prudential, planilha TAXA DE CONVERSÃO).
+   Funil sobre MQL (agendados 30%, reuniões 15%, ganhos 5%; etapa a etapa 30% → 50% → 33,3%) = REF_PRU; volume = REF_VOL.
    Contato em menos de 1 dia 80% e cadência 100% = referência interna de boa prática comercial. */
-const INS_REF_FONTE = {pru: 'Prudential (planilha Taxa de Conversão)', int: 'referência interna de boa prática comercial'};
-function insMetasHtml(x, cad, CP, parcial) {
-  const pc = (a, b) => b ? a / b * 100 : null;
+const INS_REF_FONTE = {pru: 'tabela de conversão de referência (base = MQL)', int: 'referência interna de boa prática comercial'};
+function insMetasHtml(x, cad, CP, parcial, modo, frac) {
+  const pc = (a, b) => b ? a / b * 100 : null, V = REF_VOL[modo] || REF_VOL.semanal, ff = frac || 1;
+  const nv = v => v == null ? '–' : v.toLocaleString('pt-BR', {maximumFractionDigits: 2});
+  // volume de referência no período (proporcional aos dias, no período em andamento); só sem campanha selecionada
+  const vol = CP ? [] : [
+    {t: 'MQL (leads qualificados)', v: x.leads, meta: V.mql * ff, fmt: nv, sub: `referência de ${nv(V.mql)} por ${modo === 'mensal' ? 'mês' : 'semana'}`, f: 'pru'},
+    {t: 'Reuniões agendadas', v: x.ag, meta: V.ag * ff, fmt: nv, sub: 'agendadas no período, lead de qualquer data', f: 'pru'},
+    {t: 'Reuniões realizadas', v: x.reu, meta: V.re * ff, fmt: nv, sub: 'realizadas no período', f: 'pru'},
+    {t: 'Fechamentos', v: x.won, meta: V.ga * ff, fmt: nv, sub: 'ganhos no período', f: 'pru'}];
   const itens = [
     {t: 'Contato em menos de 1 dia', v: x.rap, meta: 80, sub: `${fN(x.rapN)} de ${fN(x.leads)} leads`, f: 'int'},
     {t: 'Leads com contato', v: x.pctCont, meta: 100, sub: `${fN(x.cont)} de ${fN(x.leads)} leads`, f: 'int'},
-    {t: 'Agendados', v: pc(x.kAg, x.leads), meta: REF_PRU.ag, sub: `${fN(x.kAg)} de ${fN(x.leads)} leads do período`, f: 'pru'},
-    {t: 'Reuniões realizadas', v: pc(x.kReu, x.leads), meta: REF_PRU.re, sub: `${fN(x.kReu)} de ${fN(x.leads)} leads do período`, f: 'pru'},
-    {t: 'Ganhos', v: pc(x.kWon, x.leads), meta: REF_PRU.ga, sub: `${fN(x.kWon)} de ${fN(x.leads)} leads do período`, f: 'pru'}];
+    {t: 'MQL → reunião agendada', v: pc(x.kAg, x.leads), meta: REF_PRU.ag, sub: `${fN(x.kAg)} de ${fN(x.leads)} MQL do período`, f: 'pru'},
+    {t: 'Agendada → realizada', v: pc(x.kReu, x.kAg), meta: REF_PRU.re / REF_PRU.ag * 100, sub: x.kAg ? `${fN(x.kReu)} de ${fN(x.kAg)} agendados` : 'nenhum MQL do período agendado', f: 'pru'},
+    {t: 'Realizada → fechamento', v: pc(x.kWon, x.kReu), meta: REF_PRU.ga / REF_PRU.re * 100, sub: x.kReu ? `${fN(x.kWon)} de ${fN(x.kReu)} com reunião` : `nenhuma reunião registrada entre os MQL do período${x.kWon ? ` (${fN(x.kWon)} ganhos sem reunião lançada)` : ''}`, f: 'pru'},
+    {t: 'MQL → fechamento', v: pc(x.kWon, x.leads), meta: REF_PRU.ga, sub: `${fN(x.kWon)} de ${fN(x.leads)} MQL do período`, f: 'pru'}];
   if (cad && cad.abertos) {
     itens.push({t: 'Leads abertos em dia com a cadência', v: pc(cad.abertos - cad.atraso, cad.abertos), meta: 100, sub: `${fN(cad.atraso)} com atividade vencida · situação de hoje`, f: 'int'});
     itens.push({t: 'Leads abertos com próxima atividade', v: pc(cad.abertos - cad.semProx, cad.abertos), meta: 100, sub: `${fN(cad.semProx)} sem nada agendado · situação de hoje`, f: 'int'});
   }
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
-  const card = m => { const q = m.v == null ? null : m.v / m.meta * 100;
+  const card = m => { const q = m.v == null || !m.meta ? null : m.v / m.meta * 100, F = m.fmt || fP;
     return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${q == null ? '–' : fP(q)}</b></div>
       <div class="mt-bar"><i style="width:${Math.min(100, q || 0)}%"></i></div>
-      <div class="mt-f"><span>Realizado <b>${fP(m.v)}</b></span><span>Referência <b>${fP(m.meta)}</b></span></div>
+      <div class="mt-f"><span>Realizado <b>${F(m.v)}</b></span><span>Referência <b>${F(m.meta)}</b></span></div>
       <div class="mt-n">${m.sub}</div></div>`; };
-  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas de referência${CP ? ` · ${ESC(CP)}` : ''}</h3><p>% = quanto da referência foi atingido · funil (agendados 60%, reuniões 30%, ganhos 10%) = referência Prudential; contato e cadência = referência interna${parcial ? ' · período em andamento' : ''} · as metas oficiais do B2C substituem estas quando forem definidas</p></div>
+  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas de referência${CP ? ` · ${ESC(CP)}` : ''}</h3><p>% = quanto da referência foi atingido · base = MQL (todo lead do Funil Alpha já é qualificado): 30% agendam, 50% dos agendados fazem a reunião e 33,3% das reuniões fecham${parcial ? ' · período em andamento: volume proporcional aos dias' : ''} · as metas oficiais do B2C substituem estas quando forem definidas</p></div>
     <div class="lg"><span><i style="background:#00a611"></i>100% ou mais</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
-    <div class="mt-g">${itens.map(card).join('')}</div>
-    <div class="mt-n" style="margin-top:10px">Agendados, reuniões e ganhos contam os leads que entraram no período e já avançaram; em semanas recentes esses números ainda sobem. Meta de volume de leads: aguardando o número oficial.</div></div>`;
+    ${vol.length ? `<h4 class="insmh">Volume no período</h4><div class="mt-g">${vol.map(card).join('')}</div>` : ''}
+    <h4 class="insmh">Conversão do funil e atendimento</h4><div class="mt-g">${itens.map(card).join('')}</div>
+    <div class="mt-n" style="margin-top:10px">Volume = o que aconteceu no período${CP ? '' : ` (referência mensal: 100 MQL, 30 agendadas, 15 realizadas e 5 fechamentos; semanal: 25, 7,5, 3,75 e 1,25)`}. Conversão = MQL que entraram no período e já avançaram; em semanas recentes ainda sobe.${CP ? ' Volume de referência é do B2C inteiro: aparece em "Todos os leads".' : ''}</div></div>`;
 }
 function viewInsights() {
   const modo = S.insModo === 'mensal' ? 'mensal' : 'semanal', nm = INS_NOME[modo], nb = INS_BASE[modo];
@@ -2276,7 +2287,7 @@ function viewInsights() {
       tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período'})
   ].join('') + '</div>';
   const KA = run(filtros({de: MIN_DAY, ate: TODAY})).res.kpis;
-  h += insMetasHtml(x, {abertos: KA.abertos, atraso: KA.leads_em_atraso, semProx: KA.leads_sem_proxima}, CP, P.parcial);
+  h += insMetasHtml(x, {abertos: KA.abertos, atraso: KA.leads_em_atraso, semProx: KA.leads_sem_proxima}, CP, P.parcial, modo, frac);
   // avaliação
   const pos = [], neg = [], neu = [];
   const put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);
@@ -3128,10 +3139,10 @@ function viewTempo() {
 const PAR_COLS = [LL_COLS[0], LL_COLS[1], LL_COLS[3], LL_COLS[5], LL_COLS[7], LL_COLS[8], LL_COLS[9]].map(c => ({...c, nosort: true}));
 const PAR_COLS_S = [LL_COLS[0], LL_COLS[1], LL_COLS[3], LL_COLS[9]].map(c => ({...c, nosort: true}));
 
-/* referência ideal (Prudential) × funil real do período */
+/* referência ideal do funil (base MQL: 30% / 15% / 5%) × funil real do período */
 function refPrudential(k) {
   const L = k.leads, R = [
-    ['Leads qualificados', L, 100, 'Leads do período no Funil Alpha (todos já chegam qualificados pelo formulário)'],
+    ['Leads qualificados (MQL)', L, 100, 'Leads do período no Funil Alpha (todos já chegam qualificados)'],
     ['Reuniões agendadas', k.agendados, REF_PRU.ag, 'Chegaram à etapa Reunião ou além (ou ganhos)'],
     ['Reuniões realizadas', k.reunioes, REF_PRU.re, 'Leads com reunião concluída registrada no Pipedrive'],
     ['Fechamento', k.ganhos, REF_PRU.ga, 'Leads do período já ganhos']];
@@ -3147,11 +3158,11 @@ function refPrudential(k) {
     return `<tr><td data-tip="${ESC(tip)}"><b>${nome}</b></td><td class="num b">${fN(v)}</td><td class="num">${fP(real)}</td><td class="num">${fP(ref)}</td><td class="num">${fN(esp)}</td>` +
       `<td class="num${dif < 0 ? ' red' : ''} b">${dif > 0 ? '+' : ''}${fN(dif)}</td><td class="num">${fP(pctOf(v, pv))} <span class="muted">/ ${fP(ref / pref * 100)}</span></td><td>${st(real, ref)}</td></tr>`;
   }).join('');
-  const th = [['Etapa', 'Etapa do funil da Prudential'], ['Real', 'Leads do período que chegaram à etapa'], ['% dos leads', 'Real ÷ leads qualificados do período'], ['Referência', 'Taxa ideal da Prudential sobre os qualificados'],
-    ['Esperado', 'Leads do período × referência'], ['Diferença', 'Real − esperado'], ['Etapa anterior real / ref.', 'Real ÷ etapa anterior / taxa ideal da Prudential sobre a etapa anterior'], ['Situação', 'Real ÷ referência: verde = atingiu, amarelo = 70% a 99%, vermelho = abaixo de 70%']];
-  return `<div class="card np mt"><div class="ch"><div><h3>Funil × referência ideal (Prudential)</h3><p>Base = ${fN(L)} leads do período, todos já qualificados pelo formulário · referência da coluna Prudential da planilha de taxas de conversão, recalculada sobre os qualificados</p></div></div>
+  const th = [['Etapa', 'Etapa do funil'], ['Real', 'Leads do período que chegaram à etapa'], ['% dos leads', 'Real ÷ leads qualificados do período'], ['Referência', 'Taxa de referência sobre os qualificados (MQL)'],
+    ['Esperado', 'Leads do período × referência'], ['Diferença', 'Real − esperado'], ['Etapa anterior real / ref.', 'Real ÷ etapa anterior / taxa de referência sobre a etapa anterior'], ['Situação', 'Real ÷ referência: verde = atingiu, amarelo = 70% a 99%, vermelho = abaixo de 70%']];
+  return `<div class="card np mt"><div class="ch"><div><h3>Funil × referência ideal</h3><p>Base = ${fN(L)} leads do período, todos já qualificados (MQL) · referência: 30% agendam, 15% fazem a reunião e 5% fecham</p></div></div>
     <div class="tw"><table class="t"><thead><tr>${th.map(([t, tip], i) => `<th class="${i && i < 7 ? 'num' : ''}" title="${ESC(tip)}">${t}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="muted" style="font-size:12px;margin:10px 16px 14px;line-height:1.45">Na Prudential, 50% dos leads brutos viram qualificados; por isso agendadas 30% → 60%, realizadas 15% → 30% e fechamento 5% → 10% sobre os qualificados. Reuniões realizadas dependem da atividade de reunião lançada no Pipedrive (falta de registro derruba a taxa). Leads recentes ainda não tiveram tempo de avançar: compare de preferência meses fechados.</p></div>`;
+    <p class="muted" style="font-size:12px;margin:10px 16px 14px;line-height:1.45">Tabela de referência: Leads 100% → Qualificados 10% → agendadas 3% → realizadas 1,5% → fechamento 0,5%. Como trabalhamos só com MQL, a base é o Qualificado: agendadas 30%, realizadas 15% e fechamento 5% (etapa a etapa: 30%, 50% e 33,3%). Reuniões realizadas dependem da atividade de reunião lançada no Pipedrive (falta de registro derruba a taxa). Leads recentes ainda não tiveram tempo de avançar: compare de preferência meses fechados.</p></div>`;
 }
 
 /* ---- Funil / Mapa do CRM ---- */
