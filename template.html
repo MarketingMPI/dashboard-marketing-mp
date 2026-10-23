@@ -2591,7 +2591,7 @@ function viewMPProMensal() {
     kpiCard({label: 'CAC', v: fRc(x.cac), sub: `${fRc(x.investimento)} de mídia ÷ novas assinaturas`, extra: pa('cac', fRc), d: insVar(x.cac, B && B.cac, -1, fRc, rotMed)}),
     kpiCard({label: 'Resultado do mês', cls: x.resultado < 0 ? 'red' : '', v: fRc(x.resultado), sub: `receita líquida − mídia · ROAS ${fX1(x.roas)}`, extra: pa('resultado', fRc), d: insVar(x.resultado, B && B.resultado, 1, fRc, rotMed)})
   ].join('') + '</div>';
-  h += mpMetasHtml(x);
+  h += `<div class="note insexc" style="margin-top:12px">As metas até 31/12/2026 estão na seção <b data-mpmodo="metas" style="cursor:pointer;text-decoration:underline">Metas</b>.</div>`;
   // avaliação
   const pos = [], neg = [], neu = [], put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);
   const vsB = (c, b, fmt) => b == null ? '' : ` (${rotMed}: ${fmt(b)}${b ? `, ${c >= b ? '+' : '−'}${nf1.format(Math.abs((c - b) / b * 100))}%` : ''})`;
@@ -2665,7 +2665,7 @@ function viewMPProMensal() {
     <li>Cada mês vai do dia 1º ao último dia; abre no último mês fechado. O filtro de datas do topo não se aplica aqui.</li>
     <li>As cores e a <b>avaliação</b> comparam com a média dos 3 meses anteriores (até 15% de diferença é normal) e com as referências de mercado; o mês anterior aparece em texto.</li>
     <li>Variações sempre em % e em número. Mês em andamento: a comparação é ajustada ao mesmo número de dias.</li>
-    <li>Receita = MP PRO + Formação (mesmo produto, valor fixo), já sem a taxa da Kiwify. Mídia = campanhas "MP PRO … Perpétuo" na Meta. As metas são as fixas até 31/12/2026 (também na seção Metas).</li>
+    <li>Receita = MP PRO + Formação (mesmo produto, valor fixo), já sem a taxa da Kiwify. Mídia = campanhas "MP PRO … Perpétuo" na Meta. As metas até 31/12/2026 ficam na seção Metas.</li>
     <li><b>Exportar para a reunião</b> gera um PDF da página (na janela de impressão, escolha "Salvar como PDF").</li></ul></details>`;
   return h;
 }
