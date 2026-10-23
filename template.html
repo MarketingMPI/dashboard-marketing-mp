@@ -154,7 +154,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .g{display:grid;gap:16px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
-.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
+@media(min-width:761px){.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))}}.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
 .insexc{margin:0 0 14px;font-size:13px}.inscons td.num .mut{font-size:11px}.insfu td .dl{display:inline-block}.insag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px}@media(max-width:960px){.insag{grid-template-columns:1fr}}
@@ -2581,7 +2581,7 @@ function viewMPProMensal() {
   // grandes números
   const pa = (k, fmt) => ant && ant[k] != null ? `<div class="kx">${rotAnt}: <b>${fmt(ant[k])}</b></div>` : '';
   const fX1 = v => v == null ? '–' : fX(v) + 'x';
-  h += '<div class="kpis k6 insk">' + [
+  h += '<div class="kpis k3x insk">' + [
     kpiCard({label: 'Receita líquida', cls: 'hero gold', v: fRc(x.liquido), sub: `${fRc(x.bruto)} bruto · ${fN(x.pagamentos)} pagamentos`, extra: pa('liquido', fRc), d: insVar(x.liquido, B && B.liquido, 1, fRc, rotMed),
       tip: 'Pagamentos aprovados no mês (MP PRO + Formação), já sem a taxa da Kiwify'}),
     kpiCard({label: 'Novas assinaturas', v: fN(x.novas), sub: x.reemb ? `${fN(x.reemb)} reembolsada${x.reemb > 1 ? 's' : ''}` : 'nenhuma reembolsada', extra: pa('novas', insN1), d: insVar(x.novas, B && B.novas, 1, insN1, rotMed)}),
