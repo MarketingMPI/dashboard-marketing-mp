@@ -156,6 +156,32 @@ def filtra(leads, f):
     return out
 
 
+# ----------------------------------------------------------------------------- movimento do período (Insights)
+def eventos(leads, f):
+    """O que ACONTECEU no período, com lead de qualquer data de entrada (os demais filtros valem):
+    agendamento = 1ª entrada numa etapa de agendamento (ou o ganho, se nunca passou por ela); reunião = 1ª atividade
+    de reunião concluída; ganho/perda = data do ganho/perda; contatos = atividades de contato concluídas no período."""
+    de, ate = f.get("de") or "0000-00-00", f.get("ate") or "9999-99-99"
+    P = filtra(leads, dict(f, de=None, ate=None))
+    dentro = lambda s: bool(s) and de <= str(s)[:10] <= ate
+    ag = reu = won = lost = cont = contL = 0
+    motivos = Counter()
+    for l in P:
+        k, h = l["k"] or [], l["h"] or []
+        segs = [s[1] for s in h if s[0] in AGENDADO_STAGES]
+        t_ag = min(segs) if segs else (l["w"] if l["s"] == "won" and l["w"] else None)
+        if dentro(t_ag): ag += 1
+        rs = [x[0] for x in k if x[1] in REUNIAO_TIPOS]
+        if rs and dentro(min(rs)): reu += 1
+        if l["s"] == "won" and dentro(l["w"]): won += 1
+        if l["s"] == "lost" and dentro(l["l"]):
+            lost += 1; motivos[l.get("lr") or "Sem motivo informado"] += 1
+        n = sum(1 for x in k if dentro(x[0]))
+        cont += n; contL += 1 if n else 0
+    return {"agendamentos": ag, "reunioes": reu, "ganhos": won, "perdidos": lost, "contatos": cont,
+            "leads_contatados": contL, "motivos_perda": dict(motivos)}
+
+
 # ----------------------------------------------------------------------------- performance (mídia × Pipedrive)
 MIDIA = None   # D["midia"]; definido por load()/expected_all()/compare() (ou por quem importa o módulo)
 PAGAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "isca": r"^\s*\[ISCA", "outros": None}
@@ -655,6 +681,7 @@ def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
     return {"kpis": kpis, "etapas": etapas, "consultores": consultores,
             "perdidos": perdidos, "lead_time": lead_time,
             "performance": performance(leads, filtros, agora, midia if midia is not None else MIDIA),
+            "eventos": eventos(leads, filtros),
             "mppro": mppro(MPPRO, filtros, agora_str[:10]),
             "instagram": instagram(IG, filtros, agora_str[:10])}
 
@@ -696,6 +723,9 @@ def cenarios(D):
         ("mppro_julho_ate_hoje", filtros_base("2026-07-01", h)),
         ("ultimos_30_consultor_top_perf", filtros_base(d30, h, consultores=[top], campanha="trd")),
         ("mes_passado_diag", filtros_base(iso(hoje.replace(day=1) - timedelta(days=hoje.replace(day=1).day + 27)), iso(hoje.replace(day=1) - timedelta(days=1)), campanha="diag")),
+        ("insights_semana_fechada", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)))),
+        ("insights_semana_fechada_trd", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)), campanha="trd")),
+        ("insights_mes_fechado", filtros_base(iso((hoje.replace(day=1) - timedelta(days=1)).replace(day=1)), iso(hoje.replace(day=1) - timedelta(days=1)))),
     ] + _meses_mppro(hoje)
 
 
