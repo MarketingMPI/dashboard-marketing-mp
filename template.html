@@ -2136,6 +2136,82 @@ function insVar(c, p, good, fmt, rot, fmtD = fmt) {
   return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${pc == null ? 'novo' : nf1.format(Math.abs(pc)) + '%'} (${d > 0 ? '+' : '−'}${fmtD(Math.abs(d))})</span><span class="vs">${rot}: ${fmt(p)}</span>`;
 }
 const insN = v => v == null ? '–' : nf0.format(Math.round(v)), insN1 = v => v == null ? '–' : (Math.abs(v - Math.round(v)) < 0.05 ? nf0.format(Math.round(v)) : nf1.format(v));
+/* Sugestões de mudança (Insights B2C): regras sobre os números do período × média; ordem = prioridade.
+   Cada item: t (título), hoje (evidência), meta, acoes[], impacto (opcional). */
+function insSugestoes(c) {
+  const {x, B, gs, comCpl, cs, modo, CP, rotMed, recente} = c, out = [];
+  const fRs = v => v == null ? '–' : fR(v), quem = CP ? `leads ${CP}` : 'leads';
+  const gn = g => (PAGAS[g.id] || {}).nome || g.id;
+  // 1) mídia que gasta e não traz lead
+  for (const g of gs) if (g.investimento >= 50 && !g.leads) out.push({t: `Destravar a campanha ${gn(g)}`,
+    hoje: `${fRs(g.investimento)} investidos e nenhum lead com o prefixo no Pipedrive`, meta: 'todo lead do anúncio chegando ao Pipedrive com o prefixo certo',
+    acoes: ['Enviar um lead de teste pelo formulário do anúncio e conferir se o negócio cai no Funil Alpha com o prefixo no título',
+      'Se o lead cai sem prefixo ou em outro funil, corrigir a integração (é ela que define o título do negócio)',
+      'Se a integração estiver certa, revisar público e criativo ou pausar a campanha até corrigir',
+      comCpl.length && comCpl[0].id !== g.id ? `Enquanto isso, avaliar levar a verba para ${gn(comCpl[0])}, hoje com o lead mais barato (${fRs(comCpl[0].custo_lead)})` : 'Acompanhar diariamente até o primeiro lead aparecer'],
+    impacto: `Evita ${fRs(g.investimento)} por ${INS_NOME[modo][0]} sem retorno mensurável.`});
+  // 2) velocidade do 1º contato
+  if (x.leads >= 3 && x.rap != null && (x.rap < 50 || (B && insTom(x.rap, B.rap, 1, 0) === 'neg'))) out.push({t: 'Contatar o lead no mesmo dia',
+    hoje: `${fP(x.rap)} dos ${quem} contatados em menos de 1 dia · 1º contato médio de ${fD(x.t1)}`, meta: '80% ou mais dos leads com contato em menos de 1 dia',
+    acoes: ['1ª tentativa (ligação + WhatsApp) em até 1 hora para leads que entram no horário comercial',
+      'Leads de sábado, domingo e noite entram na fila da 1ª hora do próximo dia útil',
+      'Cadência curta: tentativa no dia 0, no dia 1 e no dia 3 antes de espaçar',
+      'Alerta de lead novo para o consultor (notificação do Pipedrive ou WhatsApp) em vez de depender de abrir o CRM'],
+    impacto: x.leads ? `Chegar a 80% significa contatar no mesmo dia cerca de ${fN(Math.max(0, Math.round(x.leads * 0.8) - x.rapN))} ${quem} a mais por ${INS_NOME[modo][0]}.` : ''});
+  // 3) leads do período ainda sem contato
+  if (x.leads && x.semCont >= 3 && x.semCont / x.leads > 0.2) out.push({t: 'Zerar os leads sem nenhum contato',
+    hoje: `${fN(x.semCont)} de ${fN(x.leads)} ${quem} do período (${fP(x.semCont / x.leads * 100)}) sem contato`, meta: 'nenhum lead com mais de 1 dia sem contato',
+    acoes: ['Bloco fixo diário de ligações só para leads sem contato (filtro "Sem contato" no Lead a Lead)',
+      'Redistribuir os leads parados de quem estiver com a carteira mais cheia', 'Registrar toda tentativa como atividade no Pipedrive, mesmo sem resposta'], impacto: ''});
+  // 4) cadência (situação de hoje)
+  if (recente && recente.leads_em_atraso) out.push({t: 'Colocar a cadência em dia',
+    hoje: `${fN(recente.leads_em_atraso)} ${quem} em aberto com atividade vencida${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${recente.leads_sem_proxima ? ` · ${fN(recente.leads_sem_proxima)} sem próxima atividade` : ''}`,
+    meta: 'zero atividade vencida e todo lead aberto com próxima atividade marcada',
+    acoes: ['Resolver as atividades vencidas antes da reunião de terça (fazer, reagendar ou marcar o lead como perdido com motivo)',
+      'Regra: ao concluir uma atividade, já agendar a próxima', 'Lead sem resposta depois da cadência completa: marcar como perdido com o motivo, em vez de deixar aberto'], impacto: ''});
+  else if (recente && recente.leads_sem_proxima >= 5) out.push({t: 'Dar próxima atividade aos leads abertos',
+    hoje: `${fN(recente.leads_sem_proxima)} ${quem} em aberto sem nenhuma atividade marcada`, meta: 'todo lead aberto com próxima atividade',
+    acoes: ['Revisar a lista e agendar a próxima ação de cada lead', 'Quem não tem mais o que fazer: marcar como perdido com o motivo'], impacto: ''});
+  // 5) agendamentos abaixo da média
+  if (B && insTom(x.ag, B.ag, 1) === 'neg') out.push({t: 'Converter mais contatos em agendamento',
+    hoje: `${fN(x.ag)} ${x.ag === 1 ? 'agendamento' : 'agendamentos'} (${rotMed}: ${insN1(B.ag)})`, meta: `voltar pelo menos à média (${insN1(B.ag)})`,
+    acoes: ['Oferecer 2 horários concretos já na 1ª conversa, em vez de "quando fica bom para você?"',
+      'Enviar o link de agenda pelo WhatsApp logo após a ligação', 'Confirmação na véspera para reduzir falta na reunião'], impacto: ''});
+  // 6) entrada de leads abaixo da média
+  if (B && insTom(x.leads, B.leads, 1) === 'neg') out.push({t: 'Recuperar o volume de leads',
+    hoje: `${fN(x.leads)} ${quem} novos (${rotMed}: ${insN1(B.leads)})`, meta: `voltar à média de ${insN1(B.leads)} por ${INS_NOME[modo][0]}`,
+    acoes: [x.inv && B.inv && x.inv < B.inv * 0.85 ? `O investimento caiu (${fRs(x.inv)} contra média de ${fRs(B.inv)}): conferir orçamento e campanhas pausadas` : 'Conferir no Meta se alguma campanha ficou pausada, em análise ou sem orçamento',
+      'Renovar criativos com mais de 3 semanas no ar', 'Conferir se o formulário/site está entregando os leads ao Pipedrive'], impacto: ''});
+  // 7) custo por lead acima da média
+  if (B && x.cpl != null && insTom(x.cpl, B.cpl, -1, 0) === 'neg') out.push({t: 'Baixar o custo por lead',
+    hoje: `${fRs(x.cpl)} por lead (${rotMed}: ${fRs(B.cpl)})`, meta: `voltar a ${fRs(B.cpl)} ou menos`,
+    acoes: [comCpl.length >= 2 ? `Levar verba para ${gn(comCpl[0])} (${fRs(comCpl[0].custo_lead)} por lead) e reduzir em ${gn(comCpl[comCpl.length - 1])} (${fRs(comCpl[comCpl.length - 1].custo_lead)})` : 'Pausar os anúncios com custo por lead mais alto e reforçar os mais baratos',
+      'Testar 2 ou 3 criativos novos por campanha', 'Evitar dividir verba pequena em muitos conjuntos de anúncio'], impacto: ''});
+  // 8) perdas: motivo principal
+  const mot = Object.entries(x.motivos || {}).sort((a, b) => b[1] - a[1]);
+  if (x.lost >= 3 && mot.length) {
+    const [m, n] = mot[0], semC = /sem contato|não atend|nao atend|sem retorno|não respond/i.test(m);
+    out.push({t: semC ? 'Mais tentativas antes de dar o lead como perdido' : m === SEM_MOTIVO ? 'Registrar o motivo de cada perda' : `Atacar o principal motivo de perda: ${ESC(m)}`,
+      hoje: `${fN(x.lost)} perdidos no período · ${fN(n)} por "${ESC(m)}"`, meta: semC ? 'nenhum lead perdido por falta de contato antes de completar a cadência' : 'motivo de perda conhecido em 100% dos casos',
+      acoes: semC ? ['Só marcar "sem contato" depois de pelo menos 5 tentativas em 10 dias, em canais diferentes (ligação, WhatsApp, e-mail)', 'Variar o horário das tentativas (manhã, almoço e fim do dia)', 'Mensagem final de "posso encerrar seu atendimento?" antes de perder: costuma gerar resposta']
+        : m === SEM_MOTIVO ? ['Tornar o motivo obrigatório ao marcar como perdido no Pipedrive', 'Usar uma lista curta e padronizada de motivos'] : ['Levar os casos para a reunião de terça e definir uma resposta padrão para essa objeção', 'Rever se esse perfil de lead deveria entrar na campanha (público do anúncio)'], impacto: ''});
+  }
+  // 9) diferença grande entre consultores
+  if (cs.length >= 2 && cs[0].pct_contatados - cs[cs.length - 1].pct_contatados >= 20) {
+    const a = cs[0], z = cs[cs.length - 1];
+    out.push({t: `Nivelar o atendimento do time`, hoje: `${ESC(a.consultor)} contatou ${fP(a.pct_contatados)} dos leads; ${ESC(z.consultor)}, ${fP(z.pct_contatados)}`, meta: 'todos os consultores acima de 80% de leads contatados',
+      acoes: [`Revisar com ${ESC(z.consultor)} a carteira e a rotina de contato (volume de leads, horários, cadência)`, `Compartilhar na reunião o que ${ESC(a.consultor)} faz no 1º contato`, 'Se a carteira estiver grande demais, redistribuir os leads novos por alguns dias'], impacto: ''});
+  }
+  return out;
+}
+function insSugHtml(L, CP) {
+  if (!L.length) return `<div class="card mt"><div class="ch"><div><h3>💡 Sugestões de mudança</h3><p>Nenhum indicador pede mudança neste período: manter o que está funcionando.</p></div></div></div>`;
+  return `<div class="card mt inssug"><div class="ch"><div><h3>💡 Sugestões de mudança para melhorar resultados</h3><p>${CP ? `Campanha ${ESC(CP)} · ` : ''}da maior para a menor prioridade · clique em cada uma para ver o diagnóstico e as ações</p></div></div>
+    <div class="foco">${L.map((f, i) => `<details class="fci" name="inssug"${i === 0 ? ' open' : ''}><summary class="fch"><span class="fcn">${i + 1}</span><b>${f.t}</b><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="fcb">
+      <div class="fcr"><div><span>Hoje</span>${f.hoje}</div><div><span>Meta</span>${f.meta}</div></div>
+      <ul>${f.acoes.map(a => `<li>${a}</li>`).join('')}</ul>
+      ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div></details>`).join('')}</div></div>`;
+}
 function viewInsights() {
   const modo = S.insModo === 'mensal' ? 'mensal' : 'semanal', nm = INS_NOME[modo], nb = INS_BASE[modo];
   const {per, i, P} = insSel();
@@ -2204,8 +2280,10 @@ function viewInsights() {
   if (x.lost) { const mot = Object.entries(x.motivos || {}).sort((a, b) => b[1] - a[1]);
     put(B ? (insTom(x.lost, B.lost, -1) === 'neg' ? 'neg' : 'neu') : 'neu', 'Perdas', `<b>${fN(x.lost)}</b> ${x.lost === 1 ? 'lead perdido' : 'leads perdidos'}${B ? vsB(x.lost, B.lost, insN1) : ''}${mot.length ? `; principal motivo: <b>${ESC(mot[0][0])}</b> (${fN(mot[0][1])})` : ''}.`); }
   // cadência hoje (só para o período mais recente)
+  let recente = null;
   if (i >= per.length - 2) { const A = run(filtros({de: MIN_DAY, ate: TODAY})), ka = A.res.kpis;
-    if (ka.leads_em_atraso) { const top = A.res.consultores.filter(c => c.leads_em_atraso).sort((a, b) => b.leads_em_atraso - a.leads_em_atraso).slice(0, 3);
+    recente = {leads_em_atraso: ka.leads_em_atraso, leads_sem_proxima: ka.leads_sem_proxima, top: A.res.consultores.filter(c => c.leads_em_atraso).sort((a, b) => b.leads_em_atraso - a.leads_em_atraso).slice(0, 3)};
+    if (ka.leads_em_atraso) { const top = recente.top;
       put('neg', 'Cadência (situação de hoje)', `<b>${fN(ka.leads_em_atraso)}</b> ${ka.leads_em_atraso === 1 ? 'lead' : 'leads'}${CP ? ' ' + CP : ''} em aberto com atividade vencida${top.length ? ` (${top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${ka.leads_sem_proxima ? ` e ${fN(ka.leads_sem_proxima)} sem próxima atividade` : ''}.`); }
     else put('pos', 'Cadência (situação de hoje)', `Nenhum lead${CP ? ' ' + CP : ''} em aberto com atividade vencida.`); }
   // por prefixo de campanha (TRD / DIAG / RCON / demais): só quando o seletor de campanha está em "Todos"
@@ -2237,6 +2315,7 @@ function viewInsights() {
   h += `<div class="mph mt"><span>AVALIAÇÃO</span><em class="insv">${veredito} <small>Normal = até 15% de diferença para a ${rotMed}.</small></em></div>`;
   h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ O que está funcionando</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
     <div class="card insno"><div class="ch"><div><h3>✖ O que não está funcionando</h3><p>Abaixo da média ou fora da referência</p></div></div>${lst(neg, 'neg')}</div></div>`;
+  h += insSugHtml(insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), CP);
   if (neu.length) h += `<div class="card mt"><div class="ch"><div><h3>Dentro do normal</h3><p>Sem variação relevante contra a ${rotMed}</p></div></div>${lst(neu, '')}</div>`;
   // tabela por prefixo
   if (pxRows) {
