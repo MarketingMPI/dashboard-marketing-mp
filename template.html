@@ -266,6 +266,11 @@ table.t tr.tot td{background:#f7faf8;font-weight:700;border-top:1px solid var(--
 .fs .ft i{display:block;height:100%;border-radius:7px;animation:growx .6s cubic-bezier(.2,.7,.2,1) both;transform-origin:center}
 .fs .fv{text-align:right;line-height:1.15}.fs .fv b{display:block;font-size:17px;color:var(--prof)}.fs .fv small{font-size:11.5px;color:var(--cinza)}
 .fconv{font-size:11.5px;color:var(--cinza);line-height:1}.fconv span:nth-child(2){text-align:center}
+.fs .ft{position:relative}.fs .ft em{position:absolute;top:-3px;bottom:-3px;left:50%;transform:translateX(-50%);border:1.5px dashed var(--amb);border-radius:9px;pointer-events:none}
+.fs .fv small.rf{display:block;color:var(--amb);font-size:10.5px;white-space:nowrap}
+.lg i.rfk{background:none;border:1.5px dashed var(--amb)}
+.rfp{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:600;white-space:nowrap;line-height:1.5}
+.rfp.ok{background:#e3f5e7;color:#0b7a3b}.rfp.mid{background:var(--fds);color:var(--amb)}.rfp.low{background:var(--verm-bg);color:var(--verm)}
 /* tables */
 .tw{overflow:auto;max-width:100%}
 .tw.tall{max-height:640px}
@@ -679,6 +684,7 @@ select.bl-in+.bl-in{margin-top:8px}
         <div><dt>Agendado e Reunião</dt><dd><b>Agendado</b>: o lead chegou à etapa Reunião, Negociação ou Fechamento (ou foi ganho). <b>Reunião</b>: existe uma reunião (ou reunião de qualificação) concluída.</dd></div>
         <div><dt>Dias sem contato e parados</dt><dd>Só para leads abertos: dias desde o último contato (ou desde a entrada, se nunca houve contato). <b>Parado</b> = mais de 7 dias sem contato.</dd></div>
         <div><dt>Funil / Mapa do CRM</dt><dd>Etapas do funil sem o Cultivo. <b>Entraram</b>: leads que estiveram na etapa. <b>Avançaram</b>: chegaram a uma etapa seguinte (em Fechamento: ganhos). <b>Ainda estão</b>: abertos na etapa hoje. <b>Saíram sem avançar</b>: perdidos na etapa, enviados ao Cultivo ou que voltaram de etapa. Entraram = avançaram + ainda estão + saíram sem avançar. <b>Média até avançar</b>: dias da entrada na etapa até chegar à próxima (só quem avançou).</dd></div>
+        <div><dt>Referência Prudential</dt><dd>Taxas ideais da coluna Prudential da planilha de taxas de conversão, recalculadas sobre os leads qualificados (todo lead do Funil Alpha já chega qualificado pelo formulário): <b>60%</b> agendam, <b>30%</b> fazem a reunião e <b>10%</b> fecham. Aparecem como contorno tracejado no Funil do período (Visão Macro) e na tabela Funil × referência ideal (aba Funil / Mapa do CRM).</dd></div>
         <div><dt>Performance</dt><dd>Investimento na Meta Ads das campanhas B2C (Tríade, Diagnóstico Financeiro e Iscas) dividido pelo que aconteceu <b>no Pipedrive</b> com os leads que entraram no período: custo por lead, por agendamento, por reunião e por fechamento. Os leads contados pela Meta são ignorados. TRD = campanhas Tríade; DIAG = campanhas Diagnóstico Financeiro; RCON não tem mídia paga. Só o período e a campanha valem nesta aba.</dd></div>
         <div><dt>Perdidos</dt><dd>Lead-time até a perda = dias da entrada até a perda. Contatos até a perda = contatos concluídos até o momento da perda. Opcionalmente, a aba Perdidos pode recortar o período pela data da perda.</dd></div>
       </dl>
@@ -703,6 +709,10 @@ const RAW = /*__RAW__*/null;
 const DAY = 86400000;
 const AGENDA_STAGES = new Set([348, 349, 350]);
 const FLOW = [345, 346, 348, 349, 350];  // ordem do funil; Cultivo (438) fica fora do fluxo
+// Referência ideal (planilha TAXA DE CONVERSÃO, coluna Prudential): % sobre os leads QUALIFICADOS.
+// Todo lead do Funil Alpha já chega qualificado pelo formulário; na Prudential qualificados = 50% dos leads brutos,
+// então agendadas 30% → 60%, realizadas 15% → 30%, fechamento 5% → 10%.
+const REF_PRU = {ag: 60, re: 30, ga: 10};
 const MEETING_TYPES = new Set(['meeting', 'qualificacao']);
 const DEFAULT_STAGES = [{id: 345, nome: 'MQL - 1º Contato'}, {id: 346, nome: 'Agendar'}, {id: 348, nome: 'Reunião'},
   {id: 349, nome: 'Negociação'}, {id: 350, nome: 'Fechamento'}, {id: 438, nome: 'Cultivo'}];
@@ -1594,15 +1604,16 @@ function columns(items, o = {}) {
 }
 
 function miniFunnel(k) {
-  const steps = [['Leads', k.leads], ['Contatados', k.contatados], ['Agendados', k.agendados], ['Reuniões', k.reunioes], ['Ganhos', k.ganhos]];
+  const steps = [['Leads', k.leads], ['Contatados', k.contatados], ['Agendados', k.agendados, REF_PRU.ag], ['Reuniões', k.reunioes, REF_PRU.re], ['Ganhos', k.ganhos, REF_PRU.ga]];
   if (!k.leads) return emptyBox();
   const cols = ['#003326', '#00503c', '#1f7a58', '#3d9a6f', '#00a611'];
   let h = '<div class="fun">';
-  steps.forEach(([nome, v], i) => {
+  steps.forEach(([nome, v, ref], i) => {
     if (i) h += `<div class="fconv"><span></span><span>↓ ${fP(pctOf(v, steps[i - 1][1]))} da etapa anterior</span><span></span></div>`;
-    const tip = `${nome}: ${fN(v)}\n${fP(pctOf(v, k.leads))} dos leads do período` + (i ? `\n${fP(pctOf(v, steps[i - 1][1]))} de ${steps[i - 1][0].toLowerCase()}` : '');
-    h += `<div class="fs" data-tip="${ESC(tip)}"><span class="fl">${nome}</span><span class="ft"><i style="width:${Math.max(1.5, 100 * v / k.leads)}%;background:${cols[i]};animation-delay:${i * 70}ms"></i></span>
-      <span class="fv"><b>${fN(v)}</b><small>${fP(pctOf(v, k.leads))}</small></span></div>`;
+    const tip = `${nome}: ${fN(v)}\n${fP(pctOf(v, k.leads))} dos leads do período` + (i ? `\n${fP(pctOf(v, steps[i - 1][1]))} de ${steps[i - 1][0].toLowerCase()}` : '')
+      + (ref ? `\nReferência Prudential: ${fP(ref)} dos leads (${fN(Math.round(k.leads * ref / 100))} esperados)` : '');
+    h += `<div class="fs" data-tip="${ESC(tip)}"><span class="fl">${nome}</span><span class="ft"><i style="width:${Math.max(1.5, 100 * v / k.leads)}%;background:${cols[i]};animation-delay:${i * 70}ms"></i>${ref ? `<em style="width:${ref}%"></em>` : ''}</span>
+      <span class="fv"><b>${fN(v)}</b><small>${fP(pctOf(v, k.leads))}</small>${ref ? `<small class="rf">ref. ${fP(ref)}</small>` : ''}</span></div>`;
   });
   return h + '</div>';
 }
@@ -1736,7 +1747,8 @@ function viewMacro() {
   h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Leads por data de entrada</h3><p>Agrupado ${ch.lbl} · clique numa barra para filtrar</p></div>
       <div class="lg"><span><i style="background:#00503c"></i>Contatados</span><span><i style="background:#c2d3cb"></i>Sem contato</span><span><i style="background:#f6e7c8"></i>Fim de semana</span></div></div>
       ${C.rows.length ? ch.svg : emptyBox()}</div>
-    <div class="card"><div class="ch"><div><h3>Funil do período</h3><p>Leads → Contatados → Agendados → Reuniões → Ganhos</p></div></div>${miniFunnel(k)}</div></div>`;
+    <div class="card"><div class="ch"><div><h3>Funil do período</h3><p>Leads → Contatados → Agendados → Reuniões → Ganhos</p></div>
+      <div class="lg"><span data-tip="Taxas ideais da Prudential sobre leads qualificados: agendados 60%, reuniões 30%, ganhos 10%"><i class="rfk"></i>Referência Prudential</span></div></div>${miniFunnel(k)}</div></div>`;
   // distribuição 1º contato
   const B = [['< 1 dia', 0, '#003326', 'Mesmo dia (menos de 1 dia)'], ['1–2 dias', 0, '#00503c'], ['2–3 dias', 0, '#3d8a6b'], ['3–7 dias', 0, '#7db59c'], ['> 7 dias', 0, '#b4d6c6', 'Mais de 7 dias'], ['Sem contato', 0, '#d5ddd9']];
   for (const {d} of C.rows) { const v = d.d1; B[v == null ? 5 : v < 1 ? 0 : v < 2 ? 1 : v < 3 ? 2 : v <= 7 ? 3 : 4][1]++; }
@@ -2780,6 +2792,32 @@ function viewTempo() {
 const PAR_COLS = [LL_COLS[0], LL_COLS[1], LL_COLS[3], LL_COLS[5], LL_COLS[7], LL_COLS[8], LL_COLS[9]].map(c => ({...c, nosort: true}));
 const PAR_COLS_S = [LL_COLS[0], LL_COLS[1], LL_COLS[3], LL_COLS[9]].map(c => ({...c, nosort: true}));
 
+/* referência ideal (Prudential) × funil real do período */
+function refPrudential(k) {
+  const L = k.leads, R = [
+    ['Leads qualificados', L, 100, 'Leads do período no Funil Alpha (todos já chegam qualificados pelo formulário)'],
+    ['Reuniões agendadas', k.agendados, REF_PRU.ag, 'Chegaram à etapa Reunião ou além (ou ganhos)'],
+    ['Reuniões realizadas', k.reunioes, REF_PRU.re, 'Leads com reunião concluída registrada no Pipedrive'],
+    ['Fechamento', k.ganhos, REF_PRU.ga, 'Leads do período já ganhos']];
+  const st = (real, ref) => {
+    if (real == null) return '<span class="muted">–</span>';
+    const r = real / ref, c = r >= 1 ? 'ok' : r >= 0.7 ? 'mid' : 'low';
+    return `<span class="rfp ${c}">${r >= 1 ? 'atingiu' : fP(r * 100) + ' da ref.'}</span>`;
+  };
+  const rows = R.map(([nome, v, ref, tip], i) => {
+    const real = pctOf(v, L);
+    if (!i) return `<tr><td data-tip="${ESC(tip)}"><b>${nome}</b></td><td class="num b">${fN(v)}</td><td class="num">100%</td><td class="num muted">100%</td><td class="num muted">${fN(L)}</td><td class="num muted">–</td><td class="num muted">–</td><td class="muted">base</td></tr>`;
+    const esp = Math.round(L * ref / 100), dif = v - esp, [, pv, pref] = R[i - 1];
+    return `<tr><td data-tip="${ESC(tip)}"><b>${nome}</b></td><td class="num b">${fN(v)}</td><td class="num">${fP(real)}</td><td class="num">${fP(ref)}</td><td class="num">${fN(esp)}</td>` +
+      `<td class="num${dif < 0 ? ' red' : ''} b">${dif > 0 ? '+' : ''}${fN(dif)}</td><td class="num">${fP(pctOf(v, pv))} <span class="muted">/ ${fP(ref / pref * 100)}</span></td><td>${st(real, ref)}</td></tr>`;
+  }).join('');
+  const th = [['Etapa', 'Etapa do funil da Prudential'], ['Real', 'Leads do período que chegaram à etapa'], ['% dos leads', 'Real ÷ leads qualificados do período'], ['Referência', 'Taxa ideal da Prudential sobre os qualificados'],
+    ['Esperado', 'Leads do período × referência'], ['Diferença', 'Real − esperado'], ['Etapa anterior real / ref.', 'Real ÷ etapa anterior / taxa ideal da Prudential sobre a etapa anterior'], ['Situação', 'Real ÷ referência: verde = atingiu, amarelo = 70% a 99%, vermelho = abaixo de 70%']];
+  return `<div class="card np mt"><div class="ch"><div><h3>Funil × referência ideal (Prudential)</h3><p>Base = ${fN(L)} leads do período, todos já qualificados pelo formulário · referência da coluna Prudential da planilha de taxas de conversão, recalculada sobre os qualificados</p></div></div>
+    <div class="tw"><table class="t"><thead><tr>${th.map(([t, tip], i) => `<th class="${i && i < 7 ? 'num' : ''}" title="${ESC(tip)}">${t}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:10px 16px 14px;line-height:1.45">Na Prudential, 50% dos leads brutos viram qualificados; por isso agendadas 30% → 60%, realizadas 15% → 30% e fechamento 5% → 10% sobre os qualificados. Reuniões realizadas dependem da atividade de reunião lançada no Pipedrive (falta de registro derruba a taxa). Leads recentes ainda não tiveram tempo de avançar: compare de preferência meses fechados.</p></div>`;
+}
+
 /* ---- Funil / Mapa do CRM ---- */
 function viewFunil() {
   const C = cur(), k = C.res.kpis, E = C.res.etapas;
@@ -2795,6 +2833,7 @@ function viewFunil() {
   }).join('') + '</div>';
   h += `<div class="card"><div class="ch"><div><h3>Funil por etapa</h3><p>Barra clara = entraram na etapa · média = avançaram para a próxima · escura = ainda estão nela (abertos) · base = ${fN(k.leads)} leads</p></div>
     <div class="lg"><span><i style="background:var(--v200)"></i>Entraram</span><span><i style="background:#5f9c83"></i>Avançaram</span><span><i style="background:var(--verde)"></i>Ainda estão</span></div></div>${sf}</div>`;
+  h += refPrudential(k);
   const cols = [{k: 'et', t: 'Etapa'}, {k: 'en', t: 'Entraram', num: 1, tip: 'Leads do período que estiveram na etapa em algum momento'},
     {k: 'av', t: 'Avançaram', num: 1, tip: 'Foram para uma etapa seguinte do funil (em Fechamento: ganhos)'}, {k: 'pa', t: '% avanço', num: 1, tip: 'Avançaram ÷ entraram'},
     {k: 'at', t: 'Ainda estão', num: 1, tip: 'Abertos que estão na etapa agora'}, {k: 'sa', t: 'Saíram sem avançar', num: 1, tip: 'Perdidos na etapa, enviados ao Cultivo ou que voltaram de etapa'},
