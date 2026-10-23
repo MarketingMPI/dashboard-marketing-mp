@@ -2507,28 +2507,6 @@ function viewInsights() {
     const gp = insGrp(xPrev, modo), LP = insSugestoes({x: xPrev, B: BP, ...gp, modo, CP, rotMed: `média ${antsP.length} ${antsP.length === 1 ? nm[0] : nm[1]}`, recente: null});
     h += insFollowHtml(LP, xPrev, x, frac, modo, modo === 'semanal' ? `${fDM(per[i - 1].de)} a ${fDM(per[i - 1].fim)}` : mesNome(per[i - 1].k));
   }
-  // por consultor
-  {
-    const fc = S.consultores.length ? new Set(S.consultores) : null;
-    const nomes = [...new Set([...((D && D.equipe) || []), ...(x.consultores || []).filter(c => c.leads).map(c => c.consultor)])].filter(c => !fc || fc.has(c));
-    const linhas = nomes.map(c => { const Rc = run(insF({de: P.de, ate: P.ate, consultores: [c]})), k = Rc.res.kpis, e = Rc.res.eventos;
-      const rp = Rc.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length, at = A ? (A.res.consultores.find(y => y.consultor === c) || {}) : null;
-      return {c, leads: k.leads, rap: pctOf(rp, k.leads), t1: k.media_dias_1o_contato, ag: e.agendamentos, reu: e.reunioes, fal: e.faltas, won: e.ganhos, lost: e.perdidos, atr: at ? at.leads_em_atraso || 0 : null, sp: at ? at.leads_sem_proxima || 0 : null}; })
-      .filter(r => r.leads || r.ag || r.reu || r.won || r.lost || r.atr).sort((a, b) => b.leads - a.leads || b.ag - a.ag);
-    if (linhas.length) h += `<div class="card mt np inscons"><div class="ch" style="padding:16px 18px 0"><div><h3>Por consultor</h3><p>Leads novos e contato = leads que entraram no período · agendamentos, reuniões, ganhos e perdas = o que aconteceu no período${A ? ' · vencidas = situação de hoje' : ''}</p></div></div>
-      <div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">Leads novos</th><th class="num">Contato &lt; 1 dia</th><th class="num">1º contato médio</th><th class="num">Agendamentos</th><th class="num">Reuniões</th><th class="num">Faltas</th><th class="num">Ganhos</th><th class="num">Perdidos</th>${A ? '<th class="num">Atividades vencidas</th><th class="num">Sem próxima</th>' : ''}</tr></thead><tbody>` +
-      linhas.map(r => `<tr><td class="wrap"><b data-xf="consultores" data-v="${ESC(r.c)}" style="cursor:pointer">${ESC(r.c)}</b></td><td class="num"><b>${fN(r.leads)}</b></td><td class="num${r.rap != null && r.rap < 50 ? ' red' : ''}">${fP(r.rap)}</td><td class="num">${fD(r.t1)}</td><td class="num">${fN(r.ag)}</td><td class="num">${fN(r.reu)}</td><td class="num">${fN(r.fal)}</td><td class="num">${fN(r.won)}</td><td class="num">${fN(r.lost)}</td>${A ? `<td class="num${r.atr ? ' red' : ''}">${fN(r.atr)}</td><td class="num">${fN(r.sp)}</td>` : ''}</tr>`).join('') + `</tbody></table></div></div>`;
-  }
-  // agenda dos próximos 7 dias (situação de hoje)
-  if (i >= per.length - 2) {
-    const AG = insAgenda(), dias = Array.from({length: 7}, (_, j) => addDays(TODAY, j));
-    const porC = new Map(); for (const a of AG) porC.set(a.l.c, (porC.get(a.l.c) || 0) + 1);
-    h += `<div class="card mt insagc"><div class="ch"><div><h3>📅 Agenda: reuniões marcadas para os próximos 7 dias</h3><p>Atividades de reunião pendentes no Pipedrive, de ${fDM(TODAY)} a ${fDM(addDays(TODAY, 6))}</p></div></div>` +
-      (AG.length ? `<div class="insag"><div><div class="insagd">${dias.map(d => `<span>${DSEM[weekday(d)]} ${fDM(d)}<b>${fN(AG.filter(a => a.dia === d).length)}</b></span>`).join('')}</div>
-        <div class="mut" style="font-size:13px"><b>${fN(AG.length)}</b> ${AG.length === 1 ? 'reunião marcada' : 'reuniões marcadas'} · ${[...porC].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${ESC(c)} ${fN(n)}`).join(' · ')}</div></div>
-        <div class="tw" style="max-height:260px"><table class="t"><thead><tr><th>Dia</th><th>Lead</th><th>Consultor</th></tr></thead><tbody>${AG.map(a => `<tr><td>${DSEM[weekday(a.dia)]} ${fDM(a.dia)}</td><td style="max-width:240px">${leadCell(a.l)}</td><td>${ESC(a.l.c)}</td></tr>`).join('')}</tbody></table></div></div>`
-        : `<p class="mut" style="margin:4px 0 0">Nenhuma reunião marcada no Pipedrive para os próximos 7 dias${CP ? ` entre os leads ${ESC(CP)}` : ''}.</p>`) + `</div>`;
-  }
   // tabela por prefixo
   if (pxRows) {
     const vv = (c, b, good, fmt) => { if (c == null || b == null) return ''; const d = c - b; if (Math.abs(d) < 1e-9) return '<span class="dl neu">=</span>';
