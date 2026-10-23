@@ -154,7 +154,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .g{display:grid;gap:16px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
-.insk .kx{margin-top:4px}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
+.insk .kx{margin-top:4px}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
 .insexc{margin:0 0 14px;font-size:13px}.inscons td.num .mut{font-size:11px}.insfu td .dl{display:inline-block}.insag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px}@media(max-width:960px){.insag{grid-template-columns:1fr}}
@@ -2114,8 +2114,8 @@ const MP_METAS = [
 ];
 function mpMetaPct(m, v) {
   if (v == null) return null;
-  if (m.bom === 'alto') return m.meta ? v / m.meta * 100 : null;
-  return v <= 0 ? 100 : m.meta / v * 100;   // menor é melhor: na meta ou abaixo = 100% ou mais
+  if (m.bom === 'alto') return m.meta ? Math.min(100, v / m.meta * 100) : null;
+  return v <= 0 ? 100 : Math.min(100, m.meta / v * 100);   // % atingido vai até 100% (bateu a meta = 100%)
 }
 function mpMetasHtml(x) {
   const AL = D.mppro_alunos, mesDoAl = AL && AL.extraido_em && AL.extraido_em.slice(0, 7) === x.ym;
@@ -2127,9 +2127,9 @@ function mpMetasHtml(x) {
     return `<div class="mt-i ${cls(p)}${m.principal ? ' main' : ''}"><div class="mt-h"><span>${m.t}</span><b>${p == null ? '–' : fP(p)}</b></div>
       <div class="mt-bar"><i style="width:${Math.min(100, p || 0)}%"></i></div>
       <div class="mt-f"><span>Realizado <b>${v == null ? '–' : m.fmt(v)}</b></span><span>Meta ${m.bom === 'baixo' ? 'até ' : ''}<b>${m.fmt(m.meta)}</b></span></div>
-      ${sub || m.nota ? `<div class="mt-n">${sub || m.nota}</div>` : ''}</div>`; };
-  return `<div class="card mt mpmetas"><div class="ch"><div><h3>Metas até ${fDay(MP_METAS_ATE)}</h3><p>Metas fixas · % = quanto da meta ${mesNome(x.ym)} atingiu${x.parcial ? ' (mês em andamento)' : ''} · nos indicadores em que menor é melhor (churn, CAC, CPM, reembolso), 100% = no limite ou abaixo</p></div>
-    <div class="lg"><span><i style="background:#00a611"></i>100% ou mais</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
+      ${sub || m.nota || p >= 100 ? `<div class="mt-n">${p >= 100 ? '<b class="mt-ok">✔ meta atingida</b>' + (sub || m.nota ? ' · ' : '') : ''}${sub || m.nota || ''}</div>` : ''}</div>`; };
+  return `<div class="card mt mpmetas"><div class="ch"><div><h3>Metas até ${fDay(MP_METAS_ATE)}</h3><p>Metas fixas · % = quanto da meta ${mesNome(x.ym)} atingiu${x.parcial ? ' (mês em andamento)' : ''} · vai até 100% (meta batida) · nos indicadores em que menor é melhor (churn, CAC, CPM, reembolso), 100% = no limite ou abaixo</p></div>
+    <div class="lg"><span><i style="background:#00a611"></i>atingida (100%)</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
     <div class="mt-g">${MP_METAS.map(card).join('')}</div></div>`;
 }
 function viewMPProMetas() {
@@ -2356,13 +2356,13 @@ function insMetasHtml(x, CP, parcial, modo, frac) {
     {t: 'Realizada → fechamento', v: pc(x.kWon, x.kReu), meta: REF_PRU.ga / REF_PRU.re * 100, sub: x.kReu ? `${fN(x.kWon)} de ${fN(x.kReu)} com reunião` : 'nenhuma reunião registrada entre os MQL do período', f: 'pru'});
   itens.push({t: 'MQL → fechamento', v: pc(x.kWon, x.leads), meta: REF_PRU.ga, sub: `${fN(x.kWon)} de ${fN(x.leads)} MQL do período`, f: 'pru'});
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
-  const card = m => { const q = m.v == null || !m.meta ? null : m.v / m.meta * 100, F = m.fmt || fP;
+  const card = m => { const q = m.v == null || !m.meta ? null : Math.min(100, m.v / m.meta * 100), F = m.fmt || fP;   // bateu a referência = 100%
     return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${q == null ? '–' : fP(q)}</b></div>
       <div class="mt-bar"><i style="width:${Math.min(100, q || 0)}%"></i></div>
       <div class="mt-f"><span>Realizado <b>${F(m.v)}</b></span><span>Referência <b>${F(m.meta)}</b></span></div>
-      <div class="mt-n">${m.sub}</div></div>`; };
-  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas de referência${CP ? ` · ${ESC(CP)}` : ''}</h3><p>% da referência atingido · base = MQL${parcial ? ' · volume proporcional aos dias do período' : ''}</p></div>
-    <div class="lg"><span><i style="background:#00a611"></i>100% ou mais</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
+      <div class="mt-n">${q >= 100 ? '<b class="mt-ok">✔ referência atingida</b> · ' : ''}${m.sub}</div></div>`; };
+  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas de referência${CP ? ` · ${ESC(CP)}` : ''}</h3><p>% da referência atingido, até 100% (referência batida) · base = MQL${parcial ? ' · volume proporcional aos dias do período' : ''}</p></div>
+    <div class="lg"><span><i style="background:#00a611"></i>atingida (100%)</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
     ${vol.length ? `<h4 class="insmh">Volume no período</h4><div class="mt-g">${vol.map(card).join('')}</div>` : ''}
     <h4 class="insmh">Conversão do funil e contato</h4><div class="mt-g mt-g3">${itens.map(card).join('')}</div>
     <div class="mt-n" style="margin-top:10px">Conversão = MQL que entraram no período e já avançaram${modo === 'semanal' ? '; as taxas etapa a etapa ficam na visão Mensal' : ''}.${CP ? ' Volume de referência é do B2C inteiro: aparece em "Todos os leads".' : ''}</div></div>`;
