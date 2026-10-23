@@ -154,7 +154,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .g{display:grid;gap:16px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
-.insk .kx{margin-top:4px}.insmeta{margin:12px 0 0}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
+.insk .kx{margin-top:4px}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
 .insok{border-top:3px solid #00a611}.insno{border-top:3px solid #c0392b}
@@ -2109,6 +2109,7 @@ function insCalc(de, ate, camp) {
   const ori = new Map(); for (const {l, d} of R.rows) { const o = ori.get(l.o) || {n: 0, c: 0}; o.n++; if (d.cont) o.c++; ori.set(l.o, o); }
   return {de, ate, leads: k.leads, cont: k.contatados, pctCont: k.pct_contatados, semCont: k.sem_contato, t1: k.media_dias_1o_contato,
     rap: pctOf(rap, k.leads), rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos, lost: e.perdidos, contatos: e.contatos,
+    kAg: k.agendados, kReu: k.reunioes, kWon: k.ganhos,
     motivos: e.motivos_perda, inv: pf.investimento, cpl: pf.custo_lead, pagos: pf.leads, grupos: R.res.performance.grupos,
     consultores: R.res.consultores, ori};
 }
@@ -2214,6 +2215,33 @@ function insSugHtml(L, CP) {
       <ul>${f.acoes.map(a => `<li>${a}</li>`).join('')}</ul>
       ${f.impacto ? `<div class="fcim"><b>Impacto estimado:</b> ${f.impacto}</div>` : ''}</div></details>`).join('')}</div></div>`;
 }
+/* Metas de REFERÊNCIA dos Insights B2C (até a meta oficial ser definida pelo time). % = quanto da referência foi atingido.
+   Funil (agendados 60%, reuniões 30%, ganhos 10% dos leads) = REF_PRU (Prudential, planilha TAXA DE CONVERSÃO).
+   Contato em menos de 1 dia 80% e cadência 100% = referência interna de boa prática comercial. */
+const INS_REF_FONTE = {pru: 'Prudential (planilha Taxa de Conversão)', int: 'referência interna de boa prática comercial'};
+function insMetasHtml(x, cad, CP, parcial) {
+  const pc = (a, b) => b ? a / b * 100 : null;
+  const itens = [
+    {t: 'Contato em menos de 1 dia', v: x.rap, meta: 80, sub: `${fN(x.rapN)} de ${fN(x.leads)} leads`, f: 'int'},
+    {t: 'Leads com contato', v: x.pctCont, meta: 100, sub: `${fN(x.cont)} de ${fN(x.leads)} leads`, f: 'int'},
+    {t: 'Agendados', v: pc(x.kAg, x.leads), meta: REF_PRU.ag, sub: `${fN(x.kAg)} de ${fN(x.leads)} leads do período`, f: 'pru'},
+    {t: 'Reuniões realizadas', v: pc(x.kReu, x.leads), meta: REF_PRU.re, sub: `${fN(x.kReu)} de ${fN(x.leads)} leads do período`, f: 'pru'},
+    {t: 'Ganhos', v: pc(x.kWon, x.leads), meta: REF_PRU.ga, sub: `${fN(x.kWon)} de ${fN(x.leads)} leads do período`, f: 'pru'}];
+  if (cad && cad.abertos) {
+    itens.push({t: 'Leads abertos em dia com a cadência', v: pc(cad.abertos - cad.atraso, cad.abertos), meta: 100, sub: `${fN(cad.atraso)} com atividade vencida · situação de hoje`, f: 'int'});
+    itens.push({t: 'Leads abertos com próxima atividade', v: pc(cad.abertos - cad.semProx, cad.abertos), meta: 100, sub: `${fN(cad.semProx)} sem nada agendado · situação de hoje`, f: 'int'});
+  }
+  const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
+  const card = m => { const q = m.v == null ? null : m.v / m.meta * 100;
+    return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${q == null ? '–' : fP(q)}</b></div>
+      <div class="mt-bar"><i style="width:${Math.min(100, q || 0)}%"></i></div>
+      <div class="mt-f"><span>Realizado <b>${fP(m.v)}</b></span><span>Referência <b>${fP(m.meta)}</b></span></div>
+      <div class="mt-n">${m.sub}</div></div>`; };
+  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas de referência${CP ? ` · ${ESC(CP)}` : ''}</h3><p>% = quanto da referência foi atingido · funil (agendados 60%, reuniões 30%, ganhos 10%) = referência Prudential; contato e cadência = referência interna${parcial ? ' · período em andamento' : ''} · as metas oficiais do B2C substituem estas quando forem definidas</p></div>
+    <div class="lg"><span><i style="background:#00a611"></i>100% ou mais</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
+    <div class="mt-g">${itens.map(card).join('')}</div>
+    <div class="mt-n" style="margin-top:10px">Agendados, reuniões e ganhos contam os leads que entraram no período e já avançaram; em semanas recentes esses números ainda sobem. Meta de volume de leads: aguardando o número oficial.</div></div>`;
+}
 function viewInsights() {
   const modo = S.insModo === 'mensal' ? 'mensal' : 'semanal', nm = INS_NOME[modo], nb = INS_BASE[modo];
   const {per, i, P} = insSel();
@@ -2247,7 +2275,8 @@ function viewInsights() {
     kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: md('cpl', fRs), d: insVar(x.cpl, ant && ant.cpl, -1, fRs, rotAnt),
       tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período'})
   ].join('') + '</div>';
-  h += `<div class="note insmeta">Metas do B2C: entram aqui, com o % atingido, assim que os números forem definidos.</div>`;
+  const KA = run(filtros({de: MIN_DAY, ate: TODAY})).res.kpis;
+  h += insMetasHtml(x, {abertos: KA.abertos, atraso: KA.leads_em_atraso, semProx: KA.leads_sem_proxima}, CP, P.parcial);
   // avaliação
   const pos = [], neg = [], neu = [];
   const put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);
