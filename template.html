@@ -629,6 +629,53 @@ select.bl-in+.bl-in{margin-top:8px}
 .bl-prev-corpo blockquote{margin:12px 0;padding:10px 16px;border-left:4px solid var(--lima);background:var(--v50)}
 .bl-prev .bl-dica{padding:0 34px 24px}
 @media(max-width:1100px){.bl-ed{grid-template-columns:1fr}.bl-side{position:static}}
+/* ===== Celular (≤760px): otimização geral do Painel ===== */
+@media(max-width:960px){
+  .cadg{grid-template-columns:1fr}.cadg>div,.g>*{min-width:0}
+  .mpmeses{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:0 16px 2px}
+}
+@media(max-width:760px){.mpmeses{margin-left:-12px;margin-right:-12px;padding:0 12px 2px}
+  .mpmeses::-webkit-scrollbar{display:none}.mpmeses button{flex:none}
+}
+@media(max-width:760px){
+  header.top{padding:10px 16px;gap:6px}
+  .upd{gap:4px;font-size:12px}.upd .rfst{display:none}
+  .cps{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}.cps::-webkit-scrollbar{display:none}.cp{flex:none}
+  .main{padding:0 12px 24px}.fbar{margin:0 -12px;padding:8px 12px;position:static}   /* filtros rolam junto: libera a tela */
+  .card{padding:14px}.card.np{padding:0}
+  .ch{flex-wrap:wrap;gap:8px}.ch h3{font-size:15px}.ch p{font-size:12px}
+  .vh{flex-wrap:wrap;gap:8px}.vh p{font-size:12.5px}
+  /* sub-abas (padrão subAbas): lado a lado, compactas */
+  .sabas{grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:8px;margin-bottom:14px}
+  .sab{padding:10px 10px;gap:2px;align-items:center;text-align:center}
+  .sab svg{width:18px;height:18px;margin-bottom:2px}.sab b{font-size:13px;line-height:1.25}.sab small{display:none}
+  /* KPIs */
+  .kpi{padding:12px}.kpi .kl{font-size:10.5px}.kpi .ks{font-size:11.5px}
+  /* metas (MP PRO e Insights) */
+  .mt-g,.mpmetas.big .mt-g,.insmetas .mt-g,.insmetas .mt-g.mt-g3{grid-template-columns:1fr 1fr;gap:8px}
+  .mt-i,.mpmetas.big .mt-i{padding:10px 11px;gap:6px}
+  .mt-h{flex-direction:column;gap:4px}.mt-h b,.mpmetas.big .mt-h b{font-size:20px}.mt-h span,.mpmetas.big .mt-h span{font-size:12px}
+  .mt-f,.mpmetas.big .mt-f{flex-direction:column;gap:1px;font-size:11.5px}
+  .mpmetas .lg{flex-wrap:wrap}
+  /* listas expansíveis (Onde focar, Sugestões, mercado) */
+  .fch{padding:12px;gap:10px;flex-wrap:wrap}.fch b{font-size:15px;min-width:0}
+  .fcn{width:26px;height:26px;font-size:13px}
+  .fcb{padding:0 12px 14px}.fcr{grid-template-columns:1fr}
+  .fci ul{font-size:14px;margin-left:16px}.fcim{font-size:14px}.fcw{font-size:14px}
+  .bmk .fch,.fch{position:relative;padding-right:40px}.bmk .fch{padding:10px 40px 10px 12px}.bmk .fch b{flex:1 1 100%}.bmk .bml{width:auto}
+  .fch .fcc{position:absolute;right:12px;top:14px}
+  /* funil de mídia do MP PRO: rótulo em cima, barra, e os 3 números numa linha */
+  .mpf .mpr{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px}
+  .mpf .mpr .mpl{grid-column:1/-1}.mpf .mpr .mpt{grid-column:1/-1}
+  .mpf .mpr .mpv,.mpf .mpr .mpe,.mpf .mpr .mpc{text-align:left}
+  /* Insights */
+  .insl li{font-size:14px;gap:10px}
+  .insv{font-size:13px}.mph{flex-wrap:wrap;gap:6px}
+  .inscmp>summary{padding:14px!important}
+  /* tabelas: indica que rolam para o lado */
+  .tw{-webkit-overflow-scrolling:touch}
+}
+
 </style>
 </head>
 <body class="locked">
@@ -3439,7 +3486,7 @@ function renderFilterBar() {
   const qi = document.getElementById('q'); if (document.activeElement !== qi) qi.value = S.busca;
   qi.closest('label').style.display = S.tab === 'macro' ? 'none' : '';   // Visão Macro sem campo de busca (pedido do usuário)
   const nAct = DIMS.reduce((a, d) => a + S[d.k].length, 0) + (S.busca.trim() ? 1 : 0);
-  document.getElementById('fmob').innerHTML = `<span>📅 ${pn}${S.preset === 'custom' ? ` (${fDM(S.de)}–${fDM(S.ate)})` : ''}</span><span>Filtros${nAct ? ` <span class="cnt" style="background:var(--verde);color:#fff;border-radius:99px;padding:0 7px;font-size:11px">${nAct}</span>` : ''} ▾</span>`;
+  document.getElementById('fmob').innerHTML = `<span>${S.tab === 'insights' ? 'Semana/mês: escolha abaixo' : `📅 ${pn}${S.preset === 'custom' ? ` (${fDM(S.de)}–${fDM(S.ate)})` : ''}`}</span><span>Filtros${nAct ? ` <span class="cnt" style="background:var(--verde);color:#fff;border-radius:99px;padding:0 7px;font-size:11px">${nAct}</span>` : ''} ▾</span>`;
 }
 function renderChips() {
   const C = cur();
@@ -3950,6 +3997,11 @@ function renderView(anim) {
   document.getElementById('tip').classList.remove('on');
   v.innerHTML = VIEWS[S.tab]();
   if (S.tab === 'blog') montaBlog();
+  // listas de semana/mês que rolam para o lado (celular): deixar o período escolhido à vista
+  for (const m of v.querySelectorAll('.mpmeses')) { const o = m.querySelector('.on'); if (o && m.scrollWidth > m.clientWidth) m.scrollLeft += o.getBoundingClientRect().left - m.getBoundingClientRect().left - (m.clientWidth - o.offsetWidth) / 2; }
+  // linha de campanhas no topo (celular): manter a escolhida à vista
+  const nvb = document.getElementById('nav'), nvo = nvb && nvb.querySelector('button.on'); if (nvo && nvb.scrollWidth > nvb.clientWidth) nvb.scrollLeft += nvo.getBoundingClientRect().left - nvb.getBoundingClientRect().left - 12;
+  const cps = document.querySelector('.cps'), cpo = cps && cps.querySelector('.cp.on'); if (cpo && cps.scrollWidth > cps.clientWidth) cps.scrollLeft += cpo.getBoundingClientRect().left - cps.getBoundingClientRect().left - 12;
   if (anim) { v.classList.remove('anim'); void v.offsetWidth; v.classList.add('anim'); }
 }
 function update(o = {}) {
