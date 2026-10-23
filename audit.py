@@ -710,6 +710,9 @@ def cenarios(D):
     iso = date.isoformat
     d7, d30 = iso(hoje - timedelta(days=6)), iso(hoje - timedelta(days=29))
     seg = iso(hoje - timedelta(days=hoje.weekday()))
+    # Insights: semana de TERÇA a SEGUNDA (reunião às terças)
+    _t = hoje - timedelta(days=(hoje.weekday() - 1) % 7)
+    ter, ter_ant, seg_ant = iso(_t), iso(_t - timedelta(days=7)), iso(_t - timedelta(days=1))
     h = iso(hoje)
     top = sorted(Counter(l["c"] for l in D["leads"]).items(), key=lambda x: (-x[1], x[0]))[0][0]
     return [
@@ -734,12 +737,12 @@ def cenarios(D):
         ("mppro_julho_ate_hoje", filtros_base("2026-07-01", h)),
         ("ultimos_30_consultor_top_perf", filtros_base(d30, h, consultores=[top], campanha="trd")),
         ("mes_passado_diag", filtros_base(iso(hoje.replace(day=1) - timedelta(days=hoje.replace(day=1).day + 27)), iso(hoje.replace(day=1) - timedelta(days=1)), campanha="diag")),
-        ("insights_semana_fechada", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)), operacao=True)),
-        ("insights_semana_fechada_trd", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)), campanha="trd", operacao=True)),
-        ("insights_semana_atual", filtros_base(iso(hoje - timedelta(days=hoje.weekday())), iso(hoje), operacao=True)),
-        ("insights_semana_fechada_consultor_top", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)), consultores=[top], operacao=True)),
+        ("insights_semana_fechada", filtros_base(ter_ant, seg_ant, operacao=True)),
+        ("insights_semana_fechada_trd", filtros_base(ter_ant, seg_ant, campanha="trd", operacao=True)),
+        ("insights_semana_atual", filtros_base(ter, iso(hoje), operacao=True)),
+        ("insights_semana_fechada_consultor_top", filtros_base(ter_ant, seg_ant, consultores=[top], operacao=True)),
         ("insights_mes_fechado", filtros_base(iso((hoje.replace(day=1) - timedelta(days=1)).replace(day=1)), iso(hoje.replace(day=1) - timedelta(days=1)), operacao=True)),
-        ("semana_fechada_funil_inteiro", filtros_base(iso(hoje - timedelta(days=hoje.weekday() + 7)), iso(hoje - timedelta(days=hoje.weekday() + 1)))),
+        ("semana_fechada_funil_inteiro", filtros_base(ter_ant, seg_ant)),
     ] + _meses_mppro(hoje)
 
 

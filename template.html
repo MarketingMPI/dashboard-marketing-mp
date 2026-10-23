@@ -2150,12 +2150,12 @@ function viewMPProMetas() {
 }
 
 /* ---- Insights B2C (Semanal / Mensal): grandes números + avaliação do que funciona e do que não funciona.
-   Semana = segunda a domingo (reunião às terças: padrão = última semana fechada). Mês = 1º ao último dia.
+   Semana = terça a segunda (reunião às terças: padrão = última semana fechada, que termina na segunda). Mês = 1º ao último dia.
    Base de comparação: período anterior e média dos 4 anteriores (semana) ou 3 anteriores (mês).
    Entrada (leads, contato) = coorte do período; Movimento (agendamentos, reuniões, ganhos, perdas) = o que
    aconteceu no período, com lead de qualquer data (res.eventos, espelho em audit.eventos). */
 const INS_MODOS = [
-  ['semanal', 'Semanal', 'Semana fechada, de segunda a domingo · reunião de terça', '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8"/>'],
+  ['semanal', 'Semanal', 'Semana fechada, de terça a segunda · reunião de terça', '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8"/>'],
   ['mensal', 'Mensal', 'Mês fechado, do dia 1º ao último dia', '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>']];
 const INS_BASE = {semanal: 4, mensal: 3}, INS_NOME = {semanal: ['semana', 'semanas', 'sem.'], mensal: ['mês', 'meses', 'mês']};
 function insPeriodos(modo) {
@@ -2165,7 +2165,7 @@ function insPeriodos(modo) {
     for (let i = 0; i < 12; i++) { const de = addMonths(first, -i), fim = lastOfMonth(de);
       if (fim < MIN_DAY) break; out.unshift({k: de.slice(0, 7), de, fim, ate: fim > TODAY ? TODAY : fim, parcial: fim >= TODAY, rot: mesCurto(de.slice(0, 7))}); }
   } else {
-    const mon = addDays(TODAY, -((weekday(TODAY) + 6) % 7));
+    const mon = addDays(TODAY, -((weekday(TODAY) + 5) % 7));   // início da semana = terça (fecha na segunda)
     for (let i = 0; i < 26; i++) { const de = addDays(mon, -7 * i), fim = addDays(de, 6);
       if (fim < MIN_DAY) break; out.unshift({k: de, de, fim, ate: fim > TODAY ? TODAY : fim, parcial: fim >= TODAY, rot: `${fDM(de)}–${fDM(fim)}`}); }
   }
@@ -2533,7 +2533,7 @@ function viewInsights() {
       `</tbody></table></div></details>`;
   }
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
-    <li><b>Semanal</b> = semana de segunda a domingo; abre na última semana fechada (a da reunião de terça). <b>Mensal</b> = mês fechado.</li>
+    <li><b>Semanal</b> = semana de terça a segunda; abre na última semana fechada, que termina na segunda (véspera da reunião de terça). <b>Mensal</b> = mês fechado.</li>
     <li>Os Insights avaliam só a <b>operação</b>: ficam de fora os contatos importados da base/reativados e os lançamentos retroativos (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade registrada). Eles continuam nas outras abas.</li>
     <li><b>Leads novos</b> e <b>contato</b> olham só os leads que entraram no período. <b>Agendamentos, reuniões, faltas, ganhos e perdas</b> contam o que aconteceu no período, com leads de qualquer data de entrada.</li>
     <li>As cores e a <b>avaliação</b> comparam com a média dos ${fN(nb)} ${nm[1]} anteriores: até 15% de diferença é normal; volumes muito pequenos (menos de 3) não são julgados. O período anterior aparece em texto.</li>
