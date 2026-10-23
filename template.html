@@ -155,7 +155,9 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
 .insk .kx{margin-top:4px}.insmeta{margin:12px 0 0}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
-.insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.insok{border-top:3px solid #00a611}.insno{border-top:3px solid #c0392b}
+.insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
+.inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
+.insok{border-top:3px solid #00a611}.insno{border-top:3px solid #c0392b}
 .mph{font-size:13px;color:var(--cinza);margin:4px 0 12px;display:flex;align-items:center;gap:10px}.mph.mt{margin-top:28px}
 .mph span{font-size:11px;letter-spacing:.1em;font-weight:700;color:#8f7a3e;background:#f6f0de;border-radius:6px;padding:3px 8px}
 .kpi.hero.gold{background:linear-gradient(135deg,#1d1a13,#12100c);border-color:#2b261b}.kpi.hero.gold .kv{color:#e4d6a7}.kpi.hero.gold .kl,.kpi.hero.gold .ks{color:#bfb48f}
@@ -2335,9 +2337,9 @@ function viewInsights() {
       const tone = good === 0 ? 'neu' : ((d > 0) === (good > 0) ? 'pos' : 'neg'), pc = b ? nf1.format(Math.abs(d / b * 100)) + '%' : 'novo';
       if (fmt === fP) return `<span class="dl ${tone}">${d > 0 ? '▲ +' : '▼ −'}${nf1.format(Math.abs(d))} p.p.</span>`;
       const fd = fmt(Math.abs(d)); return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${pc} (${d > 0 ? '+' : '−'}${fd})</span>`; };
-    h += `<div class="card mt np"><div class="ch" style="padding:16px 18px 0"><div><h3>Comparativo</h3><p>${P.parcial ? 'Período em andamento: anterior e média ajustados ao mesmo número de dias' : 'Período fechado'}</p></div></div><div class="tw"><table class="t"><thead><tr><th>Indicador</th><th class="num">${modo === 'semanal' ? 'Esta semana' : mesCurto(P.k)}</th><th class="num">${rotAnt[0].toUpperCase() + rotAnt.slice(1)}</th><th class="num">${rotMed[0].toUpperCase() + rotMed.slice(1)}</th><th class="num">Variação × média</th></tr></thead><tbody>` +
+    h += `<details class="card mt np inscmp"><summary class="ch"><div><h3>Comparativo</h3><p>${P.parcial ? 'Período em andamento: anterior e média ajustados ao mesmo número de dias' : 'Período fechado'} · clique para abrir a tabela</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="tw"><table class="t"><thead><tr><th>Indicador</th><th class="num">${modo === 'semanal' ? 'Esta semana' : mesCurto(P.k)}</th><th class="num">${rotAnt[0].toUpperCase() + rotAnt.slice(1)}</th><th class="num">${rotMed[0].toUpperCase() + rotMed.slice(1)}</th><th class="num">Variação × média</th></tr></thead><tbody>` +
       rows.map(([t, key, good, fmt]) => `<tr><td>${t}</td><td class="num"><b>${fmt(x[key])}</b></td><td class="num">${ant ? fmt(ant[key]) : '–'}</td><td class="num">${fmt(B[key])}</td><td class="num">${vr(x[key], B[key], good, fmt)}</td></tr>`).join('') +
-      `</tbody></table></div></div>`;
+      `</tbody></table></div></details>`;
   }
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Semanal</b> = semana de segunda a domingo; abre na última semana fechada (a da reunião de terça). <b>Mensal</b> = mês fechado.</li>
