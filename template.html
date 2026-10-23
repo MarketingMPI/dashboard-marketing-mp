@@ -1594,7 +1594,7 @@ function readHash() {
     S[dm.k] = v ? v.split('|').filter(Boolean) : [];
     if (dm.k === 'etapas') S.etapas = S.etapas.map(Number).filter(n => !isNaN(n));
   }
-  S.busca = p.get('q') || '';
+  S.busca = '';   // campo de busca removido do Painel (pedido do usuário, 23/10/2026)
   S.perdaData = p.get('pd') === '1';
   S.camp = CAMPANHAS[p.get('camp')] ? p.get('camp') : (p.get('trd') === '1' ? 'trd' : '');
   S.igModo = IG_MODOS[p.get('ig')] ? p.get('ig') : 'org';
@@ -3498,7 +3498,7 @@ function renderFilterBar() {
   document.getElementById('de').max = TODAY; document.getElementById('ate').max = TODAY;
   document.getElementById('dims').innerHTML = DIMS.filter(d => !d.hidden).map(d => `<button class="ctl${S[d.k].length ? ' act' : ''}" type="button" data-pop="dim" data-k="${d.k}">${d.nome}${S[d.k].length ? `<span class="cnt">${S[d.k].length}</span>` : ''}<span class="cv">▼</span></button>`).join('');
   const qi = document.getElementById('q'); if (document.activeElement !== qi) qi.value = S.busca;
-  qi.closest('label').style.display = S.tab === 'macro' ? 'none' : '';   // Visão Macro sem campo de busca (pedido do usuário)
+  qi.closest('label').style.display = 'none';   // campo de busca removido de todo o Painel (pedido do usuário)
   const nAct = DIMS.reduce((a, d) => a + S[d.k].length, 0) + (S.busca.trim() ? 1 : 0);
   document.getElementById('fmob').innerHTML = `<span>${S.tab === 'insights' ? 'Semana/mês: escolha abaixo' : `📅 ${pn}${S.preset === 'custom' ? ` (${fDM(S.de)}–${fDM(S.ate)})` : ''}`}</span><span>Filtros${nAct ? ` <span class="cnt" style="background:var(--verde);color:#fff;border-radius:99px;padding:0 7px;font-size:11px">${nAct}</span>` : ''} ▾</span>`;
 }
