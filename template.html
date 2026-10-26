@@ -2500,10 +2500,10 @@ function viewInsights() {
   const QM = (modo === 'semanal' ? 'Semana' : 'Mês') + (CP ? ' ' + CP : '');
   const veredito = !B ? 'Sem histórico suficiente para comparar.' : nPos > nNeg ? `${QM} <b>acima do normal</b>: ${fN(nPos)} ${nPos === 1 ? 'ponto positivo' : 'pontos positivos'} e ${fN(nNeg)} de atenção.`
     : nNeg > nPos ? `${QM} <b>abaixo do normal</b>: ${fN(nNeg)} ${nNeg === 1 ? 'ponto de atenção' : 'pontos de atenção'} e ${fN(nPos)} positivos.` : `${QM} <b>dentro do normal</b>: ${fN(nPos)} positivos e ${fN(nNeg)} de atenção.`;
-  const lst = (L, cls) => L.length ? `<ul class="insl">${L.map(([t, s]) => `<li class="${cls}"><i></i><span><b class="inst">${t}</b> ${s}</span></li>`).join('')}</ul>` : `<p class="mut" style="margin:6px 0">Nada a destacar.</p>`;
+  const lst = (L, cls) => L.length ? `<ul class="insl">${L.map(([t, s]) => `<li class="${cls}"><i></i><span><b class="inst">${t}</b> ${s}</span></li>`).join('')}</ul>` : `<p class="mut" style="margin:6px 0">${cls === 'pos' ? 'Nenhum indicador acima da média ou dentro da referência neste período.' : 'Nenhum ponto de atenção neste período.'}</p>`;
   h += `<div class="mph mt"><span>AVALIAÇÃO</span><em class="insv">${veredito} <small>Normal = até 15% de diferença para a ${rotMed}.</small></em></div>`;
-  h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ O que está funcionando</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
-    <div class="card insno"><div class="ch"><div><h3>✖ O que não está funcionando</h3><p>Abaixo da média ou fora da referência</p></div></div>${lst(neg, 'neg')}</div></div>`;
+  h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ Pontos positivos</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
+    <div class="card insno"><div class="ch"><div><h3>⚠ Pontos de atenção</h3><p>Abaixo da média ou fora da referência: onde agir primeiro</p></div></div>${lst(neg, 'neg')}</div></div>`;
   h += insSugHtml(insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), CP);
   // acompanhamento das sugestões do período anterior
   if (xPrev && i >= 1) {
@@ -2614,10 +2614,10 @@ function viewMPProMensal() {
   const nPos = pos.length, nNeg = neg.length;
   const veredito = nPos > nNeg ? `Mês <b>acima do esperado</b>: ${fN(nPos)} ${nPos === 1 ? 'ponto positivo' : 'pontos positivos'} e ${fN(nNeg)} de atenção.`
     : nNeg > nPos ? `Mês <b>abaixo do esperado</b>: ${fN(nNeg)} ${nNeg === 1 ? 'ponto de atenção' : 'pontos de atenção'} e ${fN(nPos)} positivos.` : `Mês <b>equilibrado</b>: ${fN(nPos)} positivos e ${fN(nNeg)} de atenção.`;
-  const lst = (L, cls) => L.length ? `<ul class="insl">${L.map(([t, s]) => `<li class="${cls}"><i></i><span><b class="inst">${t}</b> ${s}</span></li>`).join('')}</ul>` : `<p class="mut" style="margin:6px 0">Nada a destacar.</p>`;
+  const lst = (L, cls) => L.length ? `<ul class="insl">${L.map(([t, s]) => `<li class="${cls}"><i></i><span><b class="inst">${t}</b> ${s}</span></li>`).join('')}</ul>` : `<p class="mut" style="margin:6px 0">${cls === 'pos' ? 'Nenhum indicador acima da média ou dentro da referência neste período.' : 'Nenhum ponto de atenção neste período.'}</p>`;
   h += `<div class="mph mt"><span>AVALIAÇÃO</span><em class="insv">${veredito} <small>Contra a ${B ? rotMed + ' (±15% = normal) e ' : ''}as referências de mercado.</small></em></div>`;
-  h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ O que está funcionando</h3><p>Acima da média ou dentro da referência de mercado</p></div></div>${lst(pos, 'pos')}</div>
-    <div class="card insno"><div class="ch"><div><h3>✖ O que não está funcionando</h3><p>Abaixo da média ou fora da referência de mercado</p></div></div>${lst(neg, 'neg')}</div></div>`;
+  h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ Pontos positivos</h3><p>Acima da média ou dentro da referência de mercado</p></div></div>${lst(pos, 'pos')}</div>
+    <div class="card insno"><div class="ch"><div><h3>⚠ Pontos de atenção</h3><p>Abaixo da média ou fora da referência de mercado: onde agir primeiro</p></div></div>${lst(neg, 'neg')}</div></div>`;
   // sugestões de mudança (mesmo formato dos Insights do B2C)
   const F = mpFoco(x, pRaw);
   h += insSugHtml(F.itens, '');
