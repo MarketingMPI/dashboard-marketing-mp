@@ -2413,7 +2413,8 @@ function insResumo(c) {
       : !b || Math.abs(d / b) > 3 ? `${nome} ${vb}: ${fmt(v)} contra ${fmt(b)} na ${rotMed}` : `${nome} ${vb} ${nf1.format(Math.abs(d / b * 100))}% (${fmt(v)} contra ${fmt(b)} na ${rotMed})`;
     mv.push({tom, txt, peso: b ? Math.abs(d / b) : 1}); }
   const neg = mv.filter(m => m.tom === 'neg').sort((a, b) => b.peso - a.peso).slice(0, 2), pos = mv.filter(m => m.tom === 'pos').sort((a, b) => b.peso - a.peso).slice(0, 1);
-  const hoje = [AT.n ? `${fN(AT.n)} ${AT.n === 1 ? 'lead' : 'leads'} com atraso` : 'nenhum lead com atraso',
+  const qp = modo === 'mensal' ? 'do mês' : 'da semana', tot = c.recente && c.recente.leads_em_atraso;
+  const hoje = [(AT.n ? `${fN(AT.n)} ${AT.n === 1 ? 'lead' : 'leads'} ${qp} com atraso` : `nenhum lead ${qp} com atraso`) + (tot && tot !== AT.n ? ` (${fN(tot)} na carteira toda)` : ''),
     AS.n ? `${fN(AS.n)} ${AS.n === 1 ? 'assumido' : 'assumidos'} sem movimentação` : ''].filter(Boolean).join(' e ');
   const at = !neg.length && (c.negT || []).length ? `Atenção: ${c.negT.slice(0, 2).map(t => t.replace(/<[^>]+>/g, '').toLowerCase()).join(' e ')}.` : '';
   const l2 = [neg.length ? `Pesou: ${neg.map(m => m.txt).join('; ')}.` : at, pos.length ? `Melhorou: ${pos[0].txt}.` : '', `Hoje: ${hoje}.`].filter(Boolean).join(' ');
@@ -2456,7 +2457,7 @@ function insSugestoes(c) {
     chk: {lbl: '% sem contato', v: X => X.leads ? X.semCont / X.leads * 100 : null, good: -1, fmt: fP}});
   // 4) cadência (situação de hoje)
   if (recente && recente.leads_em_atraso) out.push({t: 'Colocar a cadência em dia',
-    hoje: `${fN(recente.leads_em_atraso)} ${quem} em aberto com atividade vencida${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${recente.leads_sem_proxima ? ` · ${fN(recente.leads_sem_proxima)} sem próxima atividade` : ''}`,
+    hoje: `${fN(recente.leads_em_atraso)} ${quem} em aberto com atividade vencida, somando todos os períodos${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${recente.leads_sem_proxima ? ` · ${fN(recente.leads_sem_proxima)} sem próxima atividade` : ''}`,
     meta: 'zero atividade vencida e todo lead aberto com próxima atividade marcada',
     acoes: ['Resolver as atividades vencidas antes da reunião de terça (fazer, reagendar ou marcar o lead como perdido com motivo)',
       'Regra: ao concluir uma atividade, já agendar a próxima', 'Lead sem resposta depois da cadência completa: marcar como perdido com o motivo, em vez de deixar aberto'], impacto: '', chk: null});
@@ -2678,7 +2679,7 @@ function viewInsights() {
       tip: 'Leads que entraram no Funil Alpha no período (sem base importada e sem lançamentos retroativos)'}),
     kpiCard({label: 'Contato em menos de 1 dia', v: fP(x.rap), sub: `${fN(x.rapN)} de ${fN(x.leads)} · 1º contato médio ${fD(x.t1)}`, extra: pa('rap', fP), d: insVar(x.rap, B && B.rap, 1, fP, rotMed),
       tip: 'Dos leads que entraram no período, quantos tiveram o 1º contato (ou o agendamento) em menos de 24 horas'}),
-    kpiCard({label: 'Leads com atraso', cls: AT.n ? 'red' : '', v: fN(AT.n), sub: AT.n ? `${fN(AT.sc)} sem contato · ${fN(AT.cc)} com retorno atrasado` : 'nenhuma atividade vencida',
+    kpiCard({label: `Leads com atraso ${S.insModo === 'mensal' ? '(do mês)' : '(da semana)'}`, cls: AT.n ? 'red' : '', v: fN(AT.n), sub: AT.n ? `${fN(AT.sc)} sem contato · ${fN(AT.cc)} com retorno atrasado` : 'nenhuma atividade vencida',
       extra: `<div class="kx">de ${fN(AT.tot)} ${AT.tot === 1 ? 'lead' : 'leads'} do período · situação de hoje</div>`,
       tip: 'Leads que entraram no período, ainda abertos, com atividade de contato vencida e não concluída no Pipedrive (situação de hoje). Lista completa em Lead a Lead › Em atraso'}),
     kpiCard({label: 'Agendamentos', v: fN(x.ag), sub: `no período, lead de qualquer data`, extra: pa('ag', insN1), d: insVar(x.ag, B && B.ag, 1, insN1, rotMed),
@@ -2722,7 +2723,7 @@ function viewInsights() {
   let recente = null, A = null;
   if (i >= per.length - 2) { A = run(insF({de: MIN_DAY, ate: TODAY})); const ka = A.res.kpis;
     recente = {leads_em_atraso: ka.leads_em_atraso, leads_sem_proxima: ka.leads_sem_proxima, top: A.res.consultores.filter(c => c.leads_em_atraso).sort((a, b) => b.leads_em_atraso - a.leads_em_atraso).slice(0, 3)};
-    if (ka.leads_em_atraso) put('neg', 'Cadência (situação de hoje)', `<b>${fN(ka.leads_em_atraso)}</b> ${ka.leads_em_atraso === 1 ? 'lead' : 'leads'}${CP ? ' ' + CP : ''} em aberto com atividade vencida${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${ka.leads_sem_proxima ? ` e ${fN(ka.leads_sem_proxima)} sem próxima atividade` : ''}.`);
+    if (ka.leads_em_atraso) put('neg', 'Cadência (situação de hoje)', `<b>${fN(ka.leads_em_atraso)}</b> ${ka.leads_em_atraso === 1 ? 'lead' : 'leads'}${CP ? ' ' + CP : ''} em aberto com atividade vencida na carteira toda, de qualquer data de entrada${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${ka.leads_sem_proxima ? ` e ${fN(ka.leads_sem_proxima)} sem próxima atividade` : ''}.`);
     else put('pos', 'Cadência (situação de hoje)', `Nenhum lead${CP ? ' ' + CP : ''} em aberto com atividade vencida.`); }
   // por prefixo de campanha (TRD / DIAG / RCON / sem prefixo): só quando o seletor de campanha está em "Todos"
   let pxRows = null;
@@ -2753,7 +2754,7 @@ function viewInsights() {
   h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ Pontos positivos</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
     <div class="card insno"><div class="ch"><div><h3>⚠ Pontos de atenção</h3><p>Abaixo da média ou fora da referência: onde agir primeiro</p></div></div>${lst(neg, 'neg')}</div></div>`;
   const SG = insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), AS = insAssumidos();
-  h = h.replace('<!--INSRES-->', insResumoHtml({x, B, modo, CP, rotMed, nPos, nNeg, AT, AS, SG, parcial: P.parcial, negT: neg.map(n => n[0])}));
+  h = h.replace('<!--INSRES-->', insResumoHtml({x, B, modo, CP, rotMed, nPos, nNeg, AT, AS, SG, parcial: P.parcial, negT: neg.map(n => n[0]), recente}));
   h += insAssumidosHtml();
   h += insSugHtml(SG, CP);
   // acompanhamento das sugestões do período anterior
