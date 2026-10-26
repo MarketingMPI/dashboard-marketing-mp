@@ -2422,7 +2422,7 @@ function insResumo(c) {
 }
 function insResumoHtml(c) {
   const L = insResumo(c), tom = !c.B ? 'neu' : c.nNeg > c.nPos ? 'neg' : c.nPos > c.nNeg ? 'pos' : 'neu';
-  return `<div class="insres ${tom}"><div class="insrh"><b>Resumo para abrir a reunião</b><button type="button" class="btn gh sm" data-act="ins-copy" title="Copia o resumo para colar no WhatsApp ou e-mail">⧉ Copiar</button></div>
+  return `<div class="insres ${tom}"><div class="insrh"><b>Resumo</b><button type="button" class="btn gh sm" data-act="ins-copy" title="Copia o resumo para colar no WhatsApp ou e-mail">⧉ Copiar</button></div>
     <p class="l1">${ESC(L[0])}</p><p>${ESC(L[1])}</p><p class="l3">${ESC(L[2])}</p><textarea hidden class="insrt">${ESC(L.join('\n'))}</textarea></div>`;
 }
 function insSugestoes(c) {
