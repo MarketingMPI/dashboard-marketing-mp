@@ -154,7 +154,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .g{display:grid;gap:16px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
-@media(min-width:761px){.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(min-width:761px){.kpis.k7{grid-template-columns:repeat(12,minmax(0,1fr))}.kpis.k7>.kpi{grid-column:span 3}.kpis.k7>.kpi:nth-child(n+5){grid-column:span 4}}.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
+@media(min-width:761px){.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(min-width:761px){.kpis.k7{grid-template-columns:repeat(12,minmax(0,1fr))}.kpis.k7>.kpi{grid-column:span 3}.kpis.k7>.kpi:nth-child(n+5){grid-column:span 4}}.insal{margin-top:16px;border:1px solid #f0c9c2;border-left:4px solid #c0392b;background:#fdf4f2;border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px;font-size:13.5px}.insal>b{color:#a3362a;font-size:14px}.insal small{color:#69727d;font-size:12px}.insal.leve{border-color:#e6ebe9;border-left-color:#d9a441;background:#fffaf0}.insal.leve>b{color:#8a5d10}.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
 .insexc{margin:0 0 14px;font-size:13px}.inscons td.num .mut{font-size:11px}.insfu td .dl{display:inline-block}.insag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px}@media(max-width:960px){.insag{grid-template-columns:1fr}}
@@ -2542,6 +2542,26 @@ function perSelect(itens, atual, attr, rotulo) {
     <button type="button" class="persel-b" ${prx ? `data-${attr}="${prx[0]}"` : 'disabled'} aria-label="Próximo período">›</button></div>`;
 }
 // quantos negócios do período ficaram fora dos Insights (base importada/reativados e lançamentos retroativos)
+/* Alerta: leads ABERTOS que um consultor assumiu (troca de responsável no Pipedrive) e que, desde então, não tiveram
+   nenhuma atividade criada/concluída nem mudança de etapa (l.pp = momento da troca, calculado no painel.py).
+   Situação de hoje; só conta quem foi assumido há mais de 1 dia. Escopo = operação (base importada à parte). */
+function insAssumidos() {
+  const lim = Date.now() - DAY, pr = makePred(filtros({de: '', ate: '', operacao: false}), 'periodo'), por = new Map();
+  let n = 0, base = 0, velho = null;
+  for (const l of LEADS) { if (l.s !== 'open' || !l.pp || tms(l.pp) > lim || !pr(l)) continue;
+    if (l.b || isRetro(l)) { base++; continue; }
+    n++; por.set(l.c, (por.get(l.c) || 0) + 1); if (!velho || l.pp < velho) velho = l.pp; }
+  return {n, base, por: [...por].sort((a, b) => b[1] - a[1]), dias: velho ? Math.floor((Date.now() - tms(velho)) / DAY) : 0};
+}
+function insAssumidosHtml() {
+  const A = insAssumidos();
+  if (!A.n && !A.base) return '';
+  const quem = A.por.map(([c, k]) => `${ESC(c)} ${fN(k)}`).join(' · ');
+  return `<div class="insal${A.n ? '' : ' leve'}"><b>⚠ Alerta: leads assumidos sem movimentação</b>
+    <span>${A.n ? `<b>${fN(A.n)}</b> ${A.n === 1 ? 'lead foi assumido' : 'leads foram assumidos'} por um consultor e, desde então, não ${A.n === 1 ? 'teve' : 'tiveram'} nenhuma atividade nem mudança de etapa no Pipedrive${quem ? ` (${quem})` : ''}${A.dias ? ` · o mais antigo há ${fN(A.dias)} ${A.dias === 1 ? 'dia' : 'dias'}` : ''}.` : 'Nenhum lead da operação nessa situação.'}
+    ${A.base ? ` Além disso, ${fN(A.base)} ${A.base === 1 ? 'contato da base importada/reativado está' : 'contatos da base importada/reativados estão'} na mesma situação.` : ''}</span>
+    <small>Regra: assumiu o lead, faz o contato e move a etapa (ou registra a atividade). Situação de hoje · conta quem foi assumido há mais de 1 dia.</small></div>`;
+}
 function insExcl(de, ate) {
   const pr = makePred(filtros({de, ate}), 'periodo'), inW = s => { if (!s) return false; const d = String(s).slice(0, 10); return d >= de && d <= ate; };
   let base = 0, retro = 0;
@@ -2677,6 +2697,7 @@ function viewInsights() {
   h += `<div class="mph mt"><span>AVALIAÇÃO</span><em class="insv">${veredito} <small>Normal = até 15% de diferença para a ${rotMed}.</small></em></div>`;
   h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ Pontos positivos</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
     <div class="card insno"><div class="ch"><div><h3>⚠ Pontos de atenção</h3><p>Abaixo da média ou fora da referência: onde agir primeiro</p></div></div>${lst(neg, 'neg')}</div></div>`;
+  h += insAssumidosHtml();
   h += insSugHtml(insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), CP);
   // acompanhamento das sugestões do período anterior
   if (xPrev && i >= 1) {

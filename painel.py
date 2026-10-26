@@ -390,8 +390,31 @@ def base_import_ids(deals, per):
     return out
 
 
+# Nome de exibição de usuários do Pipedrive no painel (por id, para não depender do nome cadastrado)
+NOME_EXIBICAO = {16623989: "Time Santos"}
+
+
+def assumido_parado(d, info, users):
+    """Lead aberto cujo responsável foi trocado para um consultor (changelog user_id) e que, desde a troca, não teve
+    nenhuma atividade criada/concluída nem mudança de etapa. Devolve o momento da troca (BRT) ou None."""
+    if d["status"] != "open": return None
+    own = sorted((e for e in info.get("log") or [] if e.get("k") == "user_id" and e.get("t")), key=lambda e: e["t"])
+    if not own: return None
+    novo = str(own[-1].get("n") or "")
+    if novo.isdigit() and users.get(int(novo)) == "Marketing": return None
+    T = parse_utc(own[-1]["t"])
+    if not T: return None
+    for a in info.get("acts") or []:
+        for k in ("add", "done_at"):
+            t = parse_utc(a.get(k))
+            if t and t > T: return None
+    for e in info.get("log") or []:
+        if e.get("k") == "stage_id" and e.get("t") and parse_utc(e["t"]) > T: return None
+    return brt(T)
+
+
 def model(cache):
-    users = {int(k): v for k, v in cache["users"].items()}
+    users = {int(k): NOME_EXIBICAO.get(int(k), v) for k, v in cache["users"].items()}
     labels = {int(k): v for k, v in cache["labels"].items()}
     per = cache["per_deal"]
     base = base_import_ids(cache["deals"], per)
@@ -441,7 +464,7 @@ def model(cache):
             "lr": (d.get("lost_reason") or "").strip() or ("Sem motivo informado" if d["status"] == "lost" else None),
             "k": contacts, "ns": noshow,
             "pa": len(pend), "nx": pend[0] if pend else None, "pv": pv,
-            "h": hist,
+            "h": hist, "pp": assumido_parado(d, info, users),
         })
     return dedupe(leads), excl
 
