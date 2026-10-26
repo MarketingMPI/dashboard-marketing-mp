@@ -154,7 +154,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .g{display:grid;gap:16px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
-@media(min-width:761px){.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(min-width:761px){.kpis.k7{grid-template-columns:repeat(12,minmax(0,1fr))}.kpis.k7>.kpi{grid-column:span 3}.kpis.k7>.kpi:nth-child(n+5){grid-column:span 4}}.insal{margin-top:16px;border:1px solid #f0c9c2;border-left:4px solid #c0392b;background:#fdf4f2;border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px;font-size:13.5px}.insal>b{color:#a3362a;font-size:14px}.insal small{color:#69727d;font-size:12px}.insal.leve{border-color:#e6ebe9;border-left-color:#d9a441;background:#fffaf0}.insal.leve>b{color:#8a5d10}.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
+@media(min-width:761px){.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(min-width:761px){.kpis.k7{grid-template-columns:repeat(12,minmax(0,1fr))}.kpis.k7>.kpi{grid-column:span 3}.kpis.k7>.kpi:nth-child(n+5){grid-column:span 4}}.insal{margin-top:16px;border:1px solid #f0c9c2;border-left:4px solid #c0392b;background:#fdf4f2;border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px;font-size:13.5px}.insal>b{color:#a3362a;font-size:14px}.insal small{color:#69727d;font-size:12px}.insal.leve{border-color:#e6ebe9;border-left-color:#d9a441;background:#fffaf0}.insal.leve>b{color:#8a5d10}.insres{margin:0 0 16px;border:1px solid var(--line,#e6ebe9);border-left:5px solid #69727d;border-radius:12px;background:#fff;padding:14px 18px;display:flex;flex-direction:column;gap:6px}.insres.neg{border-left-color:#c0392b}.insres.pos{border-left-color:#00a611}.insrh{display:flex;justify-content:space-between;align-items:center;gap:10px}.insrh b{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#69727d}.insres p{margin:0;font-size:14.5px;line-height:1.5}.insres .l1{font-size:16px;font-weight:600}.insres .l3{font-weight:600;color:#00503c}.btn.sm{padding:4px 10px;font-size:12px}@media print{.insrh .btn{display:none}}.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
 .insexc{margin:0 0 14px;font-size:13px}.inscons td.num .mut{font-size:11px}.insfu td .dl{display:inline-block}.insag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px}@media(max-width:960px){.insag{grid-template-columns:1fr}}
@@ -2395,6 +2395,36 @@ function insGrp(x, modo) {
 const insGap = (x, modo) => { const {cs} = insGrp(x, modo); return cs.length >= 2 ? cs[0].pct_contatados - cs[cs.length - 1].pct_contatados : null; };
 /* Sugestões de mudança (Insights B2C): regras sobre os números do período × média; ordem = prioridade.
    Cada item: t, hoje, meta, acoes[], impacto e chk (como medir na semana seguinte se melhorou). */
+/* Resumo para abrir a reunião: 3 linhas montadas com os MESMOS números da página (veredito da avaliação, maiores
+   variações contra a média, leads com atraso / assumidos parados e a sugestão nº 1). */
+function insResumo(c) {
+  const {x, B, modo, CP, rotMed, nPos, nNeg, AT, AS, SG, parcial} = c, fRs = v => v == null ? '–' : fR(v);
+  const QM = (modo === 'semanal' ? 'Semana' : 'Mês') + (CP ? ' ' + CP : '') + (parcial ? ' (parcial)' : '');
+  const l1 = !B ? `${QM}: sem histórico suficiente para comparar.`
+    : `${QM} ${nNeg > nPos ? 'abaixo do esperado' : nPos > nNeg ? 'acima do esperado' : 'dentro do esperado'}: ${fN(nPos)} ${nPos === 1 ? 'ponto positivo' : 'pontos positivos'} e ${fN(nNeg)} de atenção.`;
+  const MET = [['leads', 'entrada de leads', 1, insN1, 3], ['rap', 'contato em menos de 1 dia', 1, fP, 0], ['ag', 'agendamentos', 1, insN1, 3, 1],
+    ['reu', 'reuniões realizadas', 1, insN1, 3, 1], ['won', 'ganhos', 1, insN1, 2, 1], ['cpl', 'custo por lead', -1, fRs, 0]];
+  const mv = [];
+  if (B) for (const [k, nome, good, fmt, mn, pl] of MET) { const v = x[k], b = B[k];
+    if (v == null || b == null || (k === 'cpl' && !x.inv)) continue;
+    const tom = insTom(v, b, good, mn); if (tom === 'neu') continue;
+    const d = v - b, vb = d > 0 ? (pl ? 'subiram' : 'subiu') : (pl ? 'caíram' : 'caiu');
+    const txt = fmt === fP ? `${nome} ${vb} para ${fP(v)} (${rotMed}: ${fP(b)}; ${d > 0 ? '+' : '−'}${nf1.format(Math.abs(d))} p.p.)`
+      : !b || Math.abs(d / b) > 3 ? `${nome} ${vb}: ${fmt(v)} contra ${fmt(b)} na ${rotMed}` : `${nome} ${vb} ${nf1.format(Math.abs(d / b * 100))}% (${fmt(v)} contra ${fmt(b)} na ${rotMed})`;
+    mv.push({tom, txt, peso: b ? Math.abs(d / b) : 1}); }
+  const neg = mv.filter(m => m.tom === 'neg').sort((a, b) => b.peso - a.peso).slice(0, 2), pos = mv.filter(m => m.tom === 'pos').sort((a, b) => b.peso - a.peso).slice(0, 1);
+  const hoje = [AT.n ? `${fN(AT.n)} ${AT.n === 1 ? 'lead' : 'leads'} com atraso` : 'nenhum lead com atraso',
+    AS.n ? `${fN(AS.n)} ${AS.n === 1 ? 'assumido' : 'assumidos'} sem movimentação` : ''].filter(Boolean).join(' e ');
+  const at = !neg.length && (c.negT || []).length ? `Atenção: ${c.negT.slice(0, 2).map(t => t.replace(/<[^>]+>/g, '').toLowerCase()).join(' e ')}.` : '';
+  const l2 = [neg.length ? `Pesou: ${neg.map(m => m.txt).join('; ')}.` : at, pos.length ? `Melhorou: ${pos[0].txt}.` : '', `Hoje: ${hoje}.`].filter(Boolean).join(' ');
+  const l3 = SG.length ? `Prioridade: ${SG[0].t.replace(/<[^>]+>/g, '')}${SG[1] ? `; em seguida, ${SG[1].t.replace(/<[^>]+>/g, '').toLowerCase()}` : ''}.` : 'Prioridade: manter o ritmo; nenhum indicador pede mudança.';
+  return [l1, l2.charAt(0).toUpperCase() + l2.slice(1), l3];
+}
+function insResumoHtml(c) {
+  const L = insResumo(c), tom = !c.B ? 'neu' : c.nNeg > c.nPos ? 'neg' : c.nPos > c.nNeg ? 'pos' : 'neu';
+  return `<div class="insres ${tom}"><div class="insrh"><b>Resumo para abrir a reunião</b><button type="button" class="btn gh sm" data-act="ins-copy" title="Copia o resumo para colar no WhatsApp ou e-mail">⧉ Copiar</button></div>
+    <p class="l1">${ESC(L[0])}</p><p>${ESC(L[1])}</p><p class="l3">${ESC(L[2])}</p><textarea hidden class="insrt">${ESC(L.join('\n'))}</textarea></div>`;
+}
 function insSugestoes(c) {
   const {x, B, gs, comCpl, cs, modo, CP, rotMed, recente} = c, out = [];
   const fRs = v => v == null ? '–' : fR(v), quem = CP ? `leads ${CP}` : 'leads';
@@ -2614,6 +2644,7 @@ function viewInsights() {
   h += `<div class="mph"><span>${modo === 'semanal' ? `SEMANA ${fDM(P.de)} A ${fDM(P.fim)}` : mesNome(P.k).toUpperCase()}</span>${CN ? `<span class="inscp">${ESC(CN)}</span>` : ''}${P.parcial ? `em andamento, dados até ${fDay(P.ate)} · comparação ajustada ao ritmo (${fN(diffDays(P.de, P.ate) + 1)} de ${fN(nDias)} dias)` : `comparado com a ${rotMed} (cores) e com a ${rotAnt}`}</div>`;
   const EX = insExcl(P.de, P.ate);
   if (EX.base || EX.retro) h += `<div class="note insexc">Fora desta análise${modo === 'semanal' ? ' nesta semana' : ' neste mês'}: ${[EX.base ? `<b>${fN(EX.base)}</b> ${EX.base === 1 ? 'contato importado da base/reativado' : 'contatos importados da base/reativados'}` : '', EX.retro ? `<b>${fN(EX.retro)}</b> ${EX.retro === 1 ? 'lançamento retroativo' : 'lançamentos retroativos'} (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade registrada)` : ''].filter(Boolean).join(' e ')}. Eles continuam nas outras abas.</div>`;
+  h += '<!--INSRES-->';
   // grandes números: cor/variação contra a média; período anterior em texto
   const fRs = v => v == null ? '–' : fR(v);
   const pa = (key, fmt) => ant && ant[key] != null ? `<div class="kx">${rotAnt}: <b>${fmt(ant[key])}</b></div>` : '';
@@ -2697,8 +2728,10 @@ function viewInsights() {
   h += `<div class="mph mt"><span>AVALIAÇÃO</span><em class="insv">${veredito} <small>Normal = até 15% de diferença para a ${rotMed}.</small></em></div>`;
   h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ Pontos positivos</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
     <div class="card insno"><div class="ch"><div><h3>⚠ Pontos de atenção</h3><p>Abaixo da média ou fora da referência: onde agir primeiro</p></div></div>${lst(neg, 'neg')}</div></div>`;
+  const SG = insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), AS = insAssumidos();
+  h = h.replace('<!--INSRES-->', insResumoHtml({x, B, modo, CP, rotMed, nPos, nNeg, AT, AS, SG, parcial: P.parcial, negT: neg.map(n => n[0])}));
   h += insAssumidosHtml();
-  h += insSugHtml(insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), CP);
+  h += insSugHtml(SG, CP);
   // acompanhamento das sugestões do período anterior
   if (xPrev && i >= 1) {
     const antsP = per.slice(Math.max(0, i - 1 - nb), i - 1).map(p => insCalc(p.de, p.fim)), BP = antsP.length ? insBase(antsP, 1) : null;
@@ -4444,6 +4477,8 @@ function bindEvents() {
       else if (a === 'camp') { S.camp = act.dataset.v || ''; resetPages(); update(); }
       else if (a === 'perda-data') { S.perdaData = !S.perdaData; S.lost.page = 0; update(); }
       else if (a === 'ins-pdf') insPrint();
+      else if (a === 'ins-copy') { const t = (document.querySelector('.insrt') || {}).value || ''; const ok = () => { act.textContent = '✔ Copiado'; setTimeout(() => { act.textContent = '⧉ Copiar'; }, 1800); };
+        if (navigator.clipboard) navigator.clipboard.writeText(t).then(ok, () => {}); else { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); ok(); } }
       else if (a === 'close') closeDrawer();
       else if (a === 'tl-all') { S.tlAll = true; openDrawer(act.dataset.id); }
       return;
