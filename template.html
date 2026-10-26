@@ -154,7 +154,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
 .g{display:grid;gap:16px}
 #fbar.so-periodo .sep,#fbar.so-periodo #dims,#fbar.so-periodo .crow{display:none!important}
 #fbar.sem-periodo .per,#fbar.sem-periodo .sep,#fbar.sem-periodo .pc{display:none!important}
-@media(min-width:761px){.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))}}.iatg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:12px 18px 0}.iatc{border:1px solid var(--line,#e6ebe9);border-left:4px solid #b9c4bf;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}.iatc b{font-size:24px;line-height:1.1}.iatc span{font-weight:600;font-size:13px}.iatc small{color:#69727d;font-size:11.5px}.iatc.atr{border-left-color:#c0392b}.iatc.atr b{color:#a3362a}.iatc.dia{border-left-color:#00a611}.iatc.sem{border-left-color:#b9c4bf}.iatn{padding:10px 18px 6px;color:#69727d;font-size:12.5px}.insatr .ch{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}@media(max-width:960px){.iatg{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){.iatg{grid-template-columns:1fr}}.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
+@media(min-width:761px){.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(min-width:761px){.kpis.k7{grid-template-columns:repeat(12,minmax(0,1fr))}.kpis.k7>.kpi{grid-column:span 3}.kpis.k7>.kpi:nth-child(n+5){grid-column:span 4}}.insk .kx{margin-top:4px}.insk .kv{white-space:nowrap}.insmetas .mt-g{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.insmetas .mt-g.mt-g3{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.insmetas .mt-g.mt-g3{grid-template-columns:1fr}}.mt-ok{color:#0b7a3b;font-weight:600}.mt-i.main .mt-ok{color:#cfe6dc}.insmh{margin:14px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}.insav{align-items:start}.insl .inst{display:block;font-size:13px;color:var(--cinza);font-weight:600;margin-bottom:1px}
 .insv{font-style:normal;font-size:14px;color:var(--txt)}.insv small{font-size:12px;color:var(--cinza);margin-left:4px}.inspx td .dl{display:inline-block;margin-top:3px}.inspx td .mut{font-size:11px}.inscp{background:var(--verde)!important;color:#fff!important}.inscmp>summary{list-style:none;cursor:pointer;user-select:none;padding:16px 18px 18px!important;display:flex;align-items:center;justify-content:space-between;margin:0}.inscmp>summary::-webkit-details-marker{display:none}
 .inscmp>summary .fcc{width:20px;height:20px;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .2s;flex:none}.inscmp[open]>summary .fcc{transform:rotate(180deg)}.inscmp:hover{border-color:var(--v200)}.inscmp[open]>summary{padding-bottom:0!important}.inscmp .tw{margin-top:12px}
 .insexc{margin:0 0 14px;font-size:13px}.inscons td.num .mut{font-size:11px}.insfu td .dl{display:inline-block}.insag{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px}@media(max-width:960px){.insag{grid-template-columns:1fr}}
@@ -165,7 +165,7 @@ input.ctl[type=date]{cursor:text;padding:0 8px;width:138px}
   nav.side,#fbar,footer.howto,.upd,.sabas,.persel,[data-act="ins-pdf"],#tip,#pop,#ovl{display:none!important}
   .shell{display:block!important}.main{padding:0!important}header.top{padding:8px 0!important}
   .card,.kpi,.mt-i,.fci,details{break-inside:avoid;box-shadow:none!important}
-  .tw{overflow:visible!important;max-height:none!important}.kpis.k6,.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .tw{overflow:visible!important;max-height:none!important}.kpis.k6,.kpis.k3x{grid-template-columns:repeat(3,minmax(0,1fr))!important}.kpis.k7{grid-template-columns:repeat(12,minmax(0,1fr))!important}
   .g2{grid-template-columns:1fr 1fr!important}
 }
 .insok{border-top:3px solid #00a611}.insno{border-top:3px solid #c0392b}
@@ -2568,32 +2568,12 @@ function insPrint() {
   window.addEventListener('afterprint', volta);
   setTimeout(() => window.print(), 60);
 }
-/* Insights · Leads com atraso: leads que entraram no período, na situação de HOJE. Separa quem está sem contato
-   dentro do prazo (atividade para hoje ou adiante) de quem está atrasado de fato (atividade de contato vencida e não
-   concluída) e de quem não tem nenhuma atividade agendada. Regra de atraso = a mesma da Cadência (derive: d.cad). */
-const INS_ATR = {
-  sa: ['Sem contato · atrasado', 'atr', 'a atividade de contato venceu e não foi concluída'],
-  sp: ['Sem contato · no prazo', 'dia', 'a 1ª atividade vence hoje ou mais adiante'],
-  ss: ['Sem contato · sem atividade', 'sem', 'nenhuma atividade agendada no Pipedrive'],
-  ca: ['Com contato · retorno atrasado', 'atr', 'já houve contato, mas a próxima atividade venceu']
-};
-function insAtrasoHtml(P, modo) {
-  const rows = run(insF({de: P.de, ate: P.ate})).rows, G = {sa: [], sp: [], ss: [], ca: []};
-  let ok = 0, fech = 0;
-  for (const r of rows) { const d = r.d;
-    if (!d.open) { fech++; continue; }
-    if (!d.cont) G[d.cad === 'atraso' ? 'sa' : d.cad === 'sem' ? 'ss' : 'sp'].push(r);
-    else if (d.cad === 'atraso') G.ca.push(r); else ok++; }
-  const hoje = fDay(TODAY), lista = [...G.sa, ...G.ca, ...G.ss].sort((a, b) => (b.d.dAtr || -1) - (a.d.dAtr || -1));
-  const nAtr = G.sa.length + G.ca.length;
-  const chip = k => `<div class="iatc ${INS_ATR[k][1]}"><b>${fN(G[k].length)}</b><span>${INS_ATR[k][0]}</span><small>${INS_ATR[k][2]}</small></div>`;
-  const sit = (r) => { const d = r.d; const k = !d.cont ? (d.cad === 'atraso' ? 'sa' : 'ss') : 'ca'; return `<span class="cad ${INS_ATR[k][1]}">${INS_ATR[k][0]}</span>`; };
-  const tb = lista.length ? `<div class="tw"><table class="t"><thead><tr><th>Lead</th><th>Consultor</th><th>Situação</th><th>Atividade vencida</th><th class="num">Venceu em</th><th class="num">Atraso</th></tr></thead><tbody>${
-    lista.map(r => { const d = r.d, l = r.l; return `<tr class="clk" data-lead="${ESC(l.id)}"><td class="wrap" style="max-width:260px"><b>${ESC(l.n)}</b><div class="mut">entrou em ${fDay(d.day)} · ${fN(d.nk)} ${d.nk === 1 ? 'tentativa' : 'tentativas'}</div></td><td>${ESC(l.c || '–')}</td><td>${sit(r)}</td><td class="wrap" style="max-width:220px">${d.venc ? ESC(d.vencS || 'Atividade') : '<span class="muted">nenhuma agendada</span>'}</td><td class="num">${d.venc ? fDay(d.venc) : '–'}</td><td class="num">${d.dAtr != null ? `<b class="red">${fN(d.dAtr)} ${d.dAtr === 1 ? 'dia' : 'dias'}</b>` : '–'}</td></tr>`; }).join('')}</tbody></table></div>`
-    : `<p class="mut" style="margin:4px 18px 16px">Nenhum lead ${modo === 'semanal' ? 'desta semana' : 'deste mês'} com atividade atrasada ou sem atividade agendada.</p>`;
-  return `<div class="card mt np insatr"><div class="ch" style="padding:16px 18px 0"><div><h3>⏰ Leads com atraso</h3><p>Leads que entraram ${modo === 'semanal' ? 'nesta semana' : 'neste mês'} (${fN(rows.length)}), na situação de hoje (${hoje}) · atrasado = atividade de contato vencida e não concluída no Pipedrive · clique no lead para ver o histórico</p></div>${nAtr ? `<span class="pill s-lost">${fN(nAtr)} ${nAtr === 1 ? 'atrasado' : 'atrasados'}</span>` : ''}</div>
-    <div class="iatg">${chip('sa')}${chip('sp')}${chip('ss')}${chip('ca')}</div>
-    <div class="iatn">Além desses: ${fN(ok)} com contato e retorno em dia · ${fN(fech)} já ${fech === 1 ? 'encerrado' : 'encerrados'} (ganho ou perdido).</div>${tb}</div>`;
+/* Insights · Leads com atraso: leads que entraram no período, abertos, com atividade vencida e não concluída
+   no Pipedrive (mesma regra da Cadência: derive → d.cad === 'atraso'), na situação de hoje. */
+function insAtraso(P) {
+  const rows = run(insF({de: P.de, ate: P.ate})).rows;
+  let sc = 0, cc = 0; for (const r of rows) if (r.d.open && r.d.cad === 'atraso') r.d.cont ? cc++ : sc++;
+  return {n: sc + cc, sc, cc, tot: rows.length};
 }
 function viewInsights() {
   const modo = S.insModo === 'mensal' ? 'mensal' : 'semanal', nm = INS_NOME[modo], nb = INS_BASE[modo];
@@ -2617,11 +2597,15 @@ function viewInsights() {
   // grandes números: cor/variação contra a média; período anterior em texto
   const fRs = v => v == null ? '–' : fR(v);
   const pa = (key, fmt) => ant && ant[key] != null ? `<div class="kx">${rotAnt}: <b>${fmt(ant[key])}</b></div>` : '';
-  h += '<div class="kpis k3x insk">' + [
+  const AT = insAtraso(P);
+  h += '<div class="kpis k7 insk">' + [
     kpiCard({label: 'Leads novos', cls: 'hero', v: fN(x.leads), sub: `${fN(x.cont)} com contato · ${fN(x.semCont)} sem contato`, extra: pa('leads', insN1), d: insVar(x.leads, B && B.leads, 1, insN1, rotMed),
       tip: 'Leads que entraram no Funil Alpha no período (sem base importada e sem lançamentos retroativos)'}),
     kpiCard({label: 'Contato em menos de 1 dia', v: fP(x.rap), sub: `${fN(x.rapN)} de ${fN(x.leads)} · 1º contato médio ${fD(x.t1)}`, extra: pa('rap', fP), d: insVar(x.rap, B && B.rap, 1, fP, rotMed),
       tip: 'Dos leads que entraram no período, quantos tiveram o 1º contato (ou o agendamento) em menos de 24 horas'}),
+    kpiCard({label: 'Leads com atraso', cls: AT.n ? 'red' : '', v: fN(AT.n), sub: AT.n ? `${fN(AT.sc)} sem contato · ${fN(AT.cc)} com retorno atrasado` : 'nenhuma atividade vencida',
+      extra: `<div class="kx">de ${fN(AT.tot)} ${AT.tot === 1 ? 'lead' : 'leads'} do período · situação de hoje</div>`,
+      tip: 'Leads que entraram no período, ainda abertos, com atividade de contato vencida e não concluída no Pipedrive (situação de hoje). Lista completa em Lead a Lead › Em atraso'}),
     kpiCard({label: 'Agendamentos', v: fN(x.ag), sub: `no período, lead de qualquer data`, extra: pa('ag', insN1), d: insVar(x.ag, B && B.ag, 1, insN1, rotMed),
       tip: 'Leads que chegaram à etapa de agendamento (ou foram ganhos) dentro do período, independentemente de quando entraram'}),
     kpiCard({label: 'Reuniões realizadas', v: fN(x.reu), sub: x.faltas ? `${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'} · comparecimento ${fP(x.comp)}` : 'nenhuma falta registrada', extra: pa('reu', insN1), d: insVar(x.reu, B && B.reu, 1, insN1, rotMed),
@@ -2631,7 +2615,6 @@ function viewInsights() {
     kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
       tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período. Inclui a verba de campanhas que não trouxeram lead'})
   ].join('') + '</div>';
-  h += insAtrasoHtml(P, modo);
   h += insMetasHtml(x, CP, P.parcial, modo, frac);
   // avaliação
   const pos = [], neg = [], neu = [];
