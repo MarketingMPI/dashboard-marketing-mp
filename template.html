@@ -2382,6 +2382,15 @@ function insVar(c, p, good, fmt, rot, fmtD = fmt) {
   const tone = good === 0 ? 'neu' : ((d > 0) === (good > 0) ? 'pos' : 'neg');
   return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${pc == null ? 'novo' : nf1.format(Math.abs(pc)) + '%'} (${d > 0 ? '+' : '−'}${fmtD(Math.abs(d))})</span><span class="vs">${rot}: ${fmt(p)}</span>`;
 }
+// Contagens pequenas (valor OU média < 3): o % exagera (1 reunião a mais = +166%). Mostra só a diferença em número,
+// com seta cinza; acima disso, igual a insVar (cor + % + número).
+function insVarN(c, p, good, rot, un) {
+  if (c == null || p == null || Math.min(Math.abs(c), Math.abs(p)) >= 3) return insVar(c, p, good, insN1, rot);
+  const d = c - p;
+  if (Math.abs(d) < 0.05) return `<span class="dl neu">= igual</span><span class="vs">${rot}: ${insN1(p)}</span>`;
+  const q = Math.abs(d), u = q >= 1.05 || q < 0.95 ? un[1] : un[0];
+  return `<span class="dl neu" title="Volume pequeno: a variação em % exageraria a diferença">${d > 0 ? '▲ +' : '▼ −'}${insN1(q)} ${u}</span><span class="vs">${rot}: ${insN1(p)}</span>`;
+}
 const insN = v => v == null ? '–' : nf0.format(Math.round(v)), insN1 = v => v == null ? '–' : (Math.abs(v - Math.round(v)) < 0.05 ? nf0.format(Math.round(v)) : nf1.format(v));
 const INS_SEMC = /sem contato|não atend|nao atend|sem retorno|não respond|nao respond|abandono/i;
 // grupos de mídia e consultores comparáveis de um período (usado no período atual e no anterior)
@@ -2410,7 +2419,7 @@ function insResumo(c) {
     const tom = insTom(v, b, good, mn); if (tom === 'neu') continue;
     const d = v - b, vb = d > 0 ? (pl ? 'subiram' : 'subiu') : (pl ? 'caíram' : 'caiu');
     const txt = fmt === fP ? `${nome} ${vb} para ${fP(v)} (${rotMed}: ${fP(b)}; ${d > 0 ? '+' : '−'}${nf1.format(Math.abs(d))} p.p.)`
-      : !b || Math.abs(d / b) > 3 ? `${nome} ${vb}: ${fmt(v)} contra ${fmt(b)} na ${rotMed}` : `${nome} ${vb} ${nf1.format(Math.abs(d / b * 100))}% (${fmt(v)} contra ${fmt(b)} na ${rotMed})`;
+      : !b || Math.abs(d / b) > 3 || (fmt === insN1 && Math.min(Math.abs(v), Math.abs(b)) < 3) ? `${nome} ${vb}: ${fmt(v)} contra ${fmt(b)} na ${rotMed}` : `${nome} ${vb} ${nf1.format(Math.abs(d / b * 100))}% (${fmt(v)} contra ${fmt(b)} na ${rotMed})`;
     mv.push({tom, txt, peso: b ? Math.abs(d / b) : 1}); }
   const neg = mv.filter(m => m.tom === 'neg').sort((a, b) => b.peso - a.peso).slice(0, 2), pos = mv.filter(m => m.tom === 'pos').sort((a, b) => b.peso - a.peso).slice(0, 1);
   const qp = modo === 'mensal' ? 'do mês' : 'da semana', tot = c.recente && c.recente.leads_em_atraso;
@@ -2675,18 +2684,18 @@ function viewInsights() {
   const pa = (key, fmt) => ant && ant[key] != null ? `<div class="kx">${rotAnt}: <b>${fmt(ant[key])}</b></div>` : '';
   const AT = insAtraso(P);
   h += '<div class="kpis k7 insk">' + [
-    kpiCard({label: 'Leads novos', cls: 'hero', v: fN(x.leads), sub: `${fN(x.cont)} com contato · ${fN(x.semCont)} sem contato`, extra: pa('leads', insN1), d: insVar(x.leads, B && B.leads, 1, insN1, rotMed),
+    kpiCard({label: 'Leads novos', cls: 'hero', v: fN(x.leads), sub: `${fN(x.cont)} com contato · ${fN(x.semCont)} sem contato`, extra: pa('leads', insN1), d: insVarN(x.leads, B && B.leads, 1, rotMed, ['lead', 'leads']),
       tip: 'Leads que entraram no Funil Alpha no período (sem base importada e sem lançamentos retroativos)'}),
     kpiCard({label: 'Contato em menos de 1 dia', v: fP(x.rap), sub: `${fN(x.rapN)} de ${fN(x.leads)} · 1º contato médio ${fD(x.t1)}`, extra: pa('rap', fP), d: insVar(x.rap, B && B.rap, 1, fP, rotMed),
       tip: 'Dos leads que entraram no período, quantos tiveram o 1º contato (ou o agendamento) em menos de 24 horas'}),
     kpiCard({label: `Leads com atraso ${S.insModo === 'mensal' ? '(do mês)' : '(da semana)'}`, cls: AT.n ? 'red' : '', v: fN(AT.n), sub: AT.n ? `${fN(AT.sc)} sem contato · ${fN(AT.cc)} com retorno atrasado` : 'nenhuma atividade vencida',
       extra: `<div class="kx">de ${fN(AT.tot)} ${AT.tot === 1 ? 'lead' : 'leads'} do período · situação de hoje</div>`,
       tip: 'Leads que entraram no período, ainda abertos, com atividade de contato vencida e não concluída no Pipedrive (situação de hoje). Lista completa em Lead a Lead › Em atraso'}),
-    kpiCard({label: 'Agendamentos', v: fN(x.ag), sub: `no período, lead de qualquer data`, extra: pa('ag', insN1), d: insVar(x.ag, B && B.ag, 1, insN1, rotMed),
+    kpiCard({label: 'Agendamentos', v: fN(x.ag), sub: `no período, lead de qualquer data`, extra: pa('ag', insN1), d: insVarN(x.ag, B && B.ag, 1, rotMed, ['agendamento', 'agendamentos']),
       tip: 'Leads que chegaram à etapa de agendamento (ou foram ganhos) dentro do período, independentemente de quando entraram'}),
-    kpiCard({label: 'Reuniões realizadas', v: fN(x.reu), sub: x.faltas ? `${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'} · comparecimento ${fP(x.comp)}` : 'nenhuma falta registrada', extra: pa('reu', insN1), d: insVar(x.reu, B && B.reu, 1, insN1, rotMed),
+    kpiCard({label: 'Reuniões realizadas', v: fN(x.reu), sub: x.faltas ? `${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'} · comparecimento ${fP(x.comp)}` : 'nenhuma falta registrada', extra: pa('reu', insN1), d: insVarN(x.reu, B && B.reu, 1, rotMed, ['reunião', 'reuniões']),
       tip: 'Leads com a 1ª reunião concluída dentro do período. Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
-    kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: pa('won', insN1), d: insVar(x.won, B && B.won, 1, insN1, rotMed),
+    kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: pa('won', insN1), d: insVarN(x.won, B && B.won, 1, rotMed, ['ganho', 'ganhos']),
       tip: 'Negócios marcados como ganhos dentro do período (sem lançamentos retroativos)'}),
     kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
       tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período. Inclui a verba de campanhas que não trouxeram lead'})
@@ -2695,7 +2704,9 @@ function viewInsights() {
   // avaliação
   const pos = [], neg = [], neu = [];
   const put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);
-  const vsB = (c, b, fmt) => b == null ? '' : ` (${rotMed}: ${fmt(b)}${b ? `, ${c >= b ? '+' : '−'}${nf1.format(Math.abs((c - b) / b * 100))}%` : ''})`;
+  const vsB = (c, b, fmt) => b == null ? '' : fmt === insN1 && Math.min(Math.abs(c), Math.abs(b)) < 3
+    ? ` (${rotMed}: ${fmt(b)}${Math.abs(c - b) >= 0.05 ? `, ${c >= b ? '+' : '−'}${insN1(Math.abs(c - b))}` : ''})`
+    : ` (${rotMed}: ${fmt(b)}${b ? `, ${c >= b ? '+' : '−'}${nf1.format(Math.abs((c - b) / b * 100))}%` : ''})`;
   if (B) {
     put(insTom(x.leads, B.leads, 1), 'Entrada de leads', `<b>${fN(x.leads)}</b> leads novos${vsB(x.leads, B.leads, insN1)}.`);
     const tr = insTom(x.rap, B.rap, 1, 0);
