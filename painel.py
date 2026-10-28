@@ -37,6 +37,36 @@ STAGES = [(345, "MQL - 1º Contato"), (346, "Agendar"), (348, "Reunião"), (349,
 STAGE_IDS = {s for s, _ in STAGES}
 # Atividades que representam contato com o lead (quando concluídas).
 CONTACT_TYPES = {"call", "whatsapp_chat1", "whatsapp_chat", "msg", "email", "meeting", "qualificacao"}  # no-show/tarefa não são contato
+# Reunião = pelo TIPO (meeting/qualificacao) OU pelo ASSUNTO começando com "Reunião" numa atividade de contato
+# (ex.: ligação "Reunião Qualificação/Relacionamento" = reunião marcada com o tipo errado). Não é reunião: tipo de
+# reunião cujo assunto diz outra coisa ("Ligação", "Mensagem"...) nem a TAREFA de marcar ("REUNIÃO 2 - AGENDAR").
+# Realizada só quando CONCLUÍDA e não remarcada/cancelada. Regra do usuário (28/10/2026): lead que vai para Agendar
+# com reunião em aberto = AGENDADO; só a atividade de reunião concluída = reunião REALIZADA.
+REUNIAO_TIPOS = {"meeting", "qualificacao"}
+REUNIAO_ASSUNTO_RX = re.compile(r"^\W*reuni[aã]o", re.I)
+NAO_REUNIAO_RX = re.compile(r"^\W*(liga[cç][aã]o|lig\b|mensage|msg\b|whats|e-?mail|tentar|tentativa|contato|follow|flup)", re.I)
+ACAO_MARCAR_RX = re.compile(r"\b(agendar|marcar|remarcar)\b", re.I)
+NAO_REALIZADA_RX = re.compile(r"remarc|cancel|no.?show|n[aã]o compareceu|faltou", re.I)
+
+
+def eh_reuniao(a):
+    """Atividade que representa uma reunião (marcada ou realizada)."""
+    if a.get("deleted"): return False
+    subj, t = a.get("subj") or "", a.get("type") or ""
+    if NAO_REUNIAO_RX.search(subj) or ACAO_MARCAR_RX.search(subj): return False
+    if t in REUNIAO_TIPOS: return True
+    return t in CONTACT_TYPES and bool(REUNIAO_ASSUNTO_RX.search(subj))
+
+
+def tipo_efetivo(a):
+    """Tipo usado nas métricas: 'meeting'/'qualificacao' SÓ para reunião de fato; reunião remarcada/cancelada ou
+    tipo de reunião com assunto de ligação/mensagem vira 'call' (continua contando como contato)."""
+    t = a.get("type") or ""
+    if eh_reuniao(a) and not NAO_REALIZADA_RX.search(a.get("subj") or ""):
+        return t if t in REUNIAO_TIPOS else "meeting"
+    return "call" if t in REUNIAO_TIPOS else t
+
+
 TYPE_NAMES = {"call": "Ligação", "whatsapp_chat1": "WhatsApp", "whatsapp_chat": "WhatsApp", "msg": "Mensagem",
               "email": "E-mail", "meeting": "Reunião", "qualificacao": "Reunião de qualificação"}
 # Consultores da equipe atual: aparecem sempre no dashboard, mesmo sem leads no recorte.
@@ -429,8 +459,10 @@ def model(cache):
         if owner == "Marketing": owner = "Sem consultor (Marketing)"
         # Cada atividade de contato CONCLUÍDA = 1 contato (pedido do usuário: A01 e A02 marcadas = 2 contatos,
         # mesmo concluídas no mesmo minuto). Pendentes não contam.
-        contacts = sorted([contact_time(a), a["type"]]
+        contacts = sorted([contact_time(a), tipo_efetivo(a)]
                           for a in info["acts"] if a["done"] and a["type"] in CONTACT_TYPES and contact_time(a))
+        # Reuniões MARCADAS: quando cada atividade de reunião foi criada (aberta ou concluída) = agendamento
+        ra = sorted({brt(a["add"]) for a in info["acts"] if a.get("add") and eh_reuniao(a)})
         # faltas (no-show) concluídas: base do comparecimento às reuniões (Insights)
         noshow = sorted(contact_time(a) for a in info["acts"] if a["done"] and a["type"] == "no_show" and contact_time(a))
         crm = brt(d.get("add_time")); ent = info.get("ent")
@@ -448,6 +480,7 @@ def model(cache):
             entry, fonte = moved[0], f"Entrou no Funil Alpha vindo de {moved[1]} (criado no CRM em {crm[8:10]}/{crm[5:7]}/{crm[:4]})"
             contacts = [x for x in contacts if x[0] >= entry]
             noshow = [x for x in noshow if x >= entry]
+            ra = [x for x in ra if x >= entry]
             hist = [x for x in hist if x[1] >= entry[:19]]  # jornada do ciclo atual (etapas de antes da volta ficam fora)
             reat = "base de relacionamento" in moved[1].lower()
         else:
@@ -456,13 +489,13 @@ def model(cache):
                 entry, fonte = contacts[0][0], "1º contato registrado (anterior à criação no CRM)"
         pend = sorted(a["due"] for a in info["acts"] if not a["done"] and a.get("due"))
         # Cadência: atividades pendentes (data de vencimento + assunto) só dos abertos -> bloco "Atividades em atraso"
-        pv = sorted([a["due"], sem_pii(a.get("subj") or "")[:50], a.get("type") or ""] for a in info["acts"]
+        pv = sorted([a["due"], sem_pii(a.get("subj") or "")[:50], tipo_efetivo(a)] for a in info["acts"]
                     if not a["done"] and not a.get("deleted") and a.get("due")) if d["status"] == "open" else []
         leads.append({
             "id": d["id"], "n": sem_pii(title), "s": d["status"], "sg": d["stage_id"], "c": owner, "o": origem(title, lb), "lb": lb,
             "e": entry, "ec": crm, "ef": fonte, "b": 1 if (d["id"] in base or reat) else 0, "pk": info.get("pk") or [], "w": brt(d.get("won_time")), "l": brt(d.get("lost_time")),
             "lr": (d.get("lost_reason") or "").strip() or ("Sem motivo informado" if d["status"] == "lost" else None),
-            "k": contacts, "ns": noshow,
+            "k": contacts, "ns": noshow, "ra": ra,
             "pa": len(pend), "nx": pend[0] if pend else None, "pv": pv,
             "h": hist, "pp": assumido_parado(d, info, users),
         })
@@ -502,6 +535,7 @@ def dedupe(leads, window_days=14):
                 c["ef"] = first["ef"] if first is cl_sorted[0] else f"{first['ef']} — negócio anterior #{first['id']}"
                 c["k"] = sorted(x for l in cl for x in l["k"])
                 c["ns"] = sorted(x for l in cl for x in (l.get("ns") or []))
+                c["ra"] = sorted({x for l in cl for x in (l.get("ra") or [])})
                 c["b"] = min(l["b"] for l in cl)
                 c["dd"] = [l["id"] for l in cl_sorted[1:]]
                 if c["s"] == "open":

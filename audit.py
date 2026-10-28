@@ -64,6 +64,21 @@ def norm(s):
 
 
 # ----------------------------------------------------------------------------- métricas por lead
+def agenda_tempos(l):
+    """Momentos em que o lead teve reunião MARCADA (espelho: agendaTempos no template):
+    entrada no bloco Reunião/Negociação/Fechamento vindo de fora dele (ou já nascendo nele) + criação de cada atividade
+    de reunião (`ra`, aberta ou concluída). Ganho sem nada disso = a data do ganho."""
+    h, out, prev = l.get("h") or [], [], None
+    for s in h:
+        if s[0] in AGENDADO_STAGES and (prev is None or prev not in AGENDADO_STAGES):
+            out.append(s[1])
+        prev = s[0]
+    out += list(l.get("ra") or [])
+    if not out and l["s"] == "won" and l.get("w"):
+        out.append(l["w"])
+    return sorted(out)
+
+
 def lead_metrics(l, agora):
     e = dt(l["e"])
     k = l["k"] or []
@@ -71,18 +86,12 @@ def lead_metrics(l, agora):
     m = {"e": e, "n_contatos": len(k)}
     m["fds"] = e.weekday() >= 5
 
-    # agendado
-    segs_ag = [s for s in h if s[0] in AGENDADO_STAGES]
-    m["agendado"] = bool(segs_ag) or l["s"] == "won"
-    if segs_ag:
-        ini = min(dt(s[1]) for s in segs_ag)
-        m["dias_ate_agendamento"] = max(0.0, dias(ini, e))
-    elif l["s"] == "won" and l["w"]:
-        m["dias_ate_agendamento"] = max(0.0, dias(dt(l["w"]), e))
-    else:
-        m["dias_ate_agendamento"] = None
+    # agendado = etapa Reunião+ OU atividade de reunião criada (aberta ou concluída) OU ganho
+    tags = agenda_tempos(l)
+    t_ag = dt(tags[0]) if tags else None
+    m["agendado"] = t_ag is not None or l["s"] == "won"
+    m["dias_ate_agendamento"] = max(0.0, dias(t_ag, e)) if t_ag else None
     # regra: agendado (ou ganho) conta como contatado; 1º contato = o que veio antes (contato ou agendamento)
-    t_ag = min(dt(s[1]) for s in segs_ag) if segs_ag else (dt(l["w"]) if l["s"] == "won" and l["w"] else None)
     toques = ([dt(k[0][0])] if k else []) + ([t_ag] if t_ag else [])
     m["contatado"] = bool(k) or m["agendado"]
     m["dias_1o_contato"] = max(0.0, dias(min(toques), e)) if m["contatado"] and toques else None
@@ -168,8 +177,8 @@ def filtra(leads, f):
 # ----------------------------------------------------------------------------- movimento do período (Insights)
 def eventos(leads, f):
     """O que ACONTECEU no período, com lead de qualquer data de entrada (os demais filtros valem):
-    agendamento = 1ª entrada numa etapa de agendamento (ou o ganho, se nunca passou por ela); reunião = 1ª atividade
-    de reunião concluída; ganho/perda = data do ganho/perda; contatos = atividades de contato concluídas no período."""
+    agendamento = reunião MARCADA no período (entrada no bloco Reunião+ ou atividade de reunião criada; o lead conta
+    uma vez); reunião = 1ª atividade de reunião concluída (tipo_efetivo no painel.py); ganho/perda = data do ganho/perda; contatos = atividades de contato concluídas no período."""
     de, ate = f.get("de") or "0000-00-00", f.get("ate") or "9999-99-99"
     P = filtra(leads, dict(f, de=None, ate=None))
     dentro = lambda s: bool(s) and de <= str(s)[:10] <= ate
@@ -177,9 +186,7 @@ def eventos(leads, f):
     motivos = Counter()
     for l in P:
         k, h = l["k"] or [], l["h"] or []
-        segs = [s[1] for s in h if s[0] in AGENDADO_STAGES]
-        t_ag = min(segs) if segs else (l["w"] if l["s"] == "won" and l["w"] else None)
-        if dentro(t_ag): ag += 1
+        if any(dentro(t) for t in agenda_tempos(l)): ag += 1
         rs = [x[0] for x in k if x[1] in REUNIAO_TIPOS]
         if rs and dentro(min(rs)): reu += 1
         if l["s"] == "won" and dentro(l["w"]): won += 1

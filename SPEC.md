@@ -62,8 +62,12 @@ E (etiquetas: tem ao menos uma das selecionadas), E busca de texto (case/acento-
 - `dias_1o_contato` (por lead contatado) = max(0, dias(k[0][0] − e)); KPI = **média** e **mediana** sobre os contatados
 - `contatos_por_lead` = média de `k.length` sobre os contatados
 - `agendado` = lead que chegou à etapa Reunião ou além: existe segmento em `h` com etapa ∈ {348,349,350}, OU `s=="won"`.
-  `dias_ate_agendamento` = dias(início do primeiro segmento com etapa ∈ {348,349,350} − e) (se won sem segmento: dias(w − e)); mínimo 0
-- `reuniao` = lead com algum contato do tipo `meeting` ou `qualificacao` em `k`; `dias_ate_reuniao` = dias(primeiro desses − e)
+  `dias_ate_agendamento` = dias(1º momento de reunião marcada − e), mínimo 0. Reunião marcada (`audit.agenda_tempos`) = entrada
+  no bloco {348,349,350} vindo de fora dele + criação de cada atividade de reunião (`ra`, aberta ou concluída); won sem nada disso: w
+- `reuniao` = lead com algum contato do tipo `meeting` ou `qualificacao` em `k`; `dias_ate_reuniao` = dias(primeiro desses − e).
+  O tipo em `k` é o EFETIVO (`painel.tipo_efetivo`): atividade de reunião = tipo meeting/qualificacao OU assunto começando com
+  "Reunião" numa atividade de contato; NÃO é reunião assunto de ligação/mensagem ("Ligação") nem a tarefa de marcar
+  ("agendar/marcar/remarcar"); remarcada/cancelada concluída vira contato comum (`call`). Só a CONCLUÍDA é realizada.
 - `dias_ate_perda` = dias(l − e) para `s=="lost"`;  `dias_ate_ganho` = dias(w − e) para `s=="won"`
 - `contatos_ate_perda` = nº de itens de `k` com data ≤ `l`
 - `dias_sem_contato` (só **abertos**) = dias(agora − último contato), ou dias(agora − e) se nunca contatado

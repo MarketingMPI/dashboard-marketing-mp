@@ -146,5 +146,31 @@ class PipedriveJanelaTests(unittest.TestCase):
         self.assertNotEqual(painel.semana("2026-10-18"), painel.semana("2026-10-19"))
 
 
+class ReuniaoTests(unittest.TestCase):
+    """Regra do usuário: reunião só é REALIZADA com a atividade de reunião concluída; aberta = agendada."""
+    def a(self, tipo, subj, done=True, add="2026-10-23 20:42:00"):
+        return {"type": tipo, "subj": subj, "done": done, "add": add, "deleted": False}
+
+    def test_ligacao_com_tipo_de_reuniao_nao_e_reuniao(self):
+        x = self.a("qualificacao", "Ligação")
+        self.assertFalse(painel.eh_reuniao(x)); self.assertEqual(painel.tipo_efetivo(x), "call")
+
+    def test_reuniao_com_tipo_ligacao_e_reuniao(self):
+        x = self.a("call", "Reunião Qualificação/Relacionamento", done=False)
+        self.assertTrue(painel.eh_reuniao(x)); self.assertEqual(painel.tipo_efetivo(x), "meeting")
+
+    def test_tarefa_de_agendar_nao_e_reuniao(self):
+        self.assertFalse(painel.eh_reuniao(self.a("call", "Agendar reunião para sexta")))
+        self.assertFalse(painel.eh_reuniao(self.a("meeting", "REUNIÃO 2 - AGENDAR")))
+        self.assertFalse(painel.eh_reuniao(self.a("call", "Contato para Reunião")))
+
+    def test_remarcada_concluida_vira_contato(self):
+        x = self.a("meeting", "Reunião remarcada")
+        self.assertTrue(painel.eh_reuniao(x)); self.assertEqual(painel.tipo_efetivo(x), "call")
+
+    def test_meeting_comum(self):
+        self.assertEqual(painel.tipo_efetivo(self.a("meeting", "Fulano")), "meeting")
+
+
 if __name__ == "__main__":
     unittest.main()

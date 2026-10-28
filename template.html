@@ -947,6 +947,16 @@ const REF_PRU = {ag: 30, re: 15, ga: 5};
 const REF_VOL = {mensal: {mql: 100, ag: 30, re: 15, ga: 5}, semanal: {mql: 25, ag: 7.5, re: 3.75, ga: 1.25}};
 const MEETING_TYPES = new Set(['meeting', 'qualificacao']);
 // Lançamento retroativo: criado direto em Reunião/Negociação/Fechamento ou ganho sem nenhuma atividade (espelho: audit.retroativo)
+/* Momentos com reunião MARCADA (espelho: audit.agenda_tempos): entrada no bloco Reunião/Negociação/Fechamento vindo
+   de fora dele + criação de cada atividade de reunião (l.ra, aberta ou concluída). Ganho sem nada disso = data do ganho.
+   Regra do usuário (28/10/2026): foi para Agendar com reunião em aberto = agendado; realizada só com a reunião concluída. */
+function agendaTempos(l) {
+  const out = []; let prev = null;
+  for (const s of l.h || []) { const st = Number(s[0]); if (AGENDA_STAGES.has(st) && (prev === null || !AGENDA_STAGES.has(prev))) out.push(s[1]); prev = st; }
+  for (const t of l.ra || []) out.push(t);
+  if (!out.length && l.s === 'won' && l.w) out.push(l.w);
+  return out.sort();
+}
 const isRetro = l => { const h = l.h || []; return (h.length > 0 && AGENDA_STAGES.has(Number(h[0][0]))) || (l.s === 'won' && !(l.k || []).length); };
 const DEFAULT_STAGES = [{id: 345, nome: 'MQL - 1º Contato'}, {id: 346, nome: 'Agendar'}, {id: 348, nome: 'Reunião'},
   {id: 349, nome: 'Negociação'}, {id: 350, nome: 'Fechamento'}, {id: 438, nome: 'Cultivo'}];
@@ -983,14 +993,14 @@ function derive(l, agora) {
   if (c && c.a === agora) return c.d;
   const e = tms(l.e), k = l.k || [], h = l.h || [], nk = k.length;
   const open = l.s === 'open', won = l.s === 'won', lost = l.s === 'lost';
-  let seg = null;
-  for (const s of h) if (AGENDA_STAGES.has(Number(s[0]))) { seg = s; break; }
-  const dAg = seg ? Math.max(0, (tms(seg[1]) - e) / DAY) : (won && l.w ? Math.max(0, (tms(l.w) - e) / DAY) : null);
+  // Agendado = etapa Reunião+ OU atividade de reunião criada (aberta ou concluída) OU ganho
+  const ags = agendaTempos(l);
+  const tAg = ags.length ? tms(ags[0]) : null;
+  const dAg = tAg != null ? Math.max(0, (tAg - e) / DAY) : null;
   // Regra (20/10/2026): quem foi agendado (ou ganho) conta como contatado, mesmo sem atividade de contato registrada.
   // 1º contato = o que veio primeiro: a 1ª atividade de contato ou o agendamento.
-  const tAg = seg ? tms(seg[1]) : (won && l.w ? tms(l.w) : null);
   const t1 = nk ? (tAg != null ? Math.min(tms(k[0][0]), tAg) : tms(k[0][0])) : tAg;
-  const cont = nk > 0 || !!seg || won;
+  const cont = nk > 0 || tAg != null || won;
   const d1 = cont && t1 != null ? Math.max(0, (t1 - e) / DAY) : null;
   let reu = null;
   for (const x of k) if (MEETING_TYPES.has(x[1])) { reu = x; break; }
@@ -1003,7 +1013,7 @@ function derive(l, agora) {
   const day = String(l.e || '').slice(0, 10), wd = weekday(day);
   const d = {
     e, day, wd, fds: wd === 0 || wd === 6, nk, cont, d1, last,
-    agendado: !!seg || won, dAg,
+    agendado: tAg != null || won, dAg,
     reuniao: !!reu, dReu: reu ? (tms(reu[0]) - e) / DAY : null,
     dPerda: lost && l.l ? (tms(l.l) - e) / DAY : null,
     dGanho: won && l.w ? (tms(l.w) - e) / DAY : null,
@@ -1181,9 +1191,7 @@ function computeEventos(leads, f) {
   for (const l of leads || []) {
     if (!pred(l)) continue;
     const k = l.k || [], h = l.h || [];
-    let tAg = null; for (const s of h) if (AGENDA_STAGES.has(Number(s[0])) && (tAg === null || s[1] < tAg)) tAg = s[1];
-    if (tAg === null && l.s === 'won' && l.w) tAg = l.w;
-    if (dentro(tAg)) ag++;
+    if (agendaTempos(l).some(dentro)) ag++;   // reunião marcada no período (lead conta 1 vez)
     let r = null; for (const x of k) if (MEETING_TYPES.has(x[1]) && (r === null || x[0] < r)) r = x[0];
     if (r !== null && dentro(r)) reu++;
     if (l.s === 'won' && dentro(l.w)) won++;
@@ -1938,7 +1946,7 @@ const LL_COLS = [
   {k: 'last', t: 'Último contato', get: r => r.d.last, html: r => r.d.last ? fDMT(r.d.last) : '<span class="muted">–</span>'},
   {k: 'cad', t: 'Cadência', tip: 'Atividades pendentes no Pipedrive: em atraso (vencida antes de hoje), vence hoje, em dia (próxima data) ou sem próxima atividade', get: r => r.d.open ? ({atraso: 0, hoje: 1, dia: 2, sem: 3}[r.d.cad] * 1e4 - (r.d.dAtr || 0)) : null, html: r => cadPill(r.d)},
   {k: 'dSem', t: 'Dias s/ contato', num: true, tip: 'Só abertos: dias desde o último contato (ou desde a entrada)', get: r => r.d.dSem, html: r => dayCell(r.d.dSem, 7)},
-  {k: 'dAg', t: 'Até agend.', num: true, tip: 'Dias até chegar à etapa Reunião ou além', get: r => r.d.dAg, html: r => dayCell(r.d.dAg)},
+  {k: 'dAg', t: 'Até agend.', num: true, tip: 'Dias até a 1ª reunião marcada (etapa Reunião ou além, ou atividade de reunião criada)', get: r => r.d.dAg, html: r => dayCell(r.d.dAg)},
   {k: 'dReu', t: 'Até reunião', num: true, tip: 'Dias até a primeira reunião concluída', get: r => r.d.dReu, html: r => dayCell(r.d.dReu)},
   {k: 'dFim', t: 'Até perda/ganho', num: true, get: r => r.d.dPerda ?? r.d.dGanho, html: r => r.d.dPerda != null ? `<span class="red">${f1(r.d.dPerda)}</span>` : r.d.dGanho != null ? `<span style="color:#0b7a3b;font-weight:600">${f1(r.d.dGanho)}</span>` : '<span class="muted">–</span>'}
 ];
@@ -2003,8 +2011,8 @@ function viewMacro() {
       tip: 'Leads em aberto com atividade pendente no Pipedrive vencida (data anterior a hoje).\nÉ a situação de hoje, não tem comparação com o período anterior.\nClique para ver a lista no Lead a Lead'}),
     kpiCard({label: 'Entraram no FDS', v: fN(k.fim_de_semana), sub: pctK(k.fim_de_semana, k.leads), d: delta(k.fim_de_semana, pk.fim_de_semana, 0), tip: 'Leads que entraram no sábado ou domingo'}),
     kpiCard({label: 'Tempo até 1º contato', cls: 'm2', v: `${f1(k.media_dias_1o_contato)}<small>dias</small>`, sub: `mediana ${fD(k.mediana_dias_1o_contato)}`, d: delta(k.media_dias_1o_contato, pk.media_dias_1o_contato, -1, fD), tip: 'Média de dias entre a entrada e o 1º contato (só leads contatados)'}),
-    kpiCard({label: 'Agendados', v: fN(k.agendados), sub: pctK(k.agendados, k.leads), d: delta(k.agendados, pk.agendados), tip: 'Chegaram à etapa Reunião ou além (ou ganhos)'}),
-    kpiCard({label: 'Reuniões', v: fN(k.reunioes), sub: pctK(k.reunioes, k.leads), d: delta(k.reunioes, pk.reunioes), tip: 'Leads com reunião concluída'}),
+    kpiCard({label: 'Agendados', v: fN(k.agendados), sub: pctK(k.agendados, k.leads), d: delta(k.agendados, pk.agendados), tip: 'Têm reunião marcada: chegaram à etapa Reunião ou além, ou têm atividade de reunião (aberta ou concluída) — ou ganhos'}),
+    kpiCard({label: 'Reuniões', v: fN(k.reunioes), sub: pctK(k.reunioes, k.leads), d: delta(k.reunioes, pk.reunioes), tip: 'Leads com atividade de reunião CONCLUÍDA (reunião só marcada, remarcada ou cancelada não conta)'}),
     kpiCard({label: 'Ganhos', v: fN(k.ganhos), sub: pctK(k.ganhos, k.leads), d: delta(k.ganhos, pk.ganhos), tip: 'Leads do período já ganhos'}),
     kpiCard({label: 'Taxa de conversão', v: fP(k.taxa_conversao), sub: `${fN(k.ganhos)} ${k.ganhos === 1 ? 'ganho' : 'ganhos'} de ${fN(k.leads)} leads gerados`, d: delta(k.taxa_conversao, pk.taxa_conversao, 1, fP), tip: 'Leads gerados no período que já foram fechados como ganho ÷ total de leads gerados no período. Mostra 0% quando ainda não há ganho.'}),
     kpiCard({label: 'Perdidos', cls: 'red', v: fN(k.perdidos), sub: pctK(k.perdidos, k.leads), d: delta(k.perdidos, pk.perdidos, -1), tip: 'Leads do período já perdidos'})
@@ -2692,9 +2700,9 @@ function viewInsights() {
       extra: `<div class="kx">de ${fN(AT.tot)} ${AT.tot === 1 ? 'lead' : 'leads'} do período · situação de hoje</div>`,
       tip: 'Leads que entraram no período, ainda abertos, com atividade de contato vencida e não concluída no Pipedrive (situação de hoje). Lista completa em Lead a Lead › Em atraso'}),
     kpiCard({label: 'Agendamentos', v: fN(x.ag), sub: `no período, lead de qualquer data`, extra: pa('ag', insN1), d: insVarN(x.ag, B && B.ag, 1, rotMed, ['agendamento', 'agendamentos']),
-      tip: 'Leads que chegaram à etapa de agendamento (ou foram ganhos) dentro do período, independentemente de quando entraram'}),
+      tip: 'Leads que tiveram reunião MARCADA no período (entraram na etapa Reunião ou além, ou ganharam uma atividade de reunião em aberto/concluída), independentemente de quando entraram. Remarcação no período conta de novo; o lead conta 1 vez por período'}),
     kpiCard({label: 'Reuniões realizadas', v: fN(x.reu), sub: x.faltas ? `${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'} · comparecimento ${fP(x.comp)}` : 'nenhuma falta registrada', extra: pa('reu', insN1), d: insVarN(x.reu, B && B.reu, 1, rotMed, ['reunião', 'reuniões']),
-      tip: 'Leads com a 1ª reunião concluída dentro do período. Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
+      tip: 'Leads com a 1ª atividade de reunião CONCLUÍDA dentro do período (reunião só marcada conta em Agendamentos). Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
     kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: pa('won', insN1), d: insVarN(x.won, B && B.won, 1, rotMed, ['ganho', 'ganhos']),
       tip: 'Negócios marcados como ganhos dentro do período (sem lançamentos retroativos)'}),
     kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
@@ -3001,7 +3009,7 @@ function viewPerformance() {
     kpiCard({label: 'Leads no Pipedrive', v: fN(t.leads), sub: `${fN(t.contatados)} com contato · ${fN(t.agendados)} agendados`, d: delta(t.leads, tp.leads),
       tip: 'Leads das campanhas pagas que ENTRARAM no Pipedrive no período (TRD |, DIAG |, [ISCA).\nOs leads contados pela Meta são ignorados.'}),
     custo(t.custo_lead, tp.custo_lead, 'Custo por lead', `${fN(t.leads)} leads`, 'Investimento ÷ leads que entraram no Pipedrive'),
-    custo(t.custo_agendamento, tp.custo_agendamento, 'Custo por agendamento', `${fN(t.agendados)} ${t.agendados === 1 ? 'agendado' : 'agendados'}`, 'Investimento ÷ leads do período que chegaram à etapa Reunião ou além (ou ganhos)'),
+    custo(t.custo_agendamento, tp.custo_agendamento, 'Custo por agendamento', `${fN(t.agendados)} ${t.agendados === 1 ? 'agendado' : 'agendados'}`, 'Investimento ÷ leads do período com reunião marcada (etapa Reunião ou além, atividade de reunião ou ganho)'),
     custo(t.custo_reuniao, tp.custo_reuniao, 'Custo por reunião', `${fN(t.reunioes)} ${t.reunioes === 1 ? 'reunião' : 'reuniões'}`, 'Investimento ÷ leads do período com reunião realizada'),
     custo(t.custo_ganho, tp.custo_ganho, 'Custo por fechamento', `${fN(t.ganhos)} ${t.ganhos === 1 ? 'ganho' : 'ganhos'}`, 'Investimento ÷ leads do período ganhos (CAC de mídia)'),
     custo(t.custo_contatado, tp.custo_contatado, 'Custo por lead contatado', `${fN(t.contatados)} contatados`, 'Investimento ÷ leads do período com ao menos um contato concluído'),
@@ -3639,8 +3647,8 @@ const PAR_COLS_S = [LL_COLS[0], LL_COLS[1], LL_COLS[3], LL_COLS[9]].map(c => ({.
 function refPrudential(k) {
   const L = k.leads, R = [
     ['Leads qualificados (MQL)', L, 100, 'Leads do período no Funil Alpha (todos já chegam qualificados)'],
-    ['Reuniões agendadas', k.agendados, REF_PRU.ag, 'Chegaram à etapa Reunião ou além (ou ganhos)'],
-    ['Reuniões realizadas', k.reunioes, REF_PRU.re, 'Leads com reunião concluída registrada no Pipedrive'],
+    ['Reuniões agendadas', k.agendados, REF_PRU.ag, 'Têm reunião marcada: chegaram à etapa Reunião ou além, ou têm atividade de reunião (aberta ou concluída) — ou ganhos'],
+    ['Reuniões realizadas', k.reunioes, REF_PRU.re, 'Leads com atividade de reunião CONCLUÍDA no Pipedrive (só marcada não conta)'],
     ['Fechamento', k.ganhos, REF_PRU.ga, 'Leads do período já ganhos']];
   const st = (real, ref) => {
     if (real == null) return '<span class="muted">–</span>';
