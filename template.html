@@ -2615,16 +2615,20 @@ function insFollowHtml(L, xp, x, frac, modo, rotPrev) {
 const INS_REF_FONTE = {meta: 'meta oficial do B2C: 40 MQL por mês (≈ 10 por semana)', pru: 'tabela de conversão de referência aplicada à meta de 40 MQL/mês (base = MQL)', int: 'referência interna de boa prática comercial'};
 /* Metas por consultor (abaixo das Metas do funil inteiro, fechado por padrão): as MESMAS taxas de conversão e contato,
    calculadas só com os leads de cada consultor no período (mesmo filtro da página: operação + campanha do topo). */
-function insMetasConsHtml(P, modo, xT, CP) {
-  const R = run(insF({de: P.de, ate: P.ate}));
+function insMetasConsHtml(P, modo, xT, CP, opt) {
+  opt = opt || {}; const mk = opt.mk || insF;
+  const R = run(mk({de: P.de, ate: P.ate}));
   // equipe atual sempre (mesmo zerada) + quem mais tiver movimento no período (para o total fechar)
   const nomes = [...new Set([...((D && D.equipe) || []), 'Time Santos'])];
   const extra = new Set(R.rows.map(r => r.l.c));
   for (const c of R.res.consultores || []) extra.add(c.consultor);
-  const calc = nome => { const f = insF({de: P.de, ate: P.ate, consultores: nome ? [nome] : []}), X = nome ? run(f) : R, e = X.res.eventos;
+  const calc = nome => { const f = mk({de: P.de, ate: P.ate, consultores: nome ? [nome] : []}), X = nome ? run(f) : R, e = X.res.eventos;
     const L = X.res.kpis.leads, rap = X.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length;
-    return {L, rap: L ? rap / L * 100 : null, rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; };
+    const k = X.res.kpis;
+    return opt.cons ? {L, rap: L ? rap / L * 100 : null, rapN: rap, ag: k.agendados, reu: k.reunioes, won: k.ganhos}
+      : {L, rap: L ? rap / L * 100 : null, rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; };
   for (const n of extra) if (!nomes.includes(n)) { const c = calc(n); if (c.L || c.ag || c.reu || c.won) nomes.push(n); }
+  if (opt.cons && S.consultores.length) { const fc = new Set(S.consultores); for (let i = nomes.length - 1; i >= 0; i--) if (!fc.has(nomes[i])) nomes.splice(i, 1); }
   const pc = (a, b) => b ? a / b * 100 : null;
   const cols = [['Contato em menos de 1 dia', c => c.rap, 80, c => `${fN(c.rapN)} de ${fN(c.L)}`],
     ['MQL → reunião agendada', c => pc(c.ag, c.L), REF_PRU.ag, c => `${fN(c.ag)} ag. ÷ ${fN(c.L)}`]];
@@ -2632,14 +2636,15 @@ function insMetasConsHtml(P, modo, xT, CP) {
     ['Realizada → fechamento', c => pc(c.won, c.reu), REF_PRU.ga / REF_PRU.re * 100, c => `${fN(c.won)} ÷ ${fN(c.reu)} reun.`]);
   cols.push(['MQL → fechamento', c => pc(c.won, c.L), REF_PRU.ga, c => `${fN(c.won)} ganhos ÷ ${fN(c.L)}`]);
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
-  const cel = (c, [t, f, ref, sub]) => { const v = f(c), q = v == null || !ref ? null : Math.min(100, v / ref * 100);
-    return `<td class="num"><span class="imc ${cls(q)}"><b>${v == null ? '–' : fP(v)}</b><small>${q == null ? 'sem base' : fP(q) + ' da ref.'}</small></span><div class="mut">${sub(c)}</div></td>`; };
+  const cel = (c, [t, f, ref, sub]) => { const v0 = f(c), acima = v0 != null && v0 > 100.05, v = acima ? 100 : v0, q = v == null || !ref ? null : Math.min(100, v / ref * 100);
+    return `<td class="num"${acima ? ` data-tip="${ESC('Há mais negócios nesta etapa do que na anterior: etapas puladas no Pipedrive (ex.: ganho sem reunião registrada)')}"` : ''}><span class="imc ${cls(q)}"><b>${v == null ? '–' : fP(v)}${acima ? ' ⚠' : ''}</b><small>${q == null ? 'sem base' : fP(q) + ' da ref.'}</small></span><div class="mut">${sub(c)}</div></td>`; };
   const linhas = nomes.map(n => ({n, c: calc(n)}));
   const tr = (n, c, tcls) => `<tr${tcls ? ` class="${tcls}"` : ''}><td><b>${ESC(n)}</b></td><td class="num"><b>${fN(c.L)}</b></td><td class="num">${fN(c.ag)}</td><td class="num">${fN(c.reu)}</td>${cols.map(k => cel(c, k)).join('')}</tr>`;
-  return `<details class="card mt np inscmp insmc"${S.insMcOpen ? ' open' : ''}><summary class="ch"><div><h3>Metas por consultor${CP ? ` · ${ESC(CP)}` : ''}</h3><p>As mesmas contas do bloco acima e dos cards, separadas por consultor (o total do funil é o bloco Metas) · ${fN(linhas.length)} ${linhas.length === 1 ? 'consultor' : 'consultores'} · clique para abrir ou fechar</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
-    <div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">MQL</th><th class="num">Agend.</th><th class="num">Reun.</th>${cols.map(k => `<th class="num">${k[0]}<div class="mut" style="font-weight:400">ref. ${fP(k[2])}</div></th>`).join('')}</tr></thead>
+  const aberto = opt.cons ? S.consMcOpen !== false : S.insMcOpen;
+  return `<details class="card mt np inscmp insmc${opt.cons ? ' consmc' : ''}"${aberto ? ' open' : ''}><summary class="ch"><div><h3>${opt.titulo || 'Metas por consultor'}${CP ? ` · ${ESC(CP)}` : ''}</h3><p>${opt.sub || 'As mesmas contas do bloco acima e dos cards, separadas por consultor (o total do funil é o bloco Metas)'} · ${fN(linhas.length)} ${linhas.length === 1 ? 'consultor' : 'consultores'} · clique para abrir ou fechar</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+    <div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">${opt.cons ? 'Leads' : 'MQL'}</th><th class="num">Agend.</th><th class="num">Reun.</th>${cols.map(k => `<th class="num">${k[0]}<div class="mut" style="font-weight:400">ref. ${fP(k[2])}</div></th>`).join('')}</tr></thead>
     <tbody>${linhas.map(o => tr(o.n, o.c)).join('')}</tbody></table></div>
-    <div class="mt-n" style="padding:0 18px 14px">MQL = leads que entraram no período; agendamentos, reuniões e ganhos = o que aconteceu no período (lead de qualquer data de entrada), como nos cards. % da ref. = quanto da referência cada consultor atingiu (até 100%). A meta de 40 MQL é do B2C inteiro, por isso não é dividida por consultor.${modo === 'semanal' ? ' As taxas etapa a etapa ficam na visão Mensal.' : ''}</div></details>`;
+    <div class="mt-n" style="padding:0 18px 14px">${opt.cons ? 'Leads = entraram no período (filtros do topo); agendados, reuniões e ganhos = desses leads, os mesmos números dos cartões e do ranking desta aba. Referência do funil: tabela de conversão sobre MQL (30% / 15% / 5%); contato em menos de 1 dia: 80%.' : 'MQL = leads que entraram no período; agendamentos, reuniões e ganhos = o que aconteceu no período (lead de qualquer data de entrada), como nos cards.'} % da ref. = quanto da referência cada consultor atingiu (até 100%). A meta de 40 MQL é do B2C inteiro, por isso não é dividida por consultor.${modo === 'semanal' ? ' As taxas etapa a etapa ficam na visão Mensal.' : ''}</div></details>`;
 }
 function insMetasHtml(x, CP, parcial, modo, frac) {
   const pc = (a, b) => b ? a / b * 100 : null, V = REF_VOL[modo] || REF_VOL.semanal, ff = frac || 1;
@@ -3844,6 +3849,9 @@ function viewConsultores() {
       <div class="cm"><div data-tip="${ESC(`Mediana: ${fD(c.mediana_dias_1o_contato)}`)}"><b>${fD(c.media_dias_1o_contato)}</b>1º contato (média)</div><div><b>${f1(c.contatos_por_lead)}</b>contatos por lead</div>
       <div class="${c.abertos_sem_contato ? 'warn' : ''}"><b>${fN(c.abertos_sem_contato)}</b>abertos sem contato</div><div class="${c.parados_7d ? 'warn' : ''}"><b>${fN(c.parados_7d)}</b>parados > 7 dias</div></div></div>`;
   }).join('') + '</div>';
+  h += insMetasConsHtml({de: S.de, ate: S.ate}, 'mensal', null, '', {cons: true, mk: o => filtros(o),
+    titulo: 'Conversão do funil por consultor × referência',
+    sub: 'Contato em menos de 1 dia e conversão etapa a etapa de cada consultor no período, com quanto da referência foi atingido · clique para abrir ou fechar'});
   const st = S.cons, col = CONS_COLS.find(x => x.k === st.sort) || CONS_COLS[1];
   const rows = cs.slice().sort((a, b) => { const x = a[col.k], y = b[col.k]; if (x == null) return 1; if (y == null) return -1; return (x < y ? -1 : x > y ? 1 : 0) * st.dir; });
   const maxPct = 100;
@@ -4648,7 +4656,7 @@ function bindEvents() {
     for (const [p] of PRESETS) { const r = presetRange(p); if (r[0] === de && r[1] === ate) { S.preset = p; break; } }
     resetPages(); update();
   };
-  document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('insmc')) S.insMcOpen = ev.target.open; }, true);
+  document.addEventListener('toggle', ev => { const c = ev.target.classList; if (!c) return; if (c.contains('consmc')) S.consMcOpen = ev.target.open; else if (c.contains('insmc')) S.insMcOpen = ev.target.open; }, true);
   document.addEventListener('change', ev => {   // seletor de período suspenso (perSelect)
     const sel = ev.target.closest && ev.target.closest('select[data-persel]'); if (!sel) return;
     if (sel.dataset.persel === 'insper') S.insPer = sel.value; else if (sel.dataset.persel === 'mpmes') S.mpMes = sel.value;
