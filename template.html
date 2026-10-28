@@ -2333,11 +2333,11 @@ function mpMetasHtml(x) {
   const cls = p => p == null ? 'na' : p >= 100 ? 'ok' : p >= 80 ? 'quase' : 'longe';
   const card = m => { const v = val(m), p = mpMetaPct(m, v);
     const sub = m.k === 'engaj' ? (v == null ? (AL && AL.extraido_em ? `fotografia de ${fDay(AL.extraido_em.slice(0, 10))}` : 'sem fotografia da Kiwify') : `${fN(AL.assinatura_ativa.acessaram_30d)} de ${fN(AL.assinatura_ativa.na_area)} na área · ${fDay(AL.extraido_em.slice(0, 10))}`) : '';
-    return `<div class="mt-i ${cls(p)}${m.principal ? ' main' : ''}"><div class="mt-h"><span>${m.t}</span><b>${p == null ? '–' : fP(p)}</b></div>
+    return `<div class="mt-i ${cls(p)}${m.principal ? ' main' : ''}"><div class="mt-h"><span>${m.t}</span><b>${v == null ? '–' : m.fmt(v)}</b></div>
       <div class="mt-bar"><i style="width:${Math.min(100, p || 0)}%"></i></div>
-      <div class="mt-f"><span>Realizado <b>${v == null ? '–' : m.fmt(v)}</b></span><span>Meta ${m.bom === 'baixo' ? 'até ' : ''}<b>${m.fmt(m.meta)}</b></span></div>
+      <div class="mt-f"><span><b>${p == null ? '–' : fP(p)}</b> da meta</span><span>Meta ${m.bom === 'baixo' ? 'até ' : ''}<b>${m.fmt(m.meta)}</b></span></div>
       ${sub || m.nota || p >= 100 ? `<div class="mt-n">${p >= 100 ? '<b class="mt-ok">✔ meta atingida</b>' + (sub || m.nota ? ' · ' : '') : ''}${sub || m.nota || ''}</div>` : ''}</div>`; };
-  return `<div class="card mt mpmetas"><div class="ch"><div><h3>Metas até ${fDay(MP_METAS_ATE)}</h3><p>Metas fixas · % = quanto da meta ${mesNome(x.ym)} atingiu${x.parcial ? ' (mês em andamento)' : ''} · vai até 100% (meta batida) · nos indicadores em que menor é melhor (churn, CAC, CPM, reembolso), 100% = no limite ou abaixo</p></div>
+  return `<div class="card mt mpmetas"><div class="ch"><div><h3>Metas até ${fDay(MP_METAS_ATE)}</h3><p>Metas fixas · número grande = realizado em ${mesNome(x.ym)}${x.parcial ? ' (mês em andamento)' : ''}; barra, cor e % = quanto da meta foi atingido, até 100% (meta batida) · nos indicadores em que menor é melhor (churn, CAC, CPM, reembolso), 100% = no limite ou abaixo</p></div>
     <div class="lg"><span><i style="background:#00a611"></i>atingida (100%)</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
     <div class="mt-g">${MP_METAS.map(card).join('')}</div></div>`;
 }
@@ -2659,11 +2659,11 @@ function insMetasHtml(x, CP, parcial, modo, frac) {
   itens.push({t: 'MQL → fechamento', v: pc(x.won, x.leads), meta: REF_PRU.ga, sub: `${fN(x.won)} ${x.won === 1 ? 'ganho' : 'ganhos'} ÷ ${fN(x.leads)} MQL do período`, f: 'pru'});
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
   const card = m => { const q = m.v == null || !m.meta ? null : Math.min(100, m.v / m.meta * 100), F = m.fmt || fP;   // bateu a referência = 100%
-    return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${q == null ? '–' : fP(q)}</b></div>
+    return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${m.v == null ? '–' : F(m.v)}</b></div>
       <div class="mt-bar"><i style="width:${Math.min(100, q || 0)}%"></i></div>
-      <div class="mt-f"><span>Realizado <b>${F(m.v)}</b></span><span>${m.f === 'meta' ? 'Meta' : 'Referência'} <b>${F(m.meta)}</b></span></div>
+      <div class="mt-f"><span><b>${q == null ? '–' : fP(q)}</b> da ${m.f === 'meta' ? 'meta' : 'referência'}</span><span>${m.f === 'meta' ? 'Meta' : 'Referência'} <b>${F(m.meta)}</b></span></div>
       <div class="mt-n">${q >= 100 ? `<b class="mt-ok">✔ ${m.f === 'meta' ? 'meta' : 'referência'} atingida</b> · ` : ''}${m.sub}</div></div>`; };
-  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas${CP ? ` · ${ESC(CP)}` : ''}</h3><p>Meta oficial: 40 MQL por mês · agendadas, realizadas e fechamentos = referência calculada sobre ela · % atingido até 100%${parcial ? ' · volume proporcional aos dias do período' : ''}</p></div>
+  return `<div class="card mt mpmetas insmetas"><div class="ch"><div><h3>Metas${CP ? ` · ${ESC(CP)}` : ''}</h3><p>Meta oficial: 40 MQL por mês · agendadas, realizadas e fechamentos = referência calculada sobre ela · número grande = realizado; barra e cor = quanto da meta ou referência foi atingido (até 100%)${parcial ? ' · volume proporcional aos dias do período' : ''}</p></div>
     <div class="lg"><span><i style="background:#00a611"></i>atingida (100%)</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
     ${vol.length ? `<h4 class="insmh">Volume no período</h4><div class="mt-g">${vol.map(card).join('')}</div>` : ''}
     <h4 class="insmh">Conversão do funil e contato</h4><div class="mt-g mt-g3">${itens.map(card).join('')}</div>
