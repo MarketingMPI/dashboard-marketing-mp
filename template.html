@@ -2635,11 +2635,10 @@ function insMetasConsHtml(P, modo, xT, CP) {
   const cel = (c, [t, f, ref, sub]) => { const v = f(c), q = v == null || !ref ? null : Math.min(100, v / ref * 100);
     return `<td class="num"><span class="imc ${cls(q)}"><b>${v == null ? '–' : fP(v)}</b><small>${q == null ? 'sem base' : fP(q) + ' da ref.'}</small></span><div class="mut">${sub(c)}</div></td>`; };
   const linhas = nomes.map(n => ({n, c: calc(n)}));
-  const tot = calc(null);
   const tr = (n, c, tcls) => `<tr${tcls ? ` class="${tcls}"` : ''}><td><b>${ESC(n)}</b></td><td class="num"><b>${fN(c.L)}</b></td><td class="num">${fN(c.ag)}</td><td class="num">${fN(c.reu)}</td>${cols.map(k => cel(c, k)).join('')}</tr>`;
-  return `<details class="card mt np inscmp insmc"${S.insMcOpen ? ' open' : ''}><summary class="ch"><div><h3>Metas por consultor${CP ? ` · ${ESC(CP)}` : ''}</h3><p>As mesmas contas do bloco acima e dos cards, separadas por consultor · ${fN(linhas.length)} ${linhas.length === 1 ? 'consultor' : 'consultores'} · clique para abrir ou fechar</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+  return `<details class="card mt np inscmp insmc"${S.insMcOpen ? ' open' : ''}><summary class="ch"><div><h3>Metas por consultor${CP ? ` · ${ESC(CP)}` : ''}</h3><p>As mesmas contas do bloco acima e dos cards, separadas por consultor (o total do funil é o bloco Metas) · ${fN(linhas.length)} ${linhas.length === 1 ? 'consultor' : 'consultores'} · clique para abrir ou fechar</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
     <div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">MQL</th><th class="num">Agend.</th><th class="num">Reun.</th>${cols.map(k => `<th class="num">${k[0]}<div class="mut" style="font-weight:400">ref. ${fP(k[2])}</div></th>`).join('')}</tr></thead>
-    <tbody>${linhas.map(o => tr(o.n, o.c)).join('')}${tr('Funil inteiro', tot, 'imct')}</tbody></table></div>
+    <tbody>${linhas.map(o => tr(o.n, o.c)).join('')}</tbody></table></div>
     <div class="mt-n" style="padding:0 18px 14px">MQL = leads que entraram no período; agendamentos, reuniões e ganhos = o que aconteceu no período (lead de qualquer data de entrada), como nos cards. % da ref. = quanto da referência cada consultor atingiu (até 100%). A meta de 40 MQL é do B2C inteiro, por isso não é dividida por consultor.${modo === 'semanal' ? ' As taxas etapa a etapa ficam na visão Mensal.' : ''}</div></details>`;
 }
 function insMetasHtml(x, CP, parcial, modo, frac) {
