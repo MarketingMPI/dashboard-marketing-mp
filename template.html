@@ -1695,6 +1695,7 @@ const ICONS = {
   youtube: '<svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
   instagram: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor"/></svg>',
   mphub: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="9.5" r="2.2"/><path d="M8.3 14.5c.6-1.6 2-2.5 3.7-2.5s3.1.9 3.7 2.5"/></svg>',
+  indicacoes: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v9h14v-9"/><path d="M12 8C10.5 5 7 4.5 7 6.8 7 8 9 8 12 8zM12 8c1.5-3 5-3.5 5-1.2C17 8 15 8 12 8z"/></svg>',
   blog: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   aplicacao: '<svg viewBox="0 0 24 24"><circle cx="12" cy="6.5" r="3.5"/><path d="M4.5 21c.5-4.3 3.5-7 7.5-7s7 2.7 7.5 7"/><path d="M10.9 14.2h2.2l-.5 1.6h-1.2z"/><path d="M11.4 15.8l-.9 3.7 1.5 1.3 1.5-1.3-.9-3.7"/></svg>',
   performance: '<svg viewBox="0 0 24 24"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>',
@@ -1712,8 +1713,9 @@ const TABS = [
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
 const TABS_RS = [{id: 'instagram', nome: 'Instagram'}, {id: 'youtube', nome: 'YouTube', off: 'Em breve: aguardando a conexão com a API do YouTube do Gabriel'}];
 const TABS_CT = [{id: 'blog', nome: 'Blog'}];  // Conteúdo: publicação no blog do site
-const isB2B = id => TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id) || TABS_CT.some(t => t.id === id);
-const SO_PERIODO = new Set(['mppro', 'mphub', 'aplicacao', 'instagram', 'youtube']);
+const TABS_PG = [{id: 'indicacoes', nome: 'Indique e Ganhe'}];  // Programas: Indique e Ganhe (dados ao vivo do Supabase, alimentados pelo n8n)
+const isB2B = id => TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id) || TABS_CT.some(t => t.id === id) || TABS_PG.some(t => t.id === id);
+const SO_PERIODO = new Set(['mppro', 'mphub', 'aplicacao', 'instagram', 'youtube', 'indicacoes']);
 const PRESETS = [['hoje', 'Hoje'], ['7d', 'Últimos 7 dias'], ['semana', 'Esta semana'], ['semana_ant', 'Semana passada'],
   ['28d', 'Últimos 28 dias'], ['30d', 'Últimos 30 dias'], ['mes', 'Este mês'], ['mes_ant', 'Mês passado'], ['tudo', 'Tudo']];
 const DIMS = [
@@ -1789,7 +1791,7 @@ function writeHash() {
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const ok = /^\d{4}-\d{2}-\d{2}$/;
-  S.tab = TABS.concat(TABS_B2B, TABS_RS, TABS_CT).some(t => t.id === p.get('aba') && !t.off) ? p.get('aba') : 'macro';
+  S.tab = TABS.concat(TABS_B2B, TABS_RS, TABS_CT, TABS_PG).some(t => t.id === p.get('aba') && !t.off) ? p.get('aba') : 'macro';
   const pr = p.get('p');
   if (p.get('de') && ok.test(p.get('de')) && p.get('ate') && ok.test(p.get('ate'))) {
     S.preset = 'custom'; S.de = p.get('de'); S.ate = p.get('ate');
@@ -4052,6 +4054,7 @@ function renderNav() {
   const min = document.body.classList.contains('navmin');
   document.getElementById('nav').innerHTML = `<div class="ncol"><button type="button" class="ncb" data-navcol="1" title="${min ? 'Abrir o menu' : 'Recolher o menu'}" aria-label="${min ? 'Abrir o menu' : 'Recolher o menu'}" aria-expanded="${min ? 'false' : 'true'}"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="${min ? 'm13 10 2 2-2 2' : 'm16 10-2 2 2 2'}"/></svg></button></div>` +
     '<div class="nh">B2C - Análises</div>' + TABS.map(t => `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}" title="${ESC(t.nome)}">${ICONS[t.id]}<span>${t.nome}</span>${badge[t.id] != null ? `<span class="bd">${fN(badge[t.id])}</span>` : ''}</button>`).join('') +
+    '<div class="nh nb">Programas</div>' + TABS_PG.map(btn).join('') +
     '<div class="nh nb">B2B - Análises</div>' + TABS_B2B.map(btn).join('') +
     '<div class="nh nb">Redes Sociais</div>' + TABS_RS.map(btn).join('') +
     '<div class="nh nb">Conteúdo</div>' + TABS_CT.map(btn).join('') +
@@ -4172,6 +4175,100 @@ function viewAplicacao() {
 function viewB2B() {
   const t = TABS_B2B.find(x => x.id === S.tab);
   return viewHead(ESC(t.nome), 'B2B - Análises') + `<div class="card"><div class="empty"><b>Seção em construção</b>Esta área vai reunir as análises de ${ESC(t.nome)}. Os filtros e dados do B2C Funil Alpha não se aplicam aqui.</div></div>`;
+}
+/* ---- Programas · Indique e Ganhe ----
+   Formulário do site (/indique-e-ganhe/) -> Supabase MP GLOBAL (public.indicacoes) -> n8n a cada 10 min consulta o
+   negócio no Pipedrive e grava public.painel_indicacoes (sem telefone/e-mail). A aba lê ao vivo pela RPC
+   painel_indicacoes_lista com a sessão do Painel (só contas @meupatrimonio.com confirmadas). Nada disso vai no HTML cifrado. */
+const IND = {linhas: null, carregando: false, erro: '', lidoEm: 0, filtro: 'todas'};
+const IND_FILTROS = [['todas', 'Todas'], ['andamento', 'Em andamento'], ['ganho', 'Viraram clientes'], ['perdido', 'Perdidas'], ['sem', 'Sem negócio ativo']];
+const IND_FMT = new Intl.DateTimeFormat('sv-SE', {timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'});
+const indBrt = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : IND_FMT.format(d).replace(' ', 'T'); };
+const indSit = r => r.deal_status === 'won' ? 'ganho' : r.deal_status === 'lost' ? 'perdido' : r.deal_status === 'open' ? 'andamento' : 'sem';
+const indSitNome = r => r.deal_status === 'won' ? 'Virou cliente' : r.deal_status === 'lost' ? 'Perdida' : r.deal_status === 'open' ? (r.etapa || 'Em andamento')
+  : r.deal_status === 'removido' ? 'Negócio removido do Pipedrive' : r.envio_status === 'erro' ? 'Não chegou ao Pipedrive' : 'Aguardando o n8n';
+async function indCarregar(forcar) {
+  if (IND.carregando || (!forcar && IND.linhas && Date.now() - IND.lidoEm < 120000)) return;
+  IND.carregando = true; IND.erro = '';
+  try {
+    let x = lerSessao();
+    if (x && x.a !== 'dev' && Date.now() > x.x - 60000) x = await renova(x);
+    if (!x || !x.a) throw new Error('Sua sessão expirou. Saia e entre de novo no Painel.');
+    let r = await sb('/rest/v1/rpc/painel_indicacoes_lista', {body: {}, token: x.a});
+    if (r.status === 401 && x.r) { x = await renova(x); if (x) r = await sb('/rest/v1/rpc/painel_indicacoes_lista', {body: {}, token: x.a}); }
+    if (!r.ok || !Array.isArray(r.j)) throw new Error(!r.status ? 'Sem conexão com o banco de dados. Verifique a internet e tente de novo.'
+      : r.status === 401 || r.status === 403 ? 'Acesso negado: entre com um e-mail @meupatrimonio.com confirmado.' : `Não foi possível ler as indicações agora (erro ${r.status}).`);
+    IND.linhas = r.j.map(l => Object.assign({}, l, {e: indBrt(l.recebido_em), at: indBrt(l.atualizado_em), gw: indBrt(l.ganho_em), gl: indBrt(l.perdido_em)}));
+    IND.lidoEm = Date.now();
+  } catch (e) { IND.erro = (e && e.message) || 'Erro inesperado.'; }
+  IND.carregando = false;
+  if (S.tab === 'indicacoes') renderView();
+}
+function indStats(L) {
+  const c = k => L.filter(l => indSit(l) === k).length;
+  return {n: L.length, pessoas: new Set(L.map(l => norm(l.indicador_nome))).size, cli: L.filter(l => l.indicador_cliente).length,
+    and: c('andamento'), won: c('ganho'), lost: c('perdido'), sem: c('sem')};
+}
+function viewIndicacoes() {
+  const btn = `<button type="button" class="btn sm" data-indrel="1"${IND.carregando ? ' disabled' : ''}>${IND.carregando ? 'Atualizando…' : '↻ Atualizar'}</button>`;
+  let h = viewHead('Indique e Ganhe', `Programas · formulário do site <a href="https://www.meupatrimonio.com/indique-e-ganhe/" target="_blank" rel="noopener">/indique-e-ganhe/</a> · ${periodCaption().replace(/^Leads por data de entrada /, 'indicações recebidas ')}`, btn);
+  if (!IND.linhas) {
+    if (!IND.carregando && !IND.erro) setTimeout(() => indCarregar(), 0);
+    return h + `<div class="card">${IND.erro ? emptyBox('Não foi possível carregar as indicações', IND.erro) : emptyBox('Carregando indicações…', 'Lendo os dados do banco de indicações.')}</div>`;
+  }
+  if (!IND.carregando && Date.now() - IND.lidoEm > 120000) setTimeout(() => indCarregar(), 0);
+  if (IND.erro) h += `<div class="note">${ESC(IND.erro)} Mostrando a leitura de ${new Date(IND.lidoEm).toTimeString().slice(0, 5)}.</div>`;
+  const no = (L, de, ate) => L.filter(l => l.e && l.e.slice(0, 10) >= de && l.e.slice(0, 10) <= ate);
+  const [pd, pa] = prevRange(), L = no(IND.linhas, S.de, S.ate), c = indStats(L), p = indStats(no(IND.linhas, pd, pa));
+  const nd = diffDays(S.de, S.ate) + 1, pct = (a, b) => fP(pctOf(a, b));
+  h += '<div class="kpis k6">' + [
+    kpiCard({label: 'Indicações', cls: 'hero', v: fN(c.n), sub: `${f1(c.n / nd)} por dia · ${fN(IND.linhas.length)} no total`, d: delta(c.n, p.n), tip: 'Formulários do Indique e Ganhe recebidos no período (reenvio do mesmo formulário conta uma vez)'}),
+    kpiCard({label: 'Pessoas que indicaram', v: fN(c.pessoas), sub: c.pessoas ? `${f1(c.n / c.pessoas)} indicações por pessoa` : 'ninguém no período', d: delta(c.pessoas, p.pessoas), tip: 'Indicadores diferentes no período (pelo nome)'}),
+    kpiCard({label: 'Vindas de clientes MP', v: fN(c.cli), sub: `${pct(c.cli, c.n)} das indicações`, d: delta(c.cli, p.cli), tip: 'Quem indicou marcou que já é cliente Meu Patrimônio e informou o consultor que o atende'}),
+    kpiCard({label: 'Em andamento', v: fN(c.and), sub: `${pct(c.and, c.n)} · negócio aberto`, d: delta(c.and, p.and, 0), tip: 'Indicações cujo negócio está aberto hoje no Pipedrive'}),
+    kpiCard({label: 'Viraram clientes', cls: 'gain', v: fN(c.won), sub: `${pct(c.won, c.n)} das indicações`, d: delta(c.won, p.won), tip: 'Negócio marcado como ganho no Pipedrive: é o que gera a recompensa de quem indicou'}),
+    kpiCard({label: 'Perdidas', v: fN(c.lost), sub: `${pct(c.lost, c.n)} das indicações`, d: delta(c.lost, p.lost, -1), tip: 'Negócio marcado como perdido no Pipedrive'})
+  ].join('') + '</div>';
+  if (!c.n) return h + `<div class="card mt">${emptyBox('Nenhuma indicação no período', IND.linhas.length ? `Existem ${fN(IND.linhas.length)} indicações em outras datas: escolha um período maior (ex.: "Tudo").` : 'As indicações aparecem aqui assim que o formulário do site for usado.')}</div>` + indComoLer();
+  // situação hoje + consultor de quem indicou
+  const conta = (fn, vazio) => { const m = new Map(); for (const l of L) { const k = fn(l); if (k == null) continue; const id = norm(k); const o = m.get(id) || {label: k, v: 0}; o.v++; m.set(id, o); }
+    const arr = [...m.values()].sort((a, b) => b.v - a.v || (a.label < b.label ? -1 : 1)); return arr.length ? hbars(arr.map(o => ({label: o.label, v: o.v, extra: pct(o.v, c.n), tip: `${o.label}\n${fN(o.v)} ${o.v === 1 ? 'indicação' : 'indicações'}`}))) : emptyBox(vazio[0], vazio[1]); };
+  h += `<div class="g g2 mt"><div class="card"><div class="ch"><div><h3>Situação hoje</h3><p>Etapa atual do negócio no Pipedrive</p></div></div>${conta(indSitNome, ['Sem dados', ''])}</div>
+    <div class="card"><div class="ch"><div><h3>Consultor de quem indicou</h3><p>Só indicações de clientes MP · nome digitado no formulário</p></div></div>${conta(l => l.indicador_cliente ? (l.indicador_consultor || 'Não informado') : null, ['Nenhuma indicação de cliente no período', 'Quem não é cliente não informa consultor.'])}</div></div>`;
+  // quem mais indica
+  const pm = new Map();
+  for (const l of L) { const k = norm(l.indicador_nome); const o = pm.get(k) || {nome: l.indicador_nome, cli: false, cons: new Map(), n: 0, won: 0, and: 0}; o.n++; if (l.indicador_cliente) { o.cli = true; if (l.indicador_consultor && !o.cons.has(norm(l.indicador_consultor))) o.cons.set(norm(l.indicador_consultor), l.indicador_consultor); } if (indSit(l) === 'ganho') o.won++; if (indSit(l) === 'andamento') o.and++; pm.set(k, o); }
+  const ps = [...pm.values()].sort((a, b) => b.won - a.won || b.n - a.n || (a.nome < b.nome ? -1 : 1));
+  h += `<div class="card np mt"><div class="ch"><div><h3>Quem indicou</h3><p>${fN(ps.length)} ${ps.length === 1 ? 'pessoa' : 'pessoas'} no período · ordenado por indicações que viraram clientes</p></div></div><div class="tw" style="max-height:420px"><table class="t"><thead><tr><th>Quem indicou</th><th>Cliente MP</th><th class="num">Indicações</th><th class="num">Em andamento</th><th class="num">Viraram clientes</th></tr></thead><tbody>` +
+    ps.map(o => `<tr><td class="wrap" style="max-width:240px"><b>${ESC(o.nome)}</b></td><td class="wrap" style="max-width:220px">${o.cli ? `<span class="mpk nov">Sim</span>${o.cons.size ? `<div class="mut">Consultor: ${ESC([...o.cons.values()].join(', '))}</div>` : ''}` : '<span class="mpk ren">Não</span>'}</td><td class="num">${fN(o.n)}</td><td class="num">${fN(o.and)}</td><td class="num"><b>${fN(o.won)}</b></td></tr>`).join('') + '</tbody></table></div></div>';
+  // uma a uma
+  const nF = k => k === 'todas' ? c.n : L.filter(l => indSit(l) === k).length;
+  const LF = L.filter(l => IND.filtro === 'todas' || indSit(l) === IND.filtro).sort((a, b) => a.e < b.e ? 1 : -1);
+  const sitCell = l => {
+    const s = indSit(l);
+    if (s === 'andamento') return `<span class="pill s-open" style="white-space:normal;line-height:1.3">${ESC(l.etapa || 'Em andamento')}</span>${l.funil ? `<div class="mut">${ESC(l.funil)}</div>` : ''}`;
+    if (s === 'ganho') return `${statusPill('won')}${l.gw ? `<div class="mut">em ${fDay(l.gw.slice(0, 10))}</div>` : ''}`;
+    if (s === 'perdido') return `${statusPill('lost')}<div class="mut">${ESC(l.motivo_perda || 'Sem motivo informado')}${l.gl ? ` · ${fDay(l.gl.slice(0, 10))}` : ''}</div>`;
+    return `<span class="pill ${l.envio_status === 'erro' ? 's-lost' : ''}" style="white-space:normal;line-height:1.3${l.envio_status === 'erro' ? '' : ';background:#eef1f0;color:#44514c'}">${ESC(indSitNome(l))}</span>`;
+  };
+  const indCell = l => l.deal_id && l.deal_status !== 'removido' ? `<div class="lname"><a href="${pdUrl(l.deal_id)}" target="_blank" rel="noopener" title="Abrir no Pipedrive">${ESC(l.indicado_nome)}</a><span class="ext">↗</span></div>` : `<b>${ESC(l.indicado_nome)}</b>`;
+  h += `<div class="card np mt"><div class="ch"><div><h3>Indicações, uma a uma</h3><p>${fN(LF.length)} ${LF.length === 1 ? 'indicação' : 'indicações'}, da mais recente para a mais antiga · clique no indicado para abrir o negócio no Pipedrive</p></div>
+      <div class="seg">${IND_FILTROS.map(([k, t]) => `<button type="button" data-indf="${k}" class="${IND.filtro === k ? 'on' : ''}">${t}<small>${fN(nF(k))}</small></button>`).join('')}</div></div>` +
+    (LF.length ? `<div class="tw" style="max-height:560px"><table class="t stk"><thead><tr><th>Recebida</th><th>Indicado</th><th>Quem indicou</th><th>Situação no Pipedrive</th><th>Responsável</th></tr></thead><tbody>` +
+      LF.map(l => `<tr><td>${fDMT(l.e)}<span class="wd">${WD[weekday(l.e.slice(0, 10))]}</span></td><td style="max-width:220px">${indCell(l)}${l.envio_status === 'duplicado' ? '<div class="mut">já havia negócio aberto para este indicado</div>' : ''}</td>
+        <td class="wrap" style="max-width:230px">${ESC(l.indicador_nome)}<div class="mut">${l.indicador_cliente ? `Cliente MP${l.indicador_consultor ? ' · consultor ' + ESC(l.indicador_consultor) : ''}` : 'Não é cliente'}</div></td>
+        <td class="wrap" style="max-width:220px">${sitCell(l)}</td><td class="wrap" style="max-width:160px">${ESC(l.responsavel || '–')}</td></tr>`).join('') + '</tbody></table></div>'
+      : emptyBox('Nenhuma indicação neste filtro', 'Escolha outro filtro acima.')) + '</div>';
+  return h + indComoLer();
+}
+function indComoLer() {
+  const at = (IND.linhas || []).reduce((m, l) => l.at && l.at > m ? l.at : m, '');
+  return `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
+    <li><b>Indicação</b> = cada formulário enviado em <a href="https://www.meupatrimonio.com/indique-e-ganhe/" target="_blank" rel="noopener">www.meupatrimonio.com/indique-e-ganhe</a>, pela data de envio. Se a pessoa reenviar o mesmo formulário depois de um erro, conta uma vez.</li>
+    <li><b>Situação no Pipedrive</b> é a de hoje: a cada 10 minutos o n8n confere o negócio <b>INDICAÇÃO | nome</b> de cada indicação e atualiza etapa, responsável, ganho ou perda. <b>Virou cliente</b> = negócio ganho, que é o que gera a recompensa de quem indicou.</li>
+    <li><b>Não chegou ao Pipedrive</b> = o site registrou a indicação, mas o Pipedrive falhou no momento do envio: crie o negócio à mão. <b>Negócio removido</b> = o negócio foi excluído ou mesclado no Pipedrive.</li>
+    <li>Telefone e e-mail não aparecem no painel: estão na nota do negócio no Pipedrive.</li>
+    <li>${at ? `Última atualização feita pelo n8n: ${fDT(at)}` : 'Aguardando a primeira atualização do n8n.'}${IND.lidoEm ? ` · lido pelo painel às ${new Date(IND.lidoEm).toTimeString().slice(0, 5)}` : ''}.</li></ul></details>`;
 }
 /* =========================================================================
    9b. BLOG (publicação de artigos em www.meupatrimonio.com/blog/)
@@ -4531,7 +4628,7 @@ function blChange(ev) {
 }
 window.addEventListener('beforeunload', ev => { if (window.BLOG_SUJO()) { ev.preventDefault(); ev.returnValue = ''; } });
 
-const VIEWS = {blog: viewBlog, macro: viewMacro, insights: viewInsights, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewMPPro, mphub: viewMPHub, instagram: viewInstagram, youtube: viewYouTube, aplicacao: viewAplicacao};
+const VIEWS = {blog: viewBlog, macro: viewMacro, insights: viewInsights, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewMPPro, mphub: viewMPHub, instagram: viewInstagram, youtube: viewYouTube, aplicacao: viewAplicacao, indicacoes: viewIndicacoes};
 function renderView(anim) {
   const v = document.getElementById('view');
   document.getElementById('tip').classList.remove('on');
@@ -4577,6 +4674,9 @@ function bindEvents() {
     const pb = t.closest('[data-pop]');
     if (pb) { openPop(pb.dataset.pop, pb, pb.dataset.k); return; }
     if (POP) closePop();
+    const indf = t.closest('[data-indf]');
+    if (indf) { IND.filtro = indf.dataset.indf; renderView(); return; }
+    if (t.closest('[data-indrel]')) { IND.erro = ''; indCarregar(true); renderView(); return; }
     const apx = t.closest('[data-aplpx]');
     if (apx) { S.aplPx = apx.dataset.aplpx; update({anim: true}); return; }
     const insm = t.closest('[data-insmodo]');

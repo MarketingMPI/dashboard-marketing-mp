@@ -41,6 +41,7 @@ YouTube   ─┘                                                     (HTML+CSS+J
 | Consultores | Funil de eficiência por consultor e ranking comparativo |
 
 **B2B — Análises:** MP PRO (vendas Kiwify), Usuários MP HUB, Aplicação Direta (candidaturas à Rede: formulário do site `/rede/` + LP de recrutamento, funil B2B - Alpha; quantidade, perfil e etapa atual, sem e-mail/telefone; bloco de mídia paga em branco até existir campanha, ligado por `APL_MIDIA_RX` no `painel.py`).
+**Programas:** Indique e Ganhe (formulário do site `/indique-e-ganhe/`: indicações, quem indicou, se é cliente MP e o consultor dele, e a situação de cada negócio no Pipedrive — sem telefone/e-mail).
 **Redes Sociais:** Instagram (4 contas) e YouTube (canal Gabriel Liberato · Meu Patrimônio).
 
 As definições exatas de cada métrica estão em [`SPEC.md`](SPEC.md) — é o **contrato**: o front‑end (`window.MP_DASH.compute`) e a auditoria em Python (`audit.py`) implementam as mesmas fórmulas.
@@ -58,6 +59,7 @@ As definições exatas de cada métrica estão em [`SPEC.md`](SPEC.md) — é o 
 | **Instagram** — 4 contas MP | Graph API (somente leitura) | toda execução, com backfill gradual |
 | **MP HUB** — usuários | **importação manual** (`fontes/mphub.enc.json`) | sob demanda |
 | **YouTube** — exportação do YouTube Studio | **importação manual** (`fontes/youtube.enc.json`) | sob demanda |
+| **Indique e Ganhe** — Supabase MP GLOBAL `painel_indicacoes` | lido **ao vivo** pela aba (RPC `painel_indicacoes_lista`, só sessão @meupatrimonio.com); fica fora do HTML cifrado | n8n atualiza a cada 10 min (workflow `[B2C] Indique e Ganhe -> Painel Operacional`) |
 
 Se o Pipedrive falhar ou estourar o limite diário, a coleta segue com a última leitura boa e o painel avisa no cabeçalho.
 
