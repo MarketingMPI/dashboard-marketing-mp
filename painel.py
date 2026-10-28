@@ -70,7 +70,7 @@ def tipo_efetivo(a):
 TYPE_NAMES = {"call": "Ligação", "whatsapp_chat1": "WhatsApp", "whatsapp_chat": "WhatsApp", "msg": "Mensagem",
               "email": "E-mail", "meeting": "Reunião", "qualificacao": "Reunião de qualificação"}
 # Consultores da equipe atual: aparecem sempre no dashboard, mesmo sem leads no recorte.
-EQUIPE = ["Danilo Ribeiro", "Pedro Francisco", "Victor Carvalho"]
+EQUIPE = ["Danilo Ribeiro", "Pedro Francisco", "Time Santos", "Victor Carvalho"]   # nomes de exibição (Time Santos = NOME_EXIBICAO)
 PII_RX = [(re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "(e-mail oculto)"),
           (re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)"), "(CPF oculto)"),
           (re.compile(r"(?<!\d)(\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}(?!\d)"), "(telefone oculto)")]

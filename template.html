@@ -2616,27 +2616,31 @@ const INS_REF_FONTE = {meta: 'meta oficial do B2C: 40 MQL por mês (≈ 10 por s
 /* Metas por consultor (abaixo das Metas do funil inteiro, fechado por padrão): as MESMAS taxas de conversão e contato,
    calculadas só com os leads de cada consultor no período (mesmo filtro da página: operação + campanha do topo). */
 function insMetasConsHtml(P, modo, xT, CP) {
-  const base = insF({de: P.de, ate: P.ate}), R = run(base), nomes = [...new Set(R.rows.map(r => r.l.c))];
-  if (!nomes.length) return '';
-  const calc = rows => { const L = rows.length, rap = rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length,
-    ag = rows.filter(r => r.d.agendado).length, reu = rows.filter(r => r.d.reuniao).length, won = rows.filter(r => r.d.won).length;
-    return {L, rap: L ? rap / L * 100 : null, rapN: rap, ag, reu, won}; };
+  const R = run(insF({de: P.de, ate: P.ate}));
+  // equipe atual sempre (mesmo zerada) + quem mais tiver movimento no período (para o total fechar)
+  const nomes = [...new Set([...((D && D.equipe) || []), 'Time Santos'])];
+  const extra = new Set(R.rows.map(r => r.l.c));
+  for (const c of R.res.consultores || []) extra.add(c.consultor);
+  const calc = nome => { const f = insF({de: P.de, ate: P.ate, consultores: nome ? [nome] : []}), X = nome ? run(f) : R, e = X.res.eventos;
+    const L = X.res.kpis.leads, rap = X.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length;
+    return {L, rap: L ? rap / L * 100 : null, rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; };
+  for (const n of extra) if (!nomes.includes(n)) { const c = calc(n); if (c.L || c.ag || c.reu || c.won) nomes.push(n); }
   const pc = (a, b) => b ? a / b * 100 : null;
   const cols = [['Contato em menos de 1 dia', c => c.rap, 80, c => `${fN(c.rapN)} de ${fN(c.L)}`],
-    ['MQL → reunião agendada', c => pc(c.ag, c.L), REF_PRU.ag, c => `${fN(c.ag)} de ${fN(c.L)}`]];
-  if (modo === 'mensal') cols.push(['Agendada → realizada', c => pc(c.reu, c.ag), REF_PRU.re / REF_PRU.ag * 100, c => `${fN(c.reu)} de ${fN(c.ag)}`],
-    ['Realizada → fechamento', c => pc(c.won, c.reu), REF_PRU.ga / REF_PRU.re * 100, c => `${fN(c.won)} de ${fN(c.reu)}`]);
-  cols.push(['MQL → fechamento', c => pc(c.won, c.L), REF_PRU.ga, c => `${fN(c.won)} de ${fN(c.L)}`]);
+    ['MQL → reunião agendada', c => pc(c.ag, c.L), REF_PRU.ag, c => `${fN(c.ag)} ag. ÷ ${fN(c.L)}`]];
+  if (modo === 'mensal') cols.push(['Agendada → realizada', c => pc(c.reu, c.ag), REF_PRU.re / REF_PRU.ag * 100, c => `${fN(c.reu)} ÷ ${fN(c.ag)} ag.`],
+    ['Realizada → fechamento', c => pc(c.won, c.reu), REF_PRU.ga / REF_PRU.re * 100, c => `${fN(c.won)} ÷ ${fN(c.reu)} reun.`]);
+  cols.push(['MQL → fechamento', c => pc(c.won, c.L), REF_PRU.ga, c => `${fN(c.won)} ganhos ÷ ${fN(c.L)}`]);
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
   const cel = (c, [t, f, ref, sub]) => { const v = f(c), q = v == null || !ref ? null : Math.min(100, v / ref * 100);
     return `<td class="num"><span class="imc ${cls(q)}"><b>${v == null ? '–' : fP(v)}</b><small>${q == null ? 'sem base' : fP(q) + ' da ref.'}</small></span><div class="mut">${sub(c)}</div></td>`; };
-  const linhas = nomes.map(n => ({n, c: calc(R.rows.filter(r => r.l.c === n))})).sort((a, b) => b.c.L - a.c.L || a.n.localeCompare(b.n));
-  const tot = calc(R.rows);
-  const tr = (n, c, tcls) => `<tr${tcls ? ` class="${tcls}"` : ''}><td><b>${ESC(n)}</b></td><td class="num"><b>${fN(c.L)}</b></td>${cols.map(k => cel(c, k)).join('')}</tr>`;
-  return `<details class="card mt np inscmp insmc"${S.insMcOpen ? ' open' : ''}><summary class="ch"><div><h3>Metas por consultor${CP ? ` · ${ESC(CP)}` : ''}</h3><p>As mesmas taxas do bloco acima, só com os leads de cada consultor no período · ${fN(linhas.length)} ${linhas.length === 1 ? 'consultor' : 'consultores'} · clique para abrir ou fechar</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
-    <div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">MQL</th>${cols.map(k => `<th class="num">${k[0]}<div class="mut" style="font-weight:400">ref. ${fP(k[2])}</div></th>`).join('')}</tr></thead>
+  const linhas = nomes.map(n => ({n, c: calc(n)}));
+  const tot = calc(null);
+  const tr = (n, c, tcls) => `<tr${tcls ? ` class="${tcls}"` : ''}><td><b>${ESC(n)}</b></td><td class="num"><b>${fN(c.L)}</b></td><td class="num">${fN(c.ag)}</td><td class="num">${fN(c.reu)}</td>${cols.map(k => cel(c, k)).join('')}</tr>`;
+  return `<details class="card mt np inscmp insmc"${S.insMcOpen ? ' open' : ''}><summary class="ch"><div><h3>Metas por consultor${CP ? ` · ${ESC(CP)}` : ''}</h3><p>As mesmas contas do bloco acima e dos cards, separadas por consultor · ${fN(linhas.length)} ${linhas.length === 1 ? 'consultor' : 'consultores'} · clique para abrir ou fechar</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+    <div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">MQL</th><th class="num">Agend.</th><th class="num">Reun.</th>${cols.map(k => `<th class="num">${k[0]}<div class="mut" style="font-weight:400">ref. ${fP(k[2])}</div></th>`).join('')}</tr></thead>
     <tbody>${linhas.map(o => tr(o.n, o.c)).join('')}${tr('Funil inteiro', tot, 'imct')}</tbody></table></div>
-    <div class="mt-n" style="padding:0 18px 14px">% da ref. = quanto da referência cada consultor atingiu (até 100%). Volume de MQL é meta do B2C inteiro, por isso não é dividido por consultor.${modo === 'semanal' ? ' As taxas etapa a etapa ficam na visão Mensal.' : ''}</div></details>`;
+    <div class="mt-n" style="padding:0 18px 14px">MQL = leads que entraram no período; agendamentos, reuniões e ganhos = o que aconteceu no período (lead de qualquer data de entrada), como nos cards. % da ref. = quanto da referência cada consultor atingiu (até 100%). A meta de 40 MQL é do B2C inteiro, por isso não é dividida por consultor.${modo === 'semanal' ? ' As taxas etapa a etapa ficam na visão Mensal.' : ''}</div></details>`;
 }
 function insMetasHtml(x, CP, parcial, modo, frac) {
   const pc = (a, b) => b ? a / b * 100 : null, V = REF_VOL[modo] || REF_VOL.semanal, ff = frac || 1;
@@ -2648,11 +2652,11 @@ function insMetasHtml(x, CP, parcial, modo, frac) {
     {t: 'Fechamentos', v: x.won, meta: V.ga * ff, fmt: nv, sub: 'ganhos no período', f: 'pru'}];
   const itens = [
     {t: 'Contato em menos de 1 dia', v: x.rap, meta: 80, sub: `${fN(x.rapN)} de ${fN(x.leads)} leads`, f: 'int'},
-    {t: 'MQL → reunião agendada', v: pc(x.kAg, x.leads), meta: REF_PRU.ag, sub: `${fN(x.kAg)} de ${fN(x.leads)} MQL do período`, f: 'pru'}];
+    {t: 'MQL → reunião agendada', v: pc(x.ag, x.leads), meta: REF_PRU.ag, sub: `${fN(x.ag)} ${x.ag === 1 ? 'agendamento' : 'agendamentos'} ÷ ${fN(x.leads)} MQL do período`, f: 'pru'}];
   if (modo === 'mensal') itens.push(
-    {t: 'Agendada → realizada', v: pc(x.kReu, x.kAg), meta: REF_PRU.re / REF_PRU.ag * 100, sub: x.kAg ? `${fN(x.kReu)} de ${fN(x.kAg)} agendados` : 'nenhum MQL do período agendado', f: 'pru'},
-    {t: 'Realizada → fechamento', v: pc(x.kWon, x.kReu), meta: REF_PRU.ga / REF_PRU.re * 100, sub: x.kReu ? `${fN(x.kWon)} de ${fN(x.kReu)} com reunião` : 'nenhuma reunião registrada entre os MQL do período', f: 'pru'});
-  itens.push({t: 'MQL → fechamento', v: pc(x.kWon, x.leads), meta: REF_PRU.ga, sub: `${fN(x.kWon)} de ${fN(x.leads)} MQL do período`, f: 'pru'});
+    {t: 'Agendada → realizada', v: pc(x.reu, x.ag), meta: REF_PRU.re / REF_PRU.ag * 100, sub: x.ag ? `${fN(x.reu)} ${x.reu === 1 ? 'reunião realizada' : 'reuniões realizadas'} ÷ ${fN(x.ag)} ${x.ag === 1 ? 'agendamento' : 'agendamentos'}` : 'nenhum agendamento no período', f: 'pru'},
+    {t: 'Realizada → fechamento', v: pc(x.won, x.reu), meta: REF_PRU.ga / REF_PRU.re * 100, sub: x.reu ? `${fN(x.won)} ${x.won === 1 ? 'ganho' : 'ganhos'} ÷ ${fN(x.reu)} ${x.reu === 1 ? 'reunião realizada' : 'reuniões realizadas'}` : 'nenhuma reunião realizada no período', f: 'pru'});
+  itens.push({t: 'MQL → fechamento', v: pc(x.won, x.leads), meta: REF_PRU.ga, sub: `${fN(x.won)} ${x.won === 1 ? 'ganho' : 'ganhos'} ÷ ${fN(x.leads)} MQL do período`, f: 'pru'});
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
   const card = m => { const q = m.v == null || !m.meta ? null : Math.min(100, m.v / m.meta * 100), F = m.fmt || fP;   // bateu a referência = 100%
     return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${q == null ? '–' : fP(q)}</b></div>
@@ -2663,7 +2667,7 @@ function insMetasHtml(x, CP, parcial, modo, frac) {
     <div class="lg"><span><i style="background:#00a611"></i>atingida (100%)</span><span><i style="background:#d9a441"></i>80% a 99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span></div></div>
     ${vol.length ? `<h4 class="insmh">Volume no período</h4><div class="mt-g">${vol.map(card).join('')}</div>` : ''}
     <h4 class="insmh">Conversão do funil e contato</h4><div class="mt-g mt-g3">${itens.map(card).join('')}</div>
-    <div class="mt-n" style="margin-top:10px">Conversão = MQL que entraram no período e já avançaram${modo === 'semanal' ? '; as taxas etapa a etapa ficam na visão Mensal' : ''}.${CP ? ' Volume de referência é do B2C inteiro: aparece em "Todos os leads".' : ''}</div></div>`;
+    <div class="mt-n" style="margin-top:10px">Conversão = agendamentos, reuniões e ganhos do período (os mesmos números dos cards acima, lead de qualquer data de entrada) ÷ MQL do período${modo === 'semanal' ? '; as taxas etapa a etapa ficam na visão Mensal' : ''}.${CP ? ' Volume de referência é do B2C inteiro: aparece em "Todos os leads".' : ''}</div></div>`;
 }
 /* Seletor de período suspenso (semanas/meses): ◀ [lista] ▶. itens = [[valor, rótulo, parcial]] do mais antigo ao mais novo;
    attr = data-* tratado no clique (setas) e no change do select. Padrão do Painel para escolher período (pedido do usuário). */
