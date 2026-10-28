@@ -2016,16 +2016,19 @@ const convEtapa = (v, ant) => { if (!ant) return {t: '–', acima: false}; const
 const viewHead = (t, sub, right = '') => `<div class="vh"><div><h2>${t}</h2><p>${sub}</p></div>${right}</div>`;
 
 /* ---- Visão Macro ---- */
-/* Meta oficial do B2C: 40 MQL por mês. Mês corrente, B2C inteiro, só a operação (sem base importada nem lançamento
-   retroativo) = a mesma contagem de "Leads novos" dos Insights mensais. Independe dos filtros do topo. */
+/* Meta oficial do B2C: 40 MQL por mês. Conta só o MQL de mídia (pedido do usuário, 28/10/2026): etiqueta "Digital" E
+   prefixo de campanha (TRD / DIAG / RCON), sem base importada nem lançamento retroativo. Fica de fora quem entra sem
+   prefixo (eventos, cadastro manual). Mês corrente, independe dos filtros do topo. */
+const ehMetaMql = l => (l.lb || []).some(x => String(x).trim().toLowerCase() === 'digital') && Object.values(CAMPANHAS).some(c => c.rx.test(l.n || ''));
+const contaMetaMql = f => run(f).rows.filter(r => ehMetaMql(r.l)).length;
 function metaMqlHtml() {
   const ym = TODAY.slice(0, 7), de = ym + '-01', fim = ymLast(ym);
-  const n = run(filtros({de, ate: TODAY, operacao: true, campanha: null, consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [], busca: ''})).res.kpis.leads;
+  const n = contaMetaMql(filtros({de, ate: TODAY, operacao: true, campanha: null, consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [], busca: ''}));
   const dias = diffDays(de, fim) + 1, dd = diffDays(de, TODAY) + 1, esp = META_MQL_MES * dd / dias, proj = n * dias / dd;
   const q = Math.min(100, n / META_MQL_MES * 100), cls = n >= META_MQL_MES ? 'ok' : n >= esp * 0.95 ? 'ok' : n >= esp * 0.8 ? 'quase' : 'longe';
   const falta = Math.max(0, META_MQL_MES - n), rest = dias - dd;
-  return `<div class="card mmq ${cls}" data-tip="${ESC('Meta oficial do B2C: 40 MQL por mês. Conta os leads que entraram no Funil Alpha no mês, sem base importada/reativados e sem lançamentos retroativos (mesma conta dos Insights). Não muda com os filtros do topo.')}">
-    <div class="mmq-t"><span>Meta do mês · ${mesNome(ym)}</span><b>${fN(n)} <small>de ${fN(META_MQL_MES)} MQL</small></b><em>${fP(q)}</em></div>
+  return `<div class="card mmq ${cls}" data-tip="${ESC('Meta oficial do B2C: 40 MQL por mês. Conta os leads com etiqueta Digital e prefixo de campanha (TRD, DIAG ou RCON) que entraram no Funil Alpha no mês, sem base importada/reativados e sem lançamentos retroativos. Não muda com os filtros do topo.')}">
+    <div class="mmq-t"><span>Meta do mês · ${mesNome(ym)}</span><b>${fN(n)} <small>de ${fN(META_MQL_MES)} MQL · Digital (TRD, DIAG, RCON)</small></b><em>${fP(q)}</em></div>
     <div class="mt-bar"><i style="width:${q}%"></i><s style="left:${Math.min(100, esp / META_MQL_MES * 100)}%" title="esperado até hoje"></s></div>
     <div class="mmq-n">${n >= META_MQL_MES ? '<b class="mt-ok">✔ meta atingida</b>' : `faltam <b>${fN(falta)}</b> em ${fN(rest)} ${rest === 1 ? 'dia' : 'dias'}`} · esperado até hoje: ${f1(esp)} · no ritmo atual o mês fecha com ~${fN(Math.round(proj))}</div></div>`;
 }
@@ -2650,7 +2653,7 @@ function insMetasHtml(x, CP, parcial, modo, frac) {
   const pc = (a, b) => b ? a / b * 100 : null, V = REF_VOL[modo] || REF_VOL.semanal, ff = frac || 1;
   const nv = v => v == null ? '–' : v.toLocaleString('pt-BR', {maximumFractionDigits: 2});
   const vol = CP ? [] : [
-    {t: 'MQL (leads qualificados) · meta oficial', v: x.leads, meta: V.mql * ff, fmt: nv, sub: `meta de ${nv(V.mql)} por ${modo === 'mensal' ? 'mês' : 'semana'}${modo === 'mensal' ? '' : ' (40 por mês)'}`, f: 'meta'},
+    {t: 'MQL (leads qualificados) · meta oficial', v: contaMetaMql(insF({de: x.de, ate: x.ate})), meta: V.mql * ff, fmt: nv, sub: `etiqueta Digital com prefixo TRD, DIAG ou RCON · meta de ${nv(V.mql)} por ${modo === 'mensal' ? 'mês' : 'semana'}${modo === 'mensal' ? '' : ' (40 por mês)'}`, f: 'meta'},
     {t: 'Reuniões agendadas', v: x.ag, meta: V.ag * ff, fmt: nv, sub: 'agendadas no período', f: 'pru'},
     {t: 'Reuniões realizadas', v: x.reu, meta: V.re * ff, fmt: nv, sub: 'realizadas no período', f: 'pru'},
     {t: 'Fechamentos', v: x.won, meta: V.ga * ff, fmt: nv, sub: 'ganhos no período', f: 'pru'}];
