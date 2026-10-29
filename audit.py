@@ -332,12 +332,14 @@ def mppro(MP, f, agora_day):
             ab = (_d(agora_day) - _d(due)).days
             rr = [r for r in rec if r["c"] == o["c"] and r["ts"] > o["ts"]]
             tt = [r for r in tent if r["c"] == o["c"] and r["ts"] > o["ts"]]
-            if ab > INADIMPLENTE_DIAS and not tt:
+            ko = (MP.get("oficial") or {}).get(str(o["c"]))
+            canc = bool(ko and ko[0] == "cancelou" and ko[2] and ko[2] <= agora_day)
+            if (ab > INADIMPLENTE_DIAS or canc) and not tt:
                 sem_cob.append({"cliente": nome(o["c"]), "ultimo": o["day"], "vencimento": due})
                 continue
             mot = (rr[-1]["mot"] or "nao_informado") if rr else ("pix_aguardando" if any(r["st"] == "waiting" for r in tt) else None)
             prev.append(dict(c=o["c"], ult=o["day"], due=due, pago=None, atraso=ab,
-                             status="inadimplente" if ab > INADIMPLENTE_DIAS else "em_aberto", recusas=len(rr), motivo=mot))
+                             status="cancelada" if canc else "inadimplente" if ab > INADIMPLENTE_DIAS else "em_aberto", recusas=len(rr), motivo=mot))
     atrasou = [x for x in prev if x["status"] == "atrasou"]
 
     # base em T
@@ -348,7 +350,7 @@ def mppro(MP, f, agora_day):
         cliT.setdefault(o["c"], []).append(o)
     # status OFICIAL (webhook da Kiwify): oficial[c] = [status, nº ativas, cancelada em, acesso até]; sem ele, regra dos pagamentos
     t_canc, p_canc = [], []
-    ativos = cancel = reemb_cli = pend = pend_valor = pend_subs = subs_at = mrr = pagos_base = liq_base = 0
+    ativos = cancel = reemb_cli = pend = pend_valor = pend_liq = pend_subs = subs_at = mrr = pagos_base = liq_base = 0
     compradores, status = [], {}
     OF, base_hoje = MP.get("oficial") or {}, T >= agora_day
     for c, os_ in cliT.items():
@@ -369,7 +371,7 @@ def mppro(MP, f, agora_day):
                 a, st, acesso = 0, "pendente", k[3]
             elif k and base_hoje and k[0] == "ativo":
                 a, st = max(1, k[1]), "ativo"
-            elif a and _mais1mes(ult_pg["day"]) < T and any(r["c"] == c and r["ts"] > ult_pg["ts"] and r["day"] <= T for r in rec):
+            elif a and _mais1mes(ult_pg["day"]) < T and any(r["c"] == c and r["ts"] > ult_pg["ts"] and r["day"] <= T for r in tent):
                 a, st = 0, "pendente"
             else:
                 st = "ativo" if a else "cancelou"
@@ -378,6 +380,7 @@ def mppro(MP, f, agora_day):
             if st == "pendente":
                 n = max(1, a_regra); pend_subs += n
                 pend_valor += sum((subs_rec[i] if i < len(subs_rec) else subs_rec[0])["bruto"] for i in range(n))
+                pend_liq += sum((subs_rec[i] if i < len(subs_rec) else subs_rec[0])["liq"] for i in range(n))
             if st == "cancelou":
                 venc = _mais1mes(ult_pg["day"])
                 cd = cancelada or (venc if venc < T else T)
@@ -485,12 +488,13 @@ def mppro(MP, f, agora_day):
                        "em_dia": sum(1 for x in prev if x["status"] == "em_dia"), "atrasaram_pagas": len(atrasou),
                        "em_aberto": sum(1 for x in prev if x["status"] == "em_aberto"),
                        "inadimplentes": sum(1 for x in prev if x["status"] == "inadimplente"),
+                       "canceladas": sum(1 for x in prev if x["status"] == "cancelada"),
                        "atraso_medio": _media(x["atraso"] for x in atrasou), "atraso_max": max((x["atraso"] for x in atrasou), default=None),
                        "cancelaram_sem_cobranca": sem_cob,
                        "abertas": [{"cliente": nome(x["c"]), "ultimo": x["ult"], "vencimento": x["due"], "dias": x["atraso"],
                                     "recusas": x["recusas"], "motivo": x["motivo"], "status": x["status"]} for x in prev if not x["pago"]]},
         "base": {"compradores": n_comp, "ativos": ativos, "assinaturas_ativas": subs_at, "cancelaram": cancel, "reembolsados": reemb_cli,
-                 "pendentes": pend, "pendentes_valor": pend_valor, "pendentes_assinaturas": pend_subs, "mrr": mrr, "status_oficial": bool(MP.get("oficial")), "status_oficial_em": MP.get("oficial_em"), "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
+                 "pendentes": pend, "pendentes_valor": pend_valor, "pendentes_liquido": pend_liq, "pendentes_assinaturas": pend_subs, "mrr": mrr, "status_oficial": bool(MP.get("oficial")), "status_oficial_em": MP.get("oficial_em"), "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
                  "taxa_reembolso": _div(sum(1 for o in aprT if ef_ref(o)) * 100, len(aprT)), "pagamentos_por_assinante": ppa,
                  "liquido_medio": liq_medio, "ltv": ltv},
         "unit": {"cac": cac, "roas": _div(liq_p, m["inv"]), "cac_liquido": _div(m["inv"], novas - novas_re), "custo_por_ativa": _div(m["inv"], subs_at),
