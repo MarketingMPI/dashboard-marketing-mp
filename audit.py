@@ -347,6 +347,7 @@ def mppro(MP, f, agora_day):
     for o in aprT:
         cliT.setdefault(o["c"], []).append(o)
     # status OFICIAL (webhook da Kiwify): oficial[c] = [status, nº ativas, cancelada em, acesso até]; sem ele, regra dos pagamentos
+    t_canc, p_canc = [], []
     ativos = cancel = reemb_cli = pend = pend_valor = pend_subs = subs_at = mrr = pagos_base = liq_base = 0
     compradores, status = [], {}
     OF, base_hoje = MP.get("oficial") or {}, T >= agora_day
@@ -377,6 +378,10 @@ def mppro(MP, f, agora_day):
             if st == "pendente":
                 n = max(1, a_regra); pend_subs += n
                 pend_valor += sum((subs_rec[i] if i < len(subs_rec) else subs_rec[0])["bruto"] for i in range(n))
+            if st == "cancelou":
+                venc = _mais1mes(ult_pg["day"])
+                cd = cancelada or (venc if venc < T else T)
+                t_canc.append((_d(cd) - _d(os_[0]["day"])).days); p_canc.append(len(pg))
             if st == "ativo": ativos += 1
             elif st == "pendente": pend += 1
             else: cancel += 1
@@ -492,6 +497,7 @@ def mppro(MP, f, agora_day):
                  "payback_meses": cac / liq_medio if cac is not None and liq_medio else None,
                  "ltv_cac": ltv / cac if cac and ltv is not None else None},
         "churn": {"janelas": janelas, "medio": _media(j["churn"] for j in janelas), "ultimo": churn_ult, "vida_media_meses": vida,
+                  "tempo_cancel_dias": _media(t_canc), "pagamentos_ate_cancelar": _media(p_canc), "n_cancelados": len(t_canc),
                   "ltv_projetado": vida * liq_medio if vida is not None and liq_medio is not None else None},
         "evolucao": evol, "coortes": coortes, "pagamentos": pagamentos, "compradores": compradores,
     }
