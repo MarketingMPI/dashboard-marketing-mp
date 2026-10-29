@@ -716,6 +716,55 @@ def _bruto(x):
     return int(pg.get("product_base_price") or pg.get("charge_amount") or 0)
 
 
+SB_URL, SB_KEY = "https://cxbgpbibbxfhvdfhyvpx.supabase.co", "sb_publishable_-BoisE7eh2RStAF9m5H1Ug_MYPKiNa1"
+
+
+def mppro_sb_token():
+    """Token de leitura do status oficial no Supabase: derivado da PAINEL_SENHA (já existe no Actions, sem mexer no workflow).
+    O hash dele fica em private.painel_tokens (ops/kiwify_webhook_setup.py setup); trocar a senha exige rodar o setup de novo."""
+    s = env("PAINEL_SENHA")
+    return hashlib.sha256(("mppro-oficial|" + s).encode()).hexdigest() if s else None
+
+
+def mppro_status_oficial():
+    """Status OFICIAL das assinaturas (webhook da Kiwify -> Supabase; a API pública não expõe assinaturas).
+    Devolve [{email_hash, status, canceled_at, access_until, ...}] ou None se indisponível (o painel cai na regra dos pagamentos)."""
+    tok = mppro_sb_token()
+    if not tok: return None
+    try:
+        req = urllib.request.Request(SB_URL + "/rest/v1/rpc/mppro_assinaturas_painel", data=b"{}", method="POST",
+            headers={"apikey": SB_KEY, "Content-Type": "application/json", "x-painel-token": tok, "User-Agent": "mp-dashboard/1.0"})
+        return json.loads(urllib.request.urlopen(req, timeout=60).read())
+    except Exception:
+        return None
+
+
+def _dia_brt(ts):
+    return _brt(ts)[:10] if ts else None
+
+
+def mppro_oficial(sales, oficial):
+    """Por cliente (índice igual ao de mppro_pedidos): [status, nº assinaturas ativas, cancelada em, acesso até].
+    status: ativo | pendente (cobrança recusada, aguardando) | cancelou | encerrada. Só hash do e-mail é cruzado."""
+    if oficial is None: return None
+    por = {}
+    for s in oficial: por.setdefault(s["email_hash"], []).append(s)
+    out, vistos = {}, []
+    for x in sorted(sales, key=lambda x: (_brt(x.get("approved_date") if x.get("status") != "refused" else x.get("created_at")) or _brt(x.get("created_at")) or "", x["id"])):
+        if x.get("status") not in ("paid", "refunded", "refused", "waiting_payment"): continue
+        c = x["customer"]; key = (c.get("email") or c.get("id") or "").strip().lower()
+        if key not in vistos: vistos.append(key)
+    for ci, key in enumerate(vistos):
+        ss = por.get(hashlib.sha256(key.encode()).hexdigest())
+        if not ss: continue
+        at = [s for s in ss if s["status"] == "active"]; pe = [s for s in ss if s["status"] == "waiting_payment"]
+        ult = max(ss, key=lambda s: s.get("canceled_at") or s.get("access_until") or "")
+        st = "ativo" if at else "pendente" if pe else "cancelou"
+        out[ci] = [st, len(at), _dia_brt(ult.get("canceled_at")) if not at and not pe else None,
+                   _dia_brt((pe[0] if pe and not at else ult).get("access_until")) if not at else None]
+    return out
+
+
 def mppro_pedidos(sales, avulsas=()):
     """Pedidos -> payload. Assinatura reconstruída por cliente (a API não expõe assinaturas): um pagamento novo
     entra na assinatura cujo último pagamento foi há 20+ dias (a de vencimento mais antigo); senão abre outra
@@ -767,7 +816,12 @@ def mppro_payload(midia, old):
     """MP PRO = Kiwify (vendas/assinantes) + Meta só das campanhas 'MP PRO ... Perpétuo'. Falha numa fonte mantém o último dado."""
     out = dict(old or {})
     try:
-        out.update(mppro_pedidos(kiwify_sales(), kiwify_sales(FORMACAO_PRODUTO, FORMACAO_DESDE))); out["erro_kiwify"] = None
+        vendas = kiwify_sales()
+        out.update(mppro_pedidos(vendas, kiwify_sales(FORMACAO_PRODUTO, FORMACAO_DESDE))); out["erro_kiwify"] = None
+        of = mppro_oficial(vendas, mppro_status_oficial())
+        if of is not None:   # se o Supabase falhar, mantém o último status oficial conhecido
+            out["oficial"] = {str(k): v for k, v in of.items()}
+            out["oficial_em"] = datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")
         out["kiwify_em"] = datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")
     except Exception as e:
         out["erro_kiwify"] = f"falha ao consultar a Kiwify ({getattr(e, 'code', None) or type(e).__name__})"

@@ -346,31 +346,44 @@ def mppro(MP, f, agora_day):
     cliT = {}
     for o in aprT:
         cliT.setdefault(o["c"], []).append(o)
-    ativos = cancel = reemb_cli = subs_at = mrr = pagos_base = liq_base = 0
+    # status OFICIAL (webhook da Kiwify): oficial[c] = [status, nº ativas, cancelada em, acesso até]; sem ele, regra dos pagamentos
+    ativos = cancel = reemb_cli = pend = subs_at = mrr = pagos_base = liq_base = 0
     compradores, status = [], {}
+    OF, base_hoje = MP.get("oficial") or {}, T >= agora_day
     for c, os_ in cliT.items():
         pg = [o for o in os_ if not ef_ref(o)]
+        cancelada = acesso = None
         if not pg:
             st = "reembolsado"; reemb_cli += 1
         else:
             ult_sub = {}
             for o in pg:
                 ult_sub[o["sub"]] = o
-            a = 0
-            for o in ult_sub.values():
-                if (_d(T) - _d(o["day"])).days <= ATIVO_DIAS:
-                    a += 1; mrr += o["bruto"]
+            subs_rec = sorted(ult_sub.values(), key=lambda o: o["ts"], reverse=True)
+            a = sum(1 for o in subs_rec if (_d(T) - _d(o["day"])).days <= ATIVO_DIAS)
+            k, ult_pg = OF.get(str(c)), pg[-1]
+            if k and k[0] == "cancelou" and k[2] and k[2] <= T:
+                a, st, cancelada, acesso = 0, "cancelou", k[2], k[3]
+            elif k and base_hoje and k[0] == "pendente":
+                a, st, acesso = 0, "pendente", k[3]
+            elif k and base_hoje and k[0] == "ativo":
+                a, st = max(1, k[1]), "ativo"
+            elif a and _mais1mes(ult_pg["day"]) < T and any(r["c"] == c and r["ts"] > ult_pg["ts"] and r["day"] <= T for r in rec):
+                a, st = 0, "pendente"
+            else:
+                st = "ativo" if a else "cancelou"
+            mrr += sum((subs_rec[i] if i < len(subs_rec) else subs_rec[0])["bruto"] for i in range(a))
             subs_at += a
-            st = "ativo" if a else "cancelou"
-            if a: ativos += 1
+            if st == "ativo": ativos += 1
+            elif st == "pendente": pend += 1
             else: cancel += 1
             pagos_base += len(pg); liq_base += soma(pg, "liq")
         status[c] = st
         compradores.append({"cliente": nome(c), "status": st, "pagamentos": len(pg), "entrada": os_[0]["day"],
                             "ultimo": pg[-1]["day"] if pg else None, "total_pago": soma(pg, "bruto"), "metodo": os_[-1]["met"],
                             "recusas": sum(1 for r in rec if r["c"] == c and r["day"] <= T),
-                            "reembolso": next((o["rday"] for o in os_ if ef_ref(o)), None)})
-    ordem = {"ativo": 0, "cancelou": 1, "reembolsado": 2}
+                            "reembolso": next((o["rday"] for o in os_ if ef_ref(o)), None), "cancelada": cancelada, "acesso_ate": acesso})
+    ordem = {"ativo": 0, "pendente": 1, "cancelou": 2, "reembolsado": 3}
     compradores.sort(key=lambda x: (ordem[x["status"]], -x["pagamentos"], x["entrada"], x["cliente"]))
     n_comp = len(cliT); nao_re = n_comp - reemb_cli
     liq_medio = _div(liq_base, pagos_base)
@@ -469,7 +482,7 @@ def mppro(MP, f, agora_day):
                        "abertas": [{"cliente": nome(x["c"]), "ultimo": x["ult"], "vencimento": x["due"], "dias": x["atraso"],
                                     "recusas": x["recusas"], "motivo": x["motivo"], "status": x["status"]} for x in prev if not x["pago"]]},
         "base": {"compradores": n_comp, "ativos": ativos, "assinaturas_ativas": subs_at, "cancelaram": cancel, "reembolsados": reemb_cli,
-                 "mrr": mrr, "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
+                 "pendentes": pend, "mrr": mrr, "status_oficial": bool(MP.get("oficial")), "status_oficial_em": MP.get("oficial_em"), "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
                  "taxa_reembolso": _div(sum(1 for o in aprT if ef_ref(o)) * 100, len(aprT)), "pagamentos_por_assinante": ppa,
                  "liquido_medio": liq_medio, "ltv": ltv},
         "unit": {"cac": cac, "roas": _div(liq_p, m["inv"]), "cac_liquido": _div(m["inv"], novas - novas_re), "custo_por_ativa": _div(m["inv"], subs_at),
