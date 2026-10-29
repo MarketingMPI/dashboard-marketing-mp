@@ -679,13 +679,30 @@ def kiwify_get(path, tok, **q):
             time.sleep(8 * (tent + 1))
 
 
-def kiwify_sales(produto=MPPRO_PRODUTO, desde=MPPRO_DESDE):
-    """Todos os pedidos de um produto (padrão: MP PRO). Janelas de 90 dias; end_date é EXCLUSIVO (a próxima janela começa nele)."""
+_KIW_TOK = {}
+
+
+def kiwify_token():
+    """Token OAuth da Kiwify, reaproveitado no mesmo processo (a Kiwify devolve 429 se pedir token a cada consulta)."""
+    if _KIW_TOK.get("exp", 0) > time.time(): return _KIW_TOK["tok"]
     cid, sec = kiwify_cfg("KIWIFY_CLIENT_ID"), kiwify_cfg("KIWIFY_CLIENT_SECRET")
     if not (cid and sec and kiwify_cfg("KIWIFY_ACCOUNT_ID")): raise RuntimeError("sem credenciais da Kiwify")
     body = urllib.parse.urlencode({"client_id": cid, "client_secret": sec}).encode()
-    tok = json.loads(urllib.request.urlopen(urllib.request.Request(KIWIFY_API + "/oauth/token", data=body, method="POST",
-        headers={"User-Agent": "mp-dashboard/1.0", "Content-Type": "application/x-www-form-urlencoded"}), timeout=60).read())["access_token"]
+    for tent in range(3):
+        try:
+            r = json.loads(urllib.request.urlopen(urllib.request.Request(KIWIFY_API + "/oauth/token", data=body, method="POST",
+                headers={"User-Agent": "mp-dashboard/1.0", "Content-Type": "application/x-www-form-urlencoded"}), timeout=60).read())
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or tent == 2: raise
+            time.sleep(20 * (tent + 1))
+    _KIW_TOK.update(tok=r["access_token"], exp=time.time() + min(int(r.get("expires_in") or 3600), 3600) - 120)
+    return _KIW_TOK["tok"]
+
+
+def kiwify_sales(produto=MPPRO_PRODUTO, desde=MPPRO_DESDE):
+    """Todos os pedidos de um produto (padrão: MP PRO). Janelas de 90 dias; end_date é EXCLUSIVO (a próxima janela começa nele)."""
+    tok = kiwify_token()
     ini, fim, out = datetime.fromisoformat(desde).date(), datetime.now(BRT).date() + timedelta(days=2), {}
     while ini < fim:
         e = min(ini + timedelta(days=90), fim); page = 1
