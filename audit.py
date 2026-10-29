@@ -371,7 +371,7 @@ def mppro(MP, f, agora_day):
                 a, st, acesso = 0, "pendente", k[3]
             elif k and base_hoje and k[0] == "ativo":
                 a, st = max(1, k[1]), "ativo"
-            elif a and _mais1mes(ult_pg["day"]) < T and any(r["c"] == c and r["ts"] > ult_pg["ts"] and r["day"] <= T for r in tent):
+            elif (a or k) and _mais1mes(ult_pg["day"]) < T and any(r["c"] == c and r["ts"] > ult_pg["ts"] and r["day"] <= T for r in tent):
                 a, st = 0, "pendente"
             else:
                 st = "ativo" if a else "cancelou"
@@ -394,6 +394,38 @@ def mppro(MP, f, agora_day):
                             "ultimo": pg[-1]["day"] if pg else None, "total_pago": soma(pg, "bruto"), "metodo": os_[-1]["met"],
                             "recusas": sum(1 for r in rec if r["c"] == c and r["day"] <= T),
                             "reembolso": next((o["rday"] for o in os_ if ef_ref(o)), None), "cancelada": cancelada, "acesso_ate": acesso})
+    # inadimplência no período (espelho do template): episódios de cobrança da renovação que falhou
+    inad_l = []
+    evs = {}
+    for o in apr:
+        if o["st"] == "paid" and o["day"] <= T: evs.setdefault(o["c"], []).append(o)
+    for o in tent:
+        if o["day"] <= T and o["c"] in evs: evs[o["c"]].append(o)
+    for c, es in evs.items():
+        es.sort(key=lambda e: e["ts"])
+        k = OF.get(str(c)); canc_of = k[2] if k and k[0] == "cancelou" and k[2] else None
+        ult = ep = None
+        def fecha(fim, res):
+            if ep and fim > ep["ini"] and fim >= de and ep["ini"] <= T: inad_l.append({**ep, "fim": fim, "res": res})
+        for e in es:
+            if e["st"] == "paid":
+                if ep: fecha(e["day"], "recuperado"); ep = None
+                ult = e
+            elif ult:
+                if not ep: ep = {"c": c, "ultimo": ult["day"], "venc": _mais1mes(ult["day"]), "ini": e["day"], "tent": 0, "valor": ult["bruto"], "liq": ult["liq"]}
+                ep["tent"] += 1; ep["ultT"] = e["day"]
+        if ep:
+            if canc_of and canc_of <= T: fecha(canc_of, "cancelado")
+            elif not k and (_d(T) - _d(ep["ultT"])).days > 30: fecha(ep["ultT"], "cancelado")
+            elif ep["ini"] <= T: inad_l.append({**ep, "fim": None, "res": "pendente"})
+    inad_l.sort(key=lambda x: (x["ini"], x["c"]))
+    iS = lambda rs: [x for x in inad_l if x["res"] in rs]
+    iV = lambda xs, kk: sum(x[kk] for x in xs)
+    inadimplencia = {"total": len(inad_l), "pendentes": len(iS(["pendente"])), "cancelados": len(iS(["cancelado"])), "recuperados": len(iS(["recuperado"])),
+                     "valor_pendente": iV(iS(["pendente"]), "valor"), "valor_perdido": iV(iS(["cancelado"]), "valor"), "valor_recuperado": iV(iS(["recuperado"]), "valor"),
+                     "valor_travado": iV(iS(["pendente", "cancelado"]), "valor"), "liquido_travado": iV(iS(["pendente", "cancelado"]), "liq"),
+                     "lista": [{"cliente": nome(x["c"]), "ultimo": x["ultimo"], "vencimento": x["venc"], "inicio": x["ini"], "fim": x["fim"],
+                                "tentativas": x["tent"], "situacao": x["res"], "valor": x["valor"]} for x in inad_l]}
     ordem = {"ativo": 0, "pendente": 1, "cancelou": 2, "reembolsado": 3}
     compradores.sort(key=lambda x: (ordem[x["status"]], -x["pagamentos"], x["entrada"], x["cliente"]))
     n_comp = len(cliT); nao_re = n_comp - reemb_cli
@@ -493,6 +525,7 @@ def mppro(MP, f, agora_day):
                        "cancelaram_sem_cobranca": sem_cob,
                        "abertas": [{"cliente": nome(x["c"]), "ultimo": x["ult"], "vencimento": x["due"], "dias": x["atraso"],
                                     "recusas": x["recusas"], "motivo": x["motivo"], "status": x["status"]} for x in prev if not x["pago"]]},
+        "inadimplencia": inadimplencia,
         "base": {"compradores": n_comp, "ativos": ativos, "assinaturas_ativas": subs_at, "cancelaram": cancel, "reembolsados": reemb_cli,
                  "pendentes": pend, "pendentes_valor": pend_valor, "pendentes_liquido": pend_liq, "pendentes_assinaturas": pend_subs, "mrr": mrr, "status_oficial": bool(MP.get("oficial")), "status_oficial_em": MP.get("oficial_em"), "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
                  "taxa_reembolso": _div(sum(1 for o in aprT if ef_ref(o)) * 100, len(aprT)), "pagamentos_por_assinante": ppa,

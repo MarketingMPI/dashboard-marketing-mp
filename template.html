@@ -1341,7 +1341,7 @@ function computeMPPro(MP, f, agoraDay) {
       if (k && k[0] === 'cancelou' && k[2] && k[2] <= T) { a = 0; st = 'cancelou'; cancelada = k[2]; acesso = k[3]; }
       else if (k && baseHoje && k[0] === 'pendente') { a = 0; st = 'pendente'; acesso = k[3]; }
       else if (k && baseHoje && k[0] === 'ativo') { a = Math.max(1, k[1]); st = 'ativo'; }
-      else if (a && addMonth1(ultPg.day) < T && tentativas.some(r => r.c === c && r.ts > ultPg.ts && r.day <= T)) { a = 0; st = 'pendente'; }
+      else if ((a || k) && addMonth1(ultPg.day) < T && tentativas.some(r => r.c === c && r.ts > ultPg.ts && r.day <= T)) { a = 0; st = 'pendente'; }   // com status oficial: não cancelou até T
       else st = a ? 'ativo' : 'cancelou';
       for (let i = 0; i < a; i++) mrr += (subsRec[i] || subsRec[0]).bruto;
       subsAtivas += a;
@@ -1362,6 +1362,37 @@ function computeMPPro(MP, f, agoraDay) {
       total_pago: sumc(pg, 'bruto'), metodo: os[os.length - 1].met, recusas: rec.filter(r => r.c === c && r.day <= T).length,
       reembolso: os.filter(efRef).map(o => o.rday)[0] || null, cancelada, acesso_ate: acesso});
   }
+  // ---- inadimplência no período: episódios em que a cobrança da renovação falhou (cartão recusado ou Pix/boleto aguardando).
+  // Início = 1ª tentativa sem sucesso após o último pagamento; fim = pagamento (recuperado), cancelamento na Kiwify (cancelado)
+  // ou em aberto (pendente). Conta quem esteve inadimplente em algum dia entre de e T; a situação é a de T.
+  // Recusa resolvida no mesmo dia (nova tentativa aprovada) não conta.
+  const inadL = [];
+  {
+    const evs = new Map();
+    for (const o of apr) if (o.st === 'paid' && o.day <= T) { if (!evs.has(o.c)) evs.set(o.c, []); evs.get(o.c).push(o); }
+    for (const o of tentativas) if (o.day <= T && evs.has(o.c)) evs.get(o.c).push(o);
+    for (const [c, es] of evs) {
+      es.sort((x, y) => (x.ts < y.ts ? -1 : x.ts > y.ts ? 1 : 0));
+      const k = OF[c], cancOf = k && k[0] === 'cancelou' && k[2] ? k[2] : null;
+      let ult = null, ep = null;
+      const fecha = (fim, res) => { if (ep && fim > ep.ini && fim >= de && ep.ini <= T) inadL.push(Object.assign({}, ep, {fim, res})); ep = null; };
+      for (const e of es) {
+        if (e.st === 'paid') { if (ep) fecha(e.day, 'recuperado'); ult = e; }
+        else if (ult) { if (!ep) ep = {c, ultimo: ult.day, venc: addMonth1(ult.day), ini: e.day, tent: 0, valor: ult.bruto, liq: ult.liq}; ep.tent++; ep.ultT = e.day; }
+      }
+      if (ep) {
+        if (cancOf && cancOf <= T) fecha(cancOf, 'cancelado');
+        else if (!k && diffDays(ep.ultT, T) > 30) fecha(ep.ultT, 'cancelado');
+        else if (ep.ini <= T) inadL.push(Object.assign({}, ep, {fim: null, res: 'pendente'}));
+      }
+    }
+    inadL.sort((x, y) => (x.ini < y.ini ? -1 : x.ini > y.ini ? 1 : x.c - y.c));
+  }
+  const inadS = res => inadL.filter(x => res.includes(x.res)), inadV = (a, kk) => a.reduce((s, x) => s + x[kk], 0);
+  const inadimplencia = {total: inadL.length, pendentes: inadS(['pendente']).length, cancelados: inadS(['cancelado']).length, recuperados: inadS(['recuperado']).length,
+    valor_pendente: inadV(inadS(['pendente']), 'valor'), valor_perdido: inadV(inadS(['cancelado']), 'valor'), valor_recuperado: inadV(inadS(['recuperado']), 'valor'),
+    valor_travado: inadV(inadS(['pendente', 'cancelado']), 'valor'), liquido_travado: inadV(inadS(['pendente', 'cancelado']), 'liq'),
+    lista: inadL.map(x => ({cliente: nome(x.c), ultimo: x.ultimo, vencimento: x.venc, inicio: x.ini, fim: x.fim, tentativas: x.tent, situacao: x.res, valor: x.valor}))};
   const ORD = {ativo: 0, pendente: 1, cancelou: 2, reembolsado: 3};
   compradores.sort((a, b) => ORD[a.status] - ORD[b.status] || b.pagamentos - a.pagamentos || (a.entrada < b.entrada ? -1 : a.entrada > b.entrada ? 1 : 0) || (a.cliente < b.cliente ? -1 : 1));
   const nComp = cliT.size, naoRe = nComp - reembolsados;
@@ -1426,6 +1457,7 @@ function computeMPPro(MP, f, agoraDay) {
       atraso_medio: mean(atrasou.map(x => x.atraso)), atraso_max: atrasou.length ? Math.max(...atrasou.map(x => x.atraso)) : null,
       cancelaram_sem_cobranca: semCobranca,
       abertas: prev.filter(x => !x.pago).map(x => ({cliente: nome(x.c), ultimo: x.ult, vencimento: x.due, dias: x.atraso, recusas: x.recusas, motivo: x.motivo, status: x.status}))},
+    inadimplencia,
     base: {compradores: nComp, ativos, assinaturas_ativas: subsAtivas, cancelaram: cancel, reembolsados, pendentes, pendentes_valor: pendValor, pendentes_liquido: pendLiq, pendentes_assinaturas: pendSubs, mrr,
       status_oficial: !!MP.oficial, status_oficial_em: MP.oficial_em || null,
       churn_acumulado: div(cancel * 100, nComp), churn_acumulado_com_reembolso: div((cancel + reembolsados) * 100, nComp),
@@ -2196,7 +2228,7 @@ function mpMes(ym) {
   const x = {ym, de, ate, parcial: fim > TODAY, m,
     liquido: v.liquido, bruto: v.bruto, resultado: v.resultado, investimento: md.investimento,
     novas: v.novas_assinaturas, renovacoes: v.renovacoes_pagas, pagamentos: v.pagamentos, formacao: v.formacao_qtd,
-    ativos: m.base.ativos, mrr: m.base.mrr, pend: m.base.pendentes, pendValor: m.base.pendentes_valor, pendLiq: m.base.pendentes_liquido, pendSubs: m.base.pendentes_assinaturas, churn: j ? j.churn : null, churnBase: j ? j.base : null, churnSairam: j ? j.sairam : null,
+    ativos: m.base.ativos, mrr: m.base.mrr, inadN: m.inadimplencia.total, inadPend: m.inadimplencia.pendentes, inadCanc: m.inadimplencia.cancelados, inadRec: m.inadimplencia.recuperados, inadValor: m.inadimplencia.valor_travado, inadLiq: m.inadimplencia.liquido_travado, inadVPend: m.inadimplencia.valor_pendente, inadVPerd: m.inadimplencia.valor_perdido, inadVRec: m.inadimplencia.valor_recuperado, inadLista: m.inadimplencia.lista, churn: j ? j.churn : null, churnBase: j ? j.base : null, churnSairam: j ? j.sairam : null,
     renov: div(m.renovacoes.pagas * 100, m.renovacoes.previstas), previstas: m.renovacoes.previstas, inad: m.renovacoes.inadimplentes,
     cac: m.unit.cac, roas: m.unit.roas, ltv: m.base.ltv, ltvCac: m.unit.ltv_cac, payback: m.unit.payback_meses, vida: m.churn.vida_media_meses, formLiq: v.formacao_liquido,
     ticket: div(v.bruto, v.pagamentos), reemb: v.novas_reembolsadas, reembPct: div(v.novas_reembolsadas * 100, v.novas_assinaturas),
@@ -2921,7 +2953,7 @@ const FONTES_GRP = [['Fontes do Brasil', ['trafius_cpm', 'vtg', 'prosp', 'synchr
    sugestões do mês anterior, MP PRO × mercado, comparativo (fechado) e "Como ler". Mês em andamento: contagens da base
    ajustadas ao ritmo (dias decorridos). */
 const MPI_CONT = new Set(['liquido', 'resultado', 'novas', 'investimento', 'renovacoes', 'pagamentos', 'reemb']);
-const MPI_KEYS = ['liquido', 'resultado', 'novas', 'ativos', 'mrr', 'pend', 'pendValor', 'churn', 'renov', 'investimento', 'cpm', 'cac', 'roas', 'ltvCac', 'reembPct', 'convVisita', 'renovacoes', 'pagamentos'];
+const MPI_KEYS = ['liquido', 'resultado', 'novas', 'ativos', 'mrr', 'inadN', 'inadValor', 'churn', 'renov', 'investimento', 'cpm', 'cac', 'roas', 'ltvCac', 'reembPct', 'convVisita', 'renovacoes', 'pagamentos'];
 function mpiBase(list, frac) {
   const b = {}; for (const k of MPI_KEYS) { const v = list.map(x => x[k]).filter(v => v != null);
     b[k] = v.length ? v.reduce((a, y) => a + y, 0) / v.length * (MPI_CONT.has(k) ? frac : 1) : null; }
@@ -2960,10 +2992,10 @@ function viewMPProMensal() {
     kpiCard({label: 'Assinantes ativos', v: fN(x.ativos), sub: `no fim do mês · MRR ${fRc(x.mrr)}`, extra: pa('ativos', insN1), d: insVar(x.ativos, B && B.ativos, 1, insN1, rotMed), tip: 'Assinatura ativa no último dia do mês (status oficial da Kiwify; sem ele, cobrança confirmada nos últimos 40 dias). Cancelados e pagamento pendente não contam.'}),
     kpiCard({label: 'Churn do mês', cls: x.churn != null && x.churn > 4.99 ? 'red' : '', v: x.churn == null ? '–' : fP(x.churn), sub: x.churn == null ? 'sem base no mês anterior' : `${fN(x.churnSairam)} de ${fN(x.churnBase)} não renovaram · mercado 4,99%`, extra: pa('churn', fP), d: insVar(x.churn, B && B.churn, -1, fP, rotMed),
       tip: 'Assinantes que pagaram no mês anterior e não pagaram neste mês ÷ assinantes que pagaram no mês anterior'}),
-    kpiCard({label: 'Inadimplentes', cls: x.pend ? 'red' : '', v: fN(x.pend), sub: x.pend ? `${fN(x.pendSubs)} ${x.pendSubs === 1 ? 'assinatura' : 'assinaturas'} aguardando pagamento · não cancelados` : 'ninguém aguardando pagamento', extra: pa('pend', insN1), d: insVar(x.pend, B && B.pend, -1, insN1, rotMed),
-      tip: `Assinantes ${x.parcial ? 'hoje' : 'no fim do mês'} com a renovação vencida e sem pagamento: cobrança recusada (cartão) ou aguardando pagamento (Pix/boleto), ainda sem cancelamento.\nNão contam como ativos nem no MRR. Quem a Kiwify já cancelou não entra aqui (está no churn).\nMês em andamento: status oficial da Kiwify; meses fechados: vencidos com tentativa de cobrança após o último pagamento.`}),
-    kpiCard({label: 'Receita travada', cls: x.pendValor ? 'red' : '', v: fRc(x.pendValor), sub: x.pendValor ? `por mês · ≈ ${fRc(x.pendLiq)} líquido · fora do MRR` : 'nenhuma cobrança pendente', extra: pa('pendValor', fRc), d: insVar(x.pendValor, B && B.pendValor, -1, fRc, rotMed),
-      tip: 'Mensalidades dos inadimplentes que ainda não entraram: valor da última cobrança de cada assinatura aguardando pagamento (bruto; o líquido é o que sobraria após a taxa da Kiwify).\nSe a cobrança entrar, vira receita e volta para o MRR; se a Kiwify esgotar as tentativas, vira cancelamento.'}),
+    kpiCard({label: 'Inadimplentes no mês', cls: x.inadN ? 'red' : '', v: fN(x.inadN), sub: x.inadN ? [x.inadPend ? `${fN(x.inadPend)} ainda ${x.inadPend === 1 ? 'pendente' : 'pendentes'}` : '', x.inadCanc ? `${fN(x.inadCanc)} ${x.inadCanc === 1 ? 'cancelado' : 'cancelados'} por falta de pagamento` : '', x.inadRec ? `${fN(x.inadRec)} ${x.inadRec === 1 ? 'regularizou' : 'regularizaram'} depois` : ''].filter(Boolean).join(' · ') : 'nenhuma cobrança falhou no mês', extra: pa('inadN', insN1), d: insVar(x.inadN, B && B.inadN, -1, insN1, rotMed),
+      tip: `Assinantes que ficaram com a renovação sem pagar em algum dia do mês: cobrança recusada no cartão ou Pix/boleto aguardando pagamento.\nNão entram: quem cancelou por conta própria antes da cobrança (está no churn) e recusa resolvida no mesmo dia.\nSituação ${x.parcial ? 'de hoje' : 'no fim do mês'}: pendente (ainda sem pagar), regularizou (pagou depois de nova tentativa) ou cancelado pela Kiwify depois das tentativas.`}),
+    kpiCard({label: 'Receita travada', cls: x.inadValor ? 'red' : '', v: fRc(x.inadValor), sub: x.inadN ? [`${fRc(x.inadVPend)} ainda pode entrar`, x.inadVPerd ? `${fRc(x.inadVPerd)} perdida` : '', x.inadVRec ? `${fRc(x.inadVRec)} recuperada` : ''].filter(Boolean).join(' · ') : 'nenhuma mensalidade travada', extra: pa('inadValor', fRc), d: insVar(x.inadValor, B && B.inadValor, -1, fRc, rotMed),
+      tip: `Mensalidades dos inadimplentes do mês que não entraram (valor bruto; ≈ ${fRc(x.inadLiq)} líquido da taxa da Kiwify).\nAinda pode entrar = cobrança pendente; perdida = a Kiwify cancelou depois das tentativas. Recuperada (regularizou depois de nova tentativa) aparece à parte e não soma aqui.`}),
     kpiCard({label: 'CAC', v: fRc(x.cac), sub: `${fRc(x.investimento)} de mídia ÷ novas assinaturas`, extra: pa('cac', fRc), d: insVar(x.cac, B && B.cac, -1, fRc, rotMed)}),
     kpiCard({label: 'Resultado do mês', cls: x.resultado < 0 ? 'red' : '', v: fRc(x.resultado), sub: `receita líquida − mídia · ROAS ${fX1(x.roas)}`, extra: pa('resultado', fRc), d: insVar(x.resultado, B && B.resultado, 1, fRc, rotMed)})
   ].join('') + '</div>';
