@@ -347,7 +347,7 @@ def mppro(MP, f, agora_day):
     for o in aprT:
         cliT.setdefault(o["c"], []).append(o)
     # status OFICIAL (webhook da Kiwify): oficial[c] = [status, nº ativas, cancelada em, acesso até]; sem ele, regra dos pagamentos
-    ativos = cancel = reemb_cli = pend = subs_at = mrr = pagos_base = liq_base = 0
+    ativos = cancel = reemb_cli = pend = pend_valor = pend_subs = subs_at = mrr = pagos_base = liq_base = 0
     compradores, status = [], {}
     OF, base_hoje = MP.get("oficial") or {}, T >= agora_day
     for c, os_ in cliT.items():
@@ -360,7 +360,7 @@ def mppro(MP, f, agora_day):
             for o in pg:
                 ult_sub[o["sub"]] = o
             subs_rec = sorted(ult_sub.values(), key=lambda o: o["ts"], reverse=True)
-            a = sum(1 for o in subs_rec if (_d(T) - _d(o["day"])).days <= ATIVO_DIAS)
+            a = sum(1 for o in subs_rec if (_d(T) - _d(o["day"])).days <= ATIVO_DIAS); a_regra = a
             k, ult_pg = OF.get(str(c)), pg[-1]
             if k and k[0] == "cancelou" and k[2] and k[2] <= T:
                 a, st, cancelada, acesso = 0, "cancelou", k[2], k[3]
@@ -374,6 +374,9 @@ def mppro(MP, f, agora_day):
                 st = "ativo" if a else "cancelou"
             mrr += sum((subs_rec[i] if i < len(subs_rec) else subs_rec[0])["bruto"] for i in range(a))
             subs_at += a
+            if st == "pendente":
+                n = max(1, a_regra); pend_subs += n
+                pend_valor += sum((subs_rec[i] if i < len(subs_rec) else subs_rec[0])["bruto"] for i in range(n))
             if st == "ativo": ativos += 1
             elif st == "pendente": pend += 1
             else: cancel += 1
@@ -482,7 +485,7 @@ def mppro(MP, f, agora_day):
                        "abertas": [{"cliente": nome(x["c"]), "ultimo": x["ult"], "vencimento": x["due"], "dias": x["atraso"],
                                     "recusas": x["recusas"], "motivo": x["motivo"], "status": x["status"]} for x in prev if not x["pago"]]},
         "base": {"compradores": n_comp, "ativos": ativos, "assinaturas_ativas": subs_at, "cancelaram": cancel, "reembolsados": reemb_cli,
-                 "pendentes": pend, "mrr": mrr, "status_oficial": bool(MP.get("oficial")), "status_oficial_em": MP.get("oficial_em"), "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
+                 "pendentes": pend, "pendentes_valor": pend_valor, "pendentes_assinaturas": pend_subs, "mrr": mrr, "status_oficial": bool(MP.get("oficial")), "status_oficial_em": MP.get("oficial_em"), "churn_acumulado": _div(cancel * 100, n_comp), "churn_acumulado_com_reembolso": _div((cancel + reemb_cli) * 100, n_comp),
                  "taxa_reembolso": _div(sum(1 for o in aprT if ef_ref(o)) * 100, len(aprT)), "pagamentos_por_assinante": ppa,
                  "liquido_medio": liq_medio, "ltv": ltv},
         "unit": {"cac": cac, "roas": _div(liq_p, m["inv"]), "cac_liquido": _div(m["inv"], novas - novas_re), "custo_por_ativa": _div(m["inv"], subs_at),

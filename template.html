@@ -1325,7 +1325,7 @@ function computeMPPro(MP, f, agoraDay) {
   // cancelou na Kiwify = cancelou a partir da data do cancelamento (mesmo com acesso até o fim do período pago);
   // pendente (cobrança recusada aguardando nova tentativa) e ativo só valem para a base de hoje.
   // Sem o dado oficial: ativo = pagou nos últimos 40 dias; passou do vencimento com cobrança recusada = pendente.
-  let ativos = 0, cancel = 0, reembolsados = 0, pendentes = 0, subsAtivas = 0, mrr = 0, pagosBase = 0, liqBase = 0;
+  let ativos = 0, cancel = 0, reembolsados = 0, pendentes = 0, pendValor = 0, pendSubs = 0, subsAtivas = 0, mrr = 0, pagosBase = 0, liqBase = 0;
   const compradores = [], status = new Map(), OF = MP.oficial || {}, baseHoje = T >= agoraDay;
   for (const [c, os] of cliT) {
     const pg = os.filter(o => !efRef(o));
@@ -1334,7 +1334,7 @@ function computeMPPro(MP, f, agoraDay) {
     else {
       const ls = new Map(); for (const o of pg) ls.set(o.sub, o);
       const subsRec = [...ls.values()].sort((x, y) => (x.ts < y.ts ? 1 : x.ts > y.ts ? -1 : 0));
-      let a = subsRec.filter(o => diffDays(o.day, T) <= MP_ATIVO_DIAS).length;
+      let a = subsRec.filter(o => diffDays(o.day, T) <= MP_ATIVO_DIAS).length; const aRegra = a;
       const k = OF[c], ultPg = pg[pg.length - 1];
       if (k && k[0] === 'cancelou' && k[2] && k[2] <= T) { a = 0; st = 'cancelou'; cancelada = k[2]; acesso = k[3]; }
       else if (k && baseHoje && k[0] === 'pendente') { a = 0; st = 'pendente'; acesso = k[3]; }
@@ -1343,6 +1343,10 @@ function computeMPPro(MP, f, agoraDay) {
       else st = a ? 'ativo' : 'cancelou';
       for (let i = 0; i < a; i++) mrr += (subsRec[i] || subsRec[0]).bruto;
       subsAtivas += a;
+      if (st === 'pendente') {   // valor que deixou de entrar: última cobrança de cada assinatura pendente (mín. 1)
+        const n = Math.max(1, aRegra); pendSubs += n;
+        for (let i = 0; i < n; i++) pendValor += (subsRec[i] || subsRec[0]).bruto;
+      }
       if (st === 'ativo') ativos++; else if (st === 'pendente') pendentes++; else cancel++;
       pagosBase += pg.length; liqBase += sumc(pg, 'liq');
     }
@@ -1416,7 +1420,7 @@ function computeMPPro(MP, f, agoraDay) {
       atraso_medio: mean(atrasou.map(x => x.atraso)), atraso_max: atrasou.length ? Math.max(...atrasou.map(x => x.atraso)) : null,
       cancelaram_sem_cobranca: semCobranca,
       abertas: prev.filter(x => !x.pago).map(x => ({cliente: nome(x.c), ultimo: x.ult, vencimento: x.due, dias: x.atraso, recusas: x.recusas, motivo: x.motivo, status: x.status}))},
-    base: {compradores: nComp, ativos, assinaturas_ativas: subsAtivas, cancelaram: cancel, reembolsados, pendentes, mrr,
+    base: {compradores: nComp, ativos, assinaturas_ativas: subsAtivas, cancelaram: cancel, reembolsados, pendentes, pendentes_valor: pendValor, pendentes_assinaturas: pendSubs, mrr,
       status_oficial: !!MP.oficial, status_oficial_em: MP.oficial_em || null,
       churn_acumulado: div(cancel * 100, nComp), churn_acumulado_com_reembolso: div((cancel + reembolsados) * 100, nComp),
       taxa_reembolso: div(aprT.filter(efRef).length * 100, aprT.length), pagamentos_por_assinante: ppa, liquido_medio: liqMedio, ltv},
@@ -3271,9 +3275,10 @@ function viewMPProPeriodo() {
     `</tbody></table></div></div>`;
   // ---------- base
   h += `<div class="mph mt"><span>BASE</span>Assinantes MP PRO em ${fDay(base)} · plano Janela Fundadora</div>`;
-  h += '<div class="kpis">' + [
+  h += '<div class="kpis k3x">' + [
     kpiCard({label: 'Compradores totais', v: fN(b.compradores), sub: 'já pagaram ao menos um mês', tip: 'Pessoas com pagamento aprovado desde o lançamento (17/07/2026) até a data da base'}),
-    kpiCard({label: 'Usuários ativos', v: fN(b.ativos), sub: `${fP(pctOf(b.ativos, b.compradores))} dos compradores · ${pl(b.assinaturas_ativas, 'assinatura', 'assinaturas')}${b.pendentes ? ` · <b class="red">${b.pendentes} com pagamento pendente</b>` : ''}`, tip: 'Assinatura ativa na Kiwify (status oficial, recebido pelo webhook). Sem o status oficial: cobrança confirmada nos últimos 40 dias.\nPagamento pendente = cobrança da renovação recusada, aguardando nova tentativa (não conta como ativo nem no MRR).'}),
+    kpiCard({label: 'Usuários ativos', v: fN(b.ativos), sub: `${fP(pctOf(b.ativos, b.compradores))} dos compradores · ${pl(b.assinaturas_ativas, 'assinatura', 'assinaturas')}`, tip: 'Assinatura ativa na Kiwify (status oficial, recebido pelo webhook). Sem o status oficial: cobrança confirmada nos últimos 40 dias.\nPagamento pendente = cobrança da renovação recusada, aguardando nova tentativa (não conta como ativo nem no MRR).'}),
+    kpiCard({label: 'Pagamento pendente', cls: b.pendentes ? 'red' : '', v: fN(b.pendentes), sub: b.pendentes ? `${fRc(b.pendentes_valor)}/mês pendentes · ${pl(b.pendentes_assinaturas, 'assinatura', 'assinaturas')} · fora do MRR` : 'nenhuma cobrança pendente', tip: 'Renovação recusada (cartão, Pix não pago) aguardando nova tentativa de cobrança. Não conta como ativo nem no MRR.\nValor pendente = valor da última cobrança de cada assinatura pendente (bruto, por mês). Se a cobrança entrar, volta para ativos; se a Kiwify esgotar as tentativas, vira cancelado.'}),
     kpiCard({label: 'Cancelaram', cls: 'red', v: fN(b.cancelaram), sub: `churn acumulado ${fP(b.churn_acumulado)}`, tip: 'Cancelaram a assinatura na Kiwify (contam como cancelados a partir da data do cancelamento, mesmo com acesso até o fim do mês pago) ou estão há mais de 40 dias sem pagamento'}),
     kpiCard({label: 'Reembolsados', v: fN(b.reembolsados), sub: `taxa de reembolso ${fP(b.taxa_reembolso)} dos pagamentos`, tip: 'Clientes cujo único pagamento foi devolvido'}),
     kpiCard({label: 'MRR', cls: 'hero', v: fRc(b.mrr), sub: `${pl(b.assinaturas_ativas, 'assinatura ativa', 'assinaturas ativas')}`, tip: 'Receita recorrente mensal bruta das assinaturas ativas'})
