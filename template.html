@@ -3367,6 +3367,8 @@ function viewMPProPeriodo() {
   return h;
 }
 
+/* Meta do MP HUB: total de usuários (assinantes) na base até a data abaixo (definida pelo usuário em 29/10/2026) */
+const HUB_META = 330, HUB_META_ATE = '2026-12-31';
 /* ---- Usuários MP HUB (B2B) — DADOS REAIS (fotografia importada do painel admin do MP HUB) ----
    D.mphub.usuarios[i] = [id, nome, role, empresa, criado(BRT), ultimo_acesso(BRT|null), dispositivo, cidade, uf, perfil, pl, anos_mercado, escritorio]
    O HUB guarda só o ÚLTIMO acesso de cada usuário (sem histórico nem duração): situação/ativos são medidos na data
@@ -3416,15 +3418,14 @@ function viewMPHub() {
     kpiCard({label: 'Nunca acessaram', cls: c.cnt.nunca ? 'red' : '', v: fN(c.cnt.nunca), sub: `${pct(c.cnt.nunca, c.base.length)} da base`, tip: 'Contas criadas sem nenhum login registrado'}),
     kpiCard({label: 'Inativos há +30 dias', cls: 'red', v: fN(c.cnt.inativo), sub: `${pct(c.cnt.inativo, c.base.length)} da base · risco de abandono`, tip: 'Já acessaram, mas o último acesso foi há mais de 30 dias (na data da fotografia)'})
   ].join('') + '</div>';
-  // gráfico: novos por dia/semana/mês + base acumulada
-  const n = c.nDias, mode = n <= 62 ? 'dia' : n <= 420 ? 'semana' : 'mes', monday = d => addDays(d, -((weekday(d) + 6) % 7));
-  const key = d => mode === 'dia' ? d : mode === 'semana' ? monday(d) : d.slice(0, 7);
+  // gráfico: novos por SEMANA (terça a segunda, mesmo fechamento semanal do painel) + base acumulada + meta tracejada
+  const key = d => addDays(d, -((weekday(d) + 5) % 7));
   const bins = new Map();
   for (let d = S.de; d <= c.T; d = addDays(d, 1)) { const k = key(d); if (!bins.has(k)) bins.set(k, {k, from: d, to: d, novos: 0, base: 0}); bins.get(k).to = d; }
   for (const u of c.novos) { const b = bins.get(key(u[HU.criado].slice(0, 10))); if (b) b.novos++; }
   for (const b of bins.values()) b.base = H.usuarios.filter(u => u[HU.criado].slice(0, 10) <= b.to).length;
   const bs = [...bins.values()], vw = document.getElementById('view').clientWidth || 900, W = Math.max(300, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44), Hh = 260, pl = 34, pr = 34, pt = 18, pb = 30, pw = W - pl - pr, ph = Hh - pt - pb;
-  const mx = niceMax(Math.max(1, ...bs.map(b => b.novos))), ma = niceMax(Math.max(1, ...bs.map(b => b.base))), bw = pw / Math.max(1, bs.length), w = Math.max(1.5, Math.min(bw * .62, 40));
+  const mx = niceMax(Math.max(1, ...bs.map(b => b.novos))), ma = niceMax(Math.max(HUB_META, ...bs.map(b => b.base))), bw = pw / Math.max(1, bs.length), w = Math.max(1.5, Math.min(bw * .62, 40));
   let g = ''; const y = v => pt + ph - ph * v / mx, ya = v => pt + ph - ph * v / ma;
   for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mx * i / 4)}</text><text class="ax" x="${W - pr + 6}" y="${yy + 3.5}" style="fill:#a8701c">${fN(ma * i / 4)}</text>`; }
   const step = Math.max(1, Math.ceil(bs.length / Math.max(1, Math.floor(pw / 48)))), pts = [];
@@ -3432,14 +3433,17 @@ function viewMPHub() {
     const cx = pl + i * bw + bw / 2;
     if (b.novos) g += `<rect class="bar" x="${cx - w / 2}" y="${y(b.novos)}" width="${w}" height="${y(0) - y(b.novos)}" fill="#00503c" rx="${Math.min(3, w / 4)}"/>`;
     pts.push(`${cx},${ya(b.base)}`);
-    if (i % step === 0) g += `<text class="ax" x="${cx}" y="${Hh - pb + 16}" text-anchor="middle">${mode === 'mes' ? MESN(b.k) : fDM(b.from)}</text>`;
-    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)}\nNovos usuários: ${b.novos}\nTotal de usuários: ${b.base}`)}" data-range="${b.from}|${b.to}"/>`;
+    if (i % step === 0) g += `<text class="ax" x="${cx}" y="${Hh - pb + 16}" text-anchor="middle">${fDM(b.from)}</text>`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`Semana ${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)}\nNovos usuários: ${b.novos}\nTotal de usuários: ${b.base}\nMeta: ${fN(HUB_META)} até ${fDay(HUB_META_ATE)} (${fP(pctOf(b.base, HUB_META))} atingido)`)}" data-range="${b.from}|${b.to}"/>`;
   });
+  const ym = ya(HUB_META);
+  g += `<line x1="${pl}" x2="${W - pr}" y1="${ym}" y2="${ym}" stroke="#a8701c" stroke-width="1.5" stroke-dasharray="6 5"/>
+    <text class="ax" x="${W - pr - 4}" y="${ym - 6}" text-anchor="end" style="fill:#a8701c;font-weight:600">Meta ${fN(HUB_META)} até ${fDM(HUB_META_ATE)}</text>`;
   g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#c98a1b" stroke-width="2" stroke-linejoin="round"/>`;
   const chart = `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}">${g}</svg></div>`;
   const situ = [['Ativos (até 7 dias)', c.cnt.ativo7, '#00503c'], ['Ativos (8 a 30 dias)', c.cnt.ativo30, '#7db59c'], ['Inativos (+30 dias)', c.cnt.inativo, '#e0b4ad'], ['Nunca acessaram', c.cnt.nunca, '#d5ddd9']];
-  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Novos usuários × total da base</h3><p>Agrupado por ${mode} · barras = novos (eixo esquerdo) · linha = total de usuários (eixo direito)</p></div>
-      <div class="lg"><span><i style="background:#00503c"></i>Novos</span><span><i style="background:#c98a1b"></i>Total</span></div></div>${chart}</div>
+  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Novos usuários × total da base</h3><p>Por semana (terça a segunda) · barras = novos (eixo esquerdo) · linha = total de usuários (eixo direito) · tracejado = meta de ${fN(HUB_META)} até ${fDay(HUB_META_ATE)}: hoje ${fN(c.base.length)} (${fP(pctOf(c.base.length, HUB_META))})</p></div>
+      <div class="lg"><span><i style="background:#00503c"></i>Novos</span><span><i style="background:#c98a1b"></i>Total</span><span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Meta</span></div></div>${chart}</div>
     <div class="card"><div class="ch"><div><h3>Situação da base</h3><p>Pelo último acesso, em ${fDay(c.SD)}</p></div></div>${columns(situ.map(([label, v, cc]) => ({label, v, c: cc, tip: `${label}\n${fN(v)} usuários (${pct(v, c.base.length)})`})))}</div></div>`;
   // distribuições: verde = acessou nos últimos 30 dias (na fotografia) · cinza = não
   const dist = (fn, ordem) => { const m = new Map((ordem || []).map(k => [k, {v: 0, v2: 0}]));
