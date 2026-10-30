@@ -3472,14 +3472,17 @@ function viewMPHub() {
     <div class="card"><div class="ch"><div><h3>Retenção por mês de cadastro</h3><p>% com acesso nos últimos 30 dias (em ${fDay(c.SD)})</p></div></div>${cohH}</div></div>`;
   // lista de usuários: pelo ÚLTIMO ACESSO, do mais recente; quem nunca acessou vai para o fim
   const STN = {ativo7: ['ativo', 'nov'], ativo30: ['ativo 8–30d', 'abe'], inativo: ['inativo', 'ree'], nunca: ['nunca acessou', 'ren']};
-  const lin = c.base.slice().sort((a, b) => (b[HU.ult] || '') > (a[HU.ult] || '') ? 1 : (b[HU.ult] || '') < (a[HU.ult] || '') ? -1 : (b[HU.criado] > a[HU.criado] ? 1 : -1));
+  const hf = S.hubRede || 'todos', nRede = c.base.filter(u => u[HU.mp]).length;
+  const lin = c.base.filter(u => hf === 'todos' || (hf === 'rede') === !!u[HU.mp]).sort((a, b) => (b[HU.ult] || '') > (a[HU.ult] || '') ? 1 : (b[HU.ult] || '') < (a[HU.ult] || '') ? -1 : (b[HU.criado] > a[HU.criado] ? 1 : -1));
   HUBCTX = {c, H, STN};
   const ini = n => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('') || '?';
-  h += `<div class="g g2 mt hubrow"><div class="card np"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} usuários · do acesso mais recente ao mais antigo · clique para ver os detalhes</p></div>
+  h += `<div class="g g2 mt hubrow"><div class="card np"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} ${lin.length === 1 ? 'usuário' : 'usuários'}${hf === 'rede' ? ' da Rede Meu Patrimônio' : hf === 'ext' ? ' externos' : ''} · do acesso mais recente ao mais antigo · clique para ver os detalhes</p>
+      <div class="seg" style="margin-top:8px">${[['todos', 'Todos', c.base.length], ['rede', 'Rede', nRede], ['ext', 'Externos', c.base.length - nRede]].map(([k, l, n]) => `<button type="button" data-hubrede="${k}" class="${hf === k ? 'on' : ''}">${l}<small>${fN(n)}</small></button>`).join('')}</div></div>
       <div class="lg">${Object.values(STN).map(([t, k]) => `<span><i class="hubd ${k}"></i>${t}</span>`).join('')}</div></div><div class="hubl">` +
-    lin.map(u => { const s2 = STN[c.st(u)], l = u[HU.ult];
+    (lin.length ? '' : emptyBox('Nenhum usuário neste filtro')) +
+    lin.map(u => { const s2 = STN[c.st(u)], l = u[HU.ult], esc = u[HU.mp] ? (u[HU.rede] || 'Meu Patrimônio') : 'Externo';
       return `<button type="button" class="hubi" data-hub="${u[HU.id]}"><span class="hubav ${s2[1]}">${ESC(ini(u[HU.nome]))}</span>
-        <span class="hubn"><b>${ESC(u[HU.nome] || '–')}</b><small>${l ? `${fDay(l.slice(0, 10))} às ${l.slice(11, 16)} · ${hubHa(l, H.extraido_em)}` : 'nunca acessou'}</small></span>
+        <span class="hubn"><b>${ESC(u[HU.nome] || '–')}</b><small>${l ? `${fDay(l.slice(0, 10))} às ${l.slice(11, 16)} · ${hubHa(l, H.extraido_em)}` : 'nunca acessou'} · ${ESC(esc)}</small></span>
         <span class="hubd ${s2[1]}" title="${ESC(s2[0])}"></span><svg class="hubc" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>`; }).join('') +
     `</div></div>${ladoDir}</div>`;
   h += `<details class="mpd mt"><summary>O que o MP HUB ainda não registra (para pedir ao desenvolvedor)</summary><ul>
@@ -4807,6 +4810,8 @@ function bindEvents() {
     if (t.closest('a')) return;
     const row = t.closest('[data-lead]');
     if (row) { openDrawer(row.dataset.lead); return; }
+    const hr = t.closest('[data-hubrede]');
+    if (hr) { S.hubRede = hr.dataset.hubrede; const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
     const hu = t.closest('[data-hub]');
     if (hu) { openHubDrawer(hu.dataset.hub); return; }
   });
