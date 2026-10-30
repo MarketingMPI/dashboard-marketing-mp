@@ -1128,9 +1128,59 @@ MPHUB_CAMPOS = ["id", "nome", "role", "company_nome", "office_nome", "created_at
                 "last_login_browser", "cidade", "uf", "perfil_profissional", "instituicao", "pl_aproximado", "tempo_mercado_anos"]
 
 
+# Rede Meu Patrimônio = equipe MP + escritórios parceiros da rede (planilha "Parceiros b2b", 30/10/2026).
+# Escritórios/domínios ficam aqui (dado de empresa); os NOMES das pessoas da planilha ficam cifrados em REDE_ENC.
+REDE_ESCRITORIOS = {"ellevate": "Ellevate Assessoria de Investimento", "elleven": "Ellevate Assessoria de Investimento",
+                    "eternion": "HC Educação Financeira (Eternion)", "hc educacao": "HC Educação Financeira (Eternion)",
+                    "maldi": "Maldi Advisors", "rating a": "Rating A Consultoria", "ratinga": "Rating A Consultoria",
+                    "road wealth": "Road Wealth", "roadwealth": "Road Wealth", "trivero": "Trivéro Consultoria",
+                    "ullrich": "Ullrich Consultoria"}
+REDE_DOMINIOS = {"meupatrimonio.com": "Meu Patrimônio", "ellevencap.com": "Ellevate Assessoria de Investimento",
+                 "ellevatecap.com": "Ellevate Assessoria de Investimento", "eternion.com.br": "HC Educação Financeira (Eternion)",
+                 "maldiadvisors.com.br": "Maldi Advisors", "ciagroup.com.br": "Maldi Advisors", "ratinga.com.br": "Rating A Consultoria",
+                 "roadwealth.com.br": "Road Wealth", "triveroinvest.com.br": "Trivéro Consultoria"}
+REDE_ENC = ROOT / "fontes" / "rede_parceiros.enc.json"
+
+
+def _norm(s):
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower())).strip()
+
+
+def rede_import(xlsx):
+    """Planilha de parceiros da rede -> nomes normalizados (cifrados) e escritório de cada um. E-mail não é guardado."""
+    import openpyxl
+    ws = openpyxl.load_workbook(xlsx, read_only=True).active
+    pessoas = [{"nome": _norm(r[1]), "escritorio": (r[0] or "").strip()} for r in ws.iter_rows(min_row=2, values_only=True) if r and r[0] and r[1]]
+    REDE_ENC.write_bytes(crypt("enc", json.dumps({"pessoas": pessoas}, ensure_ascii=False).encode("utf-8")))
+    return len(pessoas)
+
+
+def _rede_pessoas():
+    try: return json.loads(crypt("dec", REDE_ENC.read_bytes()))["pessoas"] if REDE_ENC.exists() else []
+    except Exception: return []
+
+
+def mphub_rede(u, pessoas=None):
+    """Escritório da Rede MP do usuário (ou None = Externo): equipe MP, e-mail @meupatrimonio.com ou de parceiro,
+    instituição informada de um escritório parceiro ou nome na planilha de parceiros."""
+    if mphub_e_mp(u) or (u.get("office_nome") or "").strip(): return "Meu Patrimônio"
+    dom = (u.get("email_dominio") or "").lower()
+    if dom in REDE_DOMINIOS: return REDE_DOMINIOS[dom]
+    inst = _norm(u.get("instituicao"))
+    for k, nome in REDE_ESCRITORIOS.items():
+        if k in inst: return nome
+    n = _norm(u.get("nome"))
+    for p in (pessoas if pessoas is not None else _rede_pessoas()):
+        if n and n == p["nome"]: return p["escritorio"]
+    return None
+
+
 def mphub_import(arq):
     d = json.loads(pathlib.Path(arq).read_text(encoding="utf-8"))
-    us = [{k: u.get(k) for k in MPHUB_CAMPOS} for u in d["usuarios"]]
+    for u in d["usuarios"]:   # só o DOMÍNIO do e-mail (empresa), nunca o e-mail
+        e = (u.get("email") or "").strip().lower()
+        u["email_dominio"] = e.split("@")[-1] if "@" in e else None
+    us = [{k: u.get(k) for k in MPHUB_CAMPOS + ["email_dominio"]} for u in d["usuarios"]]
     out = {"extraido_em": d["extraido_em"], "usuarios": us, "acessos_24h": d.get("acessos_24h") or []}
     MPHUB_ENC.parent.mkdir(exist_ok=True)
     MPHUB_ENC.write_bytes(crypt("enc", json.dumps(out, ensure_ascii=False).encode("utf-8")))
@@ -1175,13 +1225,13 @@ def mphub_payload():
         d = json.loads(crypt("dec", MPHUB_ENC.read_bytes()))
     except Exception:
         return {"erro": "não foi possível ler a fotografia do MP HUB", "usuarios": []}
-    us = []
+    us, pessoas = [], _rede_pessoas()
     for u in d["usuarios"]:
         pl = u.get("pl_aproximado")
         us.append([u["id"], sem_pii(u.get("nome") or ""), u.get("role"), u.get("company_nome") or u.get("office_nome"),
                    _brt_min(u.get("created_at")), _brt_min(u.get("last_login_at")), u.get("last_login_device"), u.get("cidade"),
                    (u.get("uf") or "").upper() or None, u.get("perfil_profissional"), float(pl) if pl not in (None, "") else None,
-                   u.get("tempo_mercado_anos"), u.get("office_nome"), mphub_e_mp(u)])
+                   u.get("tempo_mercado_anos"), u.get("office_nome"), bool(mphub_rede(u, pessoas)), mphub_rede(u, pessoas)])
     return {"extraido_em": _brt_min(d["extraido_em"]), "usuarios": us, "acessos_24h": d.get("acessos_24h") or []}
 
 
@@ -1575,6 +1625,7 @@ if __name__ == "__main__":
     elif cmd == "collect": print(stable_summary(collect(full="--full" in sys.argv)))
     elif cmd == "pages": build_pages(); print("ok", OUT)
     elif cmd == "mphub-import": print("ok", mphub_import(sys.argv[2]), "usuários")
+    elif cmd == "rede-import": print("ok", rede_import(sys.argv[2]), "pessoas da rede")
     elif cmd == "alunos-import": print("ok", alunos_import(sys.argv[2]))
     elif cmd == "youtube-import": print("ok", youtube_import(sys.argv[2]))
     elif cmd == "youtube-dias": print("ok", youtube_dias_import(sys.argv[2]))

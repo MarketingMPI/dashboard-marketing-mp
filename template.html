@@ -3373,7 +3373,7 @@ const HUB_META = 330, HUB_META_ATE = '2026-12-31';
    D.mphub.usuarios[i] = [id, nome, role, empresa, criado(BRT), ultimo_acesso(BRT|null), dispositivo, cidade, uf, perfil, pl, anos_mercado, escritorio]
    O HUB guarda só o ÚLTIMO acesso de cada usuário (sem histórico nem duração): situação/ativos são medidos na data
    da fotografia; "acessaram no período" só é exato quando o período termina na data da fotografia ou depois. */
-const HU = {id: 0, nome: 1, role: 2, emp: 3, criado: 4, ult: 5, disp: 6, cid: 7, uf: 8, perfil: 9, pl: 10, anos: 11, mp: 13};
+const HU = {id: 0, nome: 1, role: 2, emp: 3, criado: 4, ult: 5, disp: 6, cid: 7, uf: 8, perfil: 9, pl: 10, anos: 11, mp: 13, rede: 14};   // mp = é da Rede Meu Patrimônio
 const HUB_ROLE = {viewer: 'Visualizador', admin: 'Admin', master: 'Master', consultor: 'Consultor', gestor_company: 'Gestor da empresa'};
 const HUB_PERFIL = {consultor: 'Consultor', consultor_investimento: 'Consultor de investimentos', especialista_investimentos: 'Especialista em investimentos',
   assessor_investimento: 'Assessor de investimentos', assessor: 'Assessor', gerente_banco: 'Gerente de banco', bancario: 'Bancário', back_office: 'Back office',
@@ -3408,9 +3408,9 @@ function viewMPHub() {
   h += '<div class="kpis">' + [
     kpiCard({label: 'Novos usuários', cls: 'hero', v: fN(c.novos.length), sub: `cadastros no período · ${f1(c.novos.length / c.nDias)} por dia`, d: delta(c.novos.length, p.novos.length), tip: 'Contas criadas no MP HUB dentro do período (data de cadastro)'}),
     kpiCard({label: 'Total de usuários', v: fN(c.base.length), sub: `base em ${fDay(c.T)}`, d: delta(c.base.length, p.base.length), tip: 'Todas as contas criadas até o fim do período'}),
-    kpiCard({label: 'Meu Patrimônio × outras instituições', cls: 'w2', v: `${fN(c.mp)}<small>Meu Patrimônio</small><span class="hsep">·</span>${fN(c.base.length - c.mp)}<small>outras</small>`,
-      sub: `<span class="hsplit"><i style="width:${pctOf(c.mp, c.base.length) || 0}%"></i></span>${pct(c.mp, c.base.length)} da base é MP · novos no período: ${fN(c.mpNovos)} MP e ${fN(c.novos.length - c.mpNovos)} de outras`,
-      d: delta(c.mp, p.mp), tip: 'Meu Patrimônio = vinculado à empresa Meu Patrimônio no MP HUB ou com Meu Patrimônio/MP como instituição no cadastro. Outras = demais instituições ou não informada. A variação compara o número de usuários MP com o período anterior.'}),
+    kpiCard({label: 'Rede Meu Patrimônio × Externos', cls: 'w2', v: `${fN(c.mp)}<small>Rede</small><span class="hsep">·</span>${fN(c.base.length - c.mp)}<small>Externos</small>`,
+      sub: `<span class="hsplit"><i style="width:${pctOf(c.mp, c.base.length) || 0}%"></i></span>${pct(c.mp, c.base.length)} da base é da Rede · novos no período: ${fN(c.mpNovos)} da Rede e ${fN(c.novos.length - c.mpNovos)} externos`,
+      d: delta(c.mp, p.mp), tip: 'Rede Meu Patrimônio = equipe MP (e-mail @meupatrimonio.com, vinculado à empresa/escritório MP no HUB ou MP como instituição) + escritórios parceiros da rede (Ellevate, HC Educação/Eternion, Maldi, Rating A, Road Wealth, Trivéro, Ullrich: pela instituição, e-mail ou nome na planilha de parceiros). Externos = demais. A variação compara o número de usuários da Rede com o período anterior.'}),
     kpiCard({label: 'Acessaram no período', v: c.exato ? fN(c.acessaram.length) : '–', sub: c.exato ? `${pct(c.acessaram.length, c.base.length)} da base` : `só para períodos até ${fDay(c.SD)}`, tip: 'Usuários cujo último acesso cai dentro do período. Exato quando o período termina na data da fotografia (o HUB não guarda acessos anteriores ao último).'}),
     kpiCard({label: 'Ativos nos últimos 7 dias', v: fN(c.cnt.ativo7), sub: `${pct(c.cnt.ativo7, c.base.length)} da base · em ${fDM(c.SD)}`, tip: 'Último acesso até 7 dias antes da fotografia'}),
     kpiCard({label: 'Logins nas últimas 24h', v: fN(log24), sub: `até ${snap}`, tip: 'Logins por hora informados pelo MP HUB nas 24 horas anteriores à fotografia'}),
@@ -4005,7 +4005,7 @@ function openHubDrawer(id) {
     ['Cidade / UF', ESC([u[HU.cid], u[HU.uf]].filter(Boolean).join(' / ') || '–')],
     ['Empresa', ESC(u[HU.emp] || '–')],
     ['Escritório', ESC(u[12] || '–')],
-    ['Meu Patrimônio?', u[HU.mp] ? 'Sim' : 'Não'],
+    ['Rede Meu Patrimônio?', u[HU.mp] ? `Sim · ${u[HU.rede] || 'Meu Patrimônio'}` : 'Não (externo)'],
     ['PL aproximado', ESC(u[HU.pl] == null ? '–' : hubPL(u[HU.pl]))],
     ['Tempo de mercado', ESC(u[HU.anos] == null ? '–' : hubAnos(u[HU.anos]))],
     ['Dispositivo do último acesso', ESC(disp)],
