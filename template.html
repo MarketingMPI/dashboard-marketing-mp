@@ -3440,7 +3440,7 @@ function viewMPHub() {
   });
   const ym = ya(HUB_META);
   g += `<line x1="${pl}" x2="${W - pr}" y1="${ym}" y2="${ym}" stroke="#a8701c" stroke-width="1.5" stroke-dasharray="6 5"/>
-    <text class="ax" x="${W - pr - 4}" y="${ym - 6}" text-anchor="end" style="fill:#a8701c;font-weight:600">Meta ${fN(HUB_META)} até ${fDM(HUB_META_ATE)}</text>`;
+    <text class="ax" x="${W - pr - 4}" y="${ym - 6}" text-anchor="end" style="fill:#a8701c;font-weight:600">Meta ${fN(HUB_META)}</text>`;
   const chart = `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}">${g}</svg></div>`;
   const situ = [['Ativos (até 7 dias)', c.cnt.ativo7, '#00503c'], ['Ativos (8 a 30 dias)', c.cnt.ativo30, '#7db59c'], ['Inativos (+30 dias)', c.cnt.inativo, '#e0b4ad'], ['Nunca acessaram', c.cnt.nunca, '#d5ddd9']];
   h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Total da base por semana</h3><p>Barras acumuladas, semana de terça a segunda · altura = total de usuários no fim da semana · verde-escuro = novos da semana · tracejado = meta de ${fN(HUB_META)} até ${fDay(HUB_META_ATE)}: hoje ${fN(c.base.length)} (${fP(pctOf(c.base.length, HUB_META))})</p></div>
