@@ -3405,12 +3405,9 @@ function viewMPHub() {
   const snap = `${fDay(H.extraido_em.slice(0, 10))} às ${H.extraido_em.slice(11, 16)}`;
   h += `<div class="note">Dados reais do painel administrativo do MP HUB, extraídos em <b>${snap}</b> (atualização manual). O MP HUB registra só o <b>último acesso</b> de cada usuário: situação e ativos são medidos nessa data.</div>`;
   const log24 = (H.acessos_24h || []).reduce((a, x) => a + (x.total || 0), 0);
-  h += '<div class="kpis">' + [
+  h += '<div class="kpis k4x">' + [
     kpiCard({label: 'Novos usuários', cls: 'hero', v: fN(c.novos.length), sub: `cadastros no período · ${f1(c.novos.length / c.nDias)} por dia`, d: delta(c.novos.length, p.novos.length), tip: 'Contas criadas no MP HUB dentro do período (data de cadastro)'}),
     kpiCard({label: 'Total de usuários', v: fN(c.base.length), sub: `base em ${fDay(c.T)}`, d: delta(c.base.length, p.base.length), tip: 'Todas as contas criadas até o fim do período'}),
-    kpiCard({label: 'Rede Meu Patrimônio × Externos', cls: 'w2', v: `${fN(c.mp)}<small>Rede</small><span class="hsep">·</span>${fN(c.base.length - c.mp)}<small>Externos</small>`,
-      sub: `<span class="hsplit"><i style="width:${pctOf(c.mp, c.base.length) || 0}%"></i></span>${pct(c.mp, c.base.length)} da base é da Rede · novos no período: ${fN(c.mpNovos)} da Rede e ${fN(c.novos.length - c.mpNovos)} externos`,
-      d: delta(c.mp, p.mp), tip: 'Rede Meu Patrimônio = equipe MP (e-mail @meupatrimonio.com, vinculado à empresa/escritório MP no HUB ou MP como instituição) + escritórios parceiros da rede (Ellevate, HC Educação/Eternion, Maldi, Rating A, Road Wealth, Trivéro, Ullrich: pela instituição, e-mail ou nome na planilha de parceiros). Externos = demais. A variação compara o número de usuários da Rede com o período anterior.'}),
     kpiCard({label: 'Acessaram no período', v: c.exato ? fN(c.acessaram.length) : '–', sub: c.exato ? `${pct(c.acessaram.length, c.base.length)} da base` : `só para períodos até ${fDay(c.SD)}`, tip: 'Usuários cujo último acesso cai dentro do período. Exato quando o período termina na data da fotografia (o HUB não guarda acessos anteriores ao último).'}),
     kpiCard({label: 'Ativos nos últimos 7 dias', v: fN(c.cnt.ativo7), sub: `${pct(c.cnt.ativo7, c.base.length)} da base · em ${fDM(c.SD)}`, tip: 'Último acesso até 7 dias antes da fotografia'}),
     kpiCard({label: 'Logins nas últimas 24h', v: fN(log24), sub: `até ${snap}`, tip: 'Logins por hora informados pelo MP HUB nas 24 horas anteriores à fotografia'}),
