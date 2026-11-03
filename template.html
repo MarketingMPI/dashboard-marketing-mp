@@ -3401,18 +3401,29 @@ function viewMPHub() {
   const H = D.mphub;
   let h = viewHead('Usuários MP HUB', `B2B - Análises · Central do Consultor (mphub.meupatrimonio.com) · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
   if (!H || !H.usuarios || !H.usuarios.length) return h + `<div class="card">${emptyBox('Dados do MP HUB indisponíveis', H && H.erro ? H.erro : 'Nenhuma fotografia do MP HUB foi importada ainda.')}</div>`;
-  const c = hubCompute(H, S.de, S.ate), [pd, pa] = prevRange(), p = hubCompute(H, pd, pa), pct = (a, b) => fP(pctOf(a, b));
+  // filtro da aba inteira: Todos / Rede Meu Patrimônio / Externos (os logins das últimas 24h são agregados e não se separam)
+  const hf = S.hubRede || 'todos', HF = hf === 'todos' ? H : Object.assign({}, H, {usuarios: H.usuarios.filter(u => (hf === 'rede') === !!u[HU.mp])});
+  const fimP = S.ate < TODAY ? S.ate : TODAY, tTot = H.usuarios.filter(u => u[HU.criado].slice(0, 10) <= fimP).length, tRede = H.usuarios.filter(u => u[HU.mp] && u[HU.criado].slice(0, 10) <= fimP).length;
+  const segRede = `<div class="aplpx"><span>Usuários</span><div class="seg">${[['todos', 'Todos', tTot], ['rede', 'Rede Meu Patrimônio', tRede], ['ext', 'Externos', tTot - tRede]].map(([k, l, n]) => `<button type="button" data-hubrede="${k}" class="${hf === k ? 'on' : ''}">${l}<small>${fN(n)}</small></button>`).join('')}</div></div>`;
+  const c = hubCompute(HF, S.de, S.ate), [pd, pa] = prevRange(), p = hubCompute(HF, pd, pa), pct = (a, b) => fP(pctOf(a, b));
   const snap = `${fDay(H.extraido_em.slice(0, 10))} às ${H.extraido_em.slice(11, 16)}`;
+  h += segRede;
   h += `<div class="note">Dados reais do painel administrativo do MP HUB, extraídos em <b>${snap}</b> (atualização manual). O MP HUB registra só o <b>último acesso</b> de cada usuário: situação e ativos são medidos nessa data.</div>`;
   const log24 = (H.acessos_24h || []).reduce((a, x) => a + (x.total || 0), 0);
   h += '<div class="kpis k4x">' + [
     kpiCard({label: 'Novos usuários', cls: 'hero', v: fN(c.novos.length), sub: `cadastros no período · ${f1(c.novos.length / c.nDias)} por dia`, d: delta(c.novos.length, p.novos.length), tip: 'Contas criadas no MP HUB dentro do período (data de cadastro)'}),
     kpiCard({label: 'Total de usuários', v: fN(c.base.length), sub: `base em ${fDay(c.T)}`, d: delta(c.base.length, p.base.length), tip: 'Todas as contas criadas até o fim do período'}),
-    kpiCard({label: 'Rede Meu Patrimônio × Externos', cls: 'w2', v: `${fN(c.mp)}<small>Rede</small><span class="hsep">·</span>${fN(c.base.length - c.mp)}<small>Externos</small>`,
+    hf === 'rede' ? (() => { const eq = c.base.filter(u => !u[HU.rede] || u[HU.rede] === 'Meu Patrimônio').length, esc = new Map();
+      for (const u of c.base) if (u[HU.rede] && u[HU.rede] !== 'Meu Patrimônio') esc.set(u[HU.rede], (esc.get(u[HU.rede]) || 0) + 1);
+      return kpiCard({label: 'Equipe MP × escritórios parceiros', cls: 'w2', v: `${fN(eq)}<small>Equipe MP</small><span class="hsep">·</span>${fN(c.base.length - eq)}<small>Parceiros</small>`,
+        sub: `<span class="hsplit"><i style="width:${pctOf(eq, c.base.length) || 0}%"></i></span>${esc.size ? [...esc].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${ESC(k)} ${fN(n)}`).join(' · ') : 'nenhum parceiro cadastrado'}`,
+        tip: 'Rede Meu Patrimônio dividida entre a equipe Meu Patrimônio e os escritórios parceiros da rede (planilha de parceiros)'}); })()
+    : hf === 'ext' ? kpiCard({label: 'Externos na base', cls: 'w2', v: fP(pctOf(c.base.length, tTot)), sub: `${fN(c.base.length)} de ${fN(tTot)} usuários são externos · novos no período: ${fN(c.novos.length)}`, tip: 'Usuários que não são da equipe Meu Patrimônio nem de escritório parceiro da rede'})
+    : kpiCard({label: 'Rede Meu Patrimônio × Externos', cls: 'w2', v: `${fN(c.mp)}<small>Rede</small><span class="hsep">·</span>${fN(c.base.length - c.mp)}<small>Externos</small>`,
       sub: `<span class="hsplit"><i style="width:${pctOf(c.mp, c.base.length) || 0}%"></i></span>${pct(c.mp, c.base.length)} da base é da Rede · novos no período: ${fN(c.mpNovos)} da Rede e ${fN(c.novos.length - c.mpNovos)} externos`,
       d: delta(c.mp, p.mp), tip: 'Rede Meu Patrimônio = equipe MP (e-mail @meupatrimonio.com, vinculado à empresa/escritório MP no HUB ou MP como instituição) + escritórios parceiros da rede (Ellevate, HC Educação/Eternion, Maldi, Rating A, Road Wealth, Trivéro, Ullrich: pela instituição, e-mail ou nome na planilha de parceiros). Externos = demais. A variação compara o número de usuários da Rede com o período anterior.'}),
     kpiCard({label: 'Acessaram no período', v: c.exato ? fN(c.acessaram.length) : '–', sub: c.exato ? `${pct(c.acessaram.length, c.base.length)} da base` : `só para períodos até ${fDay(c.SD)}`, tip: 'Usuários cujo último acesso cai dentro do período. Exato quando o período termina na data da fotografia (o HUB não guarda acessos anteriores ao último).'}),
-    kpiCard({label: 'Logins nas últimas 24h', v: fN(log24), sub: `até ${snap}`, tip: 'Logins por hora informados pelo MP HUB nas 24 horas anteriores à fotografia'}),
+    kpiCard({label: 'Logins nas últimas 24h', v: fN(log24), sub: `até ${snap}${hf === 'todos' ? '' : ' · toda a base (o HUB não separa)'}`, tip: 'Logins por hora informados pelo MP HUB nas 24 horas anteriores à fotografia'}),
     kpiCard({label: 'Novos que já acessaram', v: c.novos.length ? pct(c.novosAcessaram, c.novos.length) : '–', sub: `${fN(c.novosAcessaram)} de ${fN(c.novos.length)} novos do período`, d: c.novos.length && p.novos.length ? delta(pctOf(c.novosAcessaram, c.novos.length), pctOf(p.novosAcessaram, p.novos.length), 1, fP) : '', tip: 'Novos usuários do período com pelo menos um login registrado'}),
     kpiCard({label: 'Nunca acessaram', cls: c.cnt.nunca ? 'red' : '', v: fN(c.cnt.nunca), sub: `${pct(c.cnt.nunca, c.base.length)} da base`, tip: 'Contas criadas sem nenhum login registrado'}),
     kpiCard({label: 'Inativos há +30 dias', cls: 'red', v: fN(c.cnt.inativo), sub: `${pct(c.cnt.inativo, c.base.length)} da base · risco de abandono`, tip: 'Já acessaram, mas o último acesso foi há mais de 30 dias (na data da fotografia)'})
@@ -3422,7 +3433,7 @@ function viewMPHub() {
   const bins = new Map();
   for (let d = S.de; d <= c.T; d = addDays(d, 1)) { const k = key(d); if (!bins.has(k)) bins.set(k, {k, from: d, to: d, novos: 0, base: 0}); bins.get(k).to = d; }
   for (const u of c.novos) { const b = bins.get(key(u[HU.criado].slice(0, 10))); if (b) b.novos++; }
-  for (const b of bins.values()) b.base = H.usuarios.filter(u => u[HU.criado].slice(0, 10) <= b.to).length;
+  for (const b of bins.values()) b.base = HF.usuarios.filter(u => u[HU.criado].slice(0, 10) <= b.to).length;
   // barras ACUMULADAS: altura = total da base no fim da semana; parte clara = base que já existia, parte verde = novos da semana
   const bs = [...bins.values()], vw = document.getElementById('view').clientWidth || 900, W = Math.max(300, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44), Hh = 280, pl = 40, pr = 16, pt = 26, pb = 30, pw = W - pl - pr, ph = Hh - pt - pb;
   const ma = niceMax(Math.max(HUB_META, ...bs.map(b => b.base))), bw = pw / Math.max(1, bs.length), w = Math.max(1.5, Math.min(bw * .62, 46));
@@ -3472,12 +3483,10 @@ function viewMPHub() {
     <div class="card"><div class="ch"><div><h3>Retenção por mês de cadastro</h3><p>% com acesso nos últimos 30 dias (em ${fDay(c.SD)})</p></div></div>${cohH}</div></div>`;
   // lista de usuários: pelo ÚLTIMO ACESSO, do mais recente; quem nunca acessou vai para o fim
   const STN = {ativo7: ['ativo', 'nov'], ativo30: ['ativo 8–30d', 'abe'], inativo: ['inativo', 'ree'], nunca: ['nunca acessou', 'ren']};
-  const hf = S.hubRede || 'todos', nRede = c.base.filter(u => u[HU.mp]).length;
-  const lin = c.base.filter(u => hf === 'todos' || (hf === 'rede') === !!u[HU.mp]).sort((a, b) => (b[HU.ult] || '') > (a[HU.ult] || '') ? 1 : (b[HU.ult] || '') < (a[HU.ult] || '') ? -1 : (b[HU.criado] > a[HU.criado] ? 1 : -1));
+  const lin = c.base.slice().sort((a, b) => (b[HU.ult] || '') > (a[HU.ult] || '') ? 1 : (b[HU.ult] || '') < (a[HU.ult] || '') ? -1 : (b[HU.criado] > a[HU.criado] ? 1 : -1));
   HUBCTX = {c, H, STN};
   const ini = n => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('') || '?';
-  h += `<div class="g g2 mt hubrow"><div class="card np"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} ${lin.length === 1 ? 'usuário' : 'usuários'}${hf === 'rede' ? ' da Rede Meu Patrimônio' : hf === 'ext' ? ' externos' : ''} · do acesso mais recente ao mais antigo · clique para ver os detalhes</p>
-      <div class="seg" style="margin-top:8px">${[['todos', 'Todos', c.base.length], ['rede', 'Rede', nRede], ['ext', 'Externos', c.base.length - nRede]].map(([k, l, n]) => `<button type="button" data-hubrede="${k}" class="${hf === k ? 'on' : ''}">${l}<small>${fN(n)}</small></button>`).join('')}</div></div>
+  h += `<div class="g g2 mt hubrow"><div class="card np"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} ${lin.length === 1 ? 'usuário' : 'usuários'}${hf === 'rede' ? ' da Rede Meu Patrimônio' : hf === 'ext' ? ' externos' : ''} · do acesso mais recente ao mais antigo · clique para ver os detalhes</p></div>
       <div class="lg">${Object.values(STN).map(([t, k]) => `<span><i class="hubd ${k}"></i>${t}</span>`).join('')}</div></div><div class="hubl">` +
     (lin.length ? '' : emptyBox('Nenhum usuário neste filtro')) +
     lin.map(u => { const s2 = STN[c.st(u)], l = u[HU.ult], esc = u[HU.mp] ? (u[HU.rede] || 'Meu Patrimônio') : 'Externo';
