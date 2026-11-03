@@ -2724,8 +2724,10 @@ function insMetasHtml(x, CP, parcial, modo, frac) {
     {t: 'Realizada → fechamento', v: pc(x.won, x.reu), meta: REF_PRU.ga / REF_PRU.re * 100, sub: x.reu ? `${fN(x.won)} ${x.won === 1 ? 'ganho' : 'ganhos'} ÷ ${fN(x.reu)} ${x.reu === 1 ? 'reunião realizada' : 'reuniões realizadas'}` : 'nenhuma reunião realizada no período', f: 'pru'});
   itens.push({t: 'MQL → fechamento', v: pc(x.won, x.leads), meta: REF_PRU.ga, sub: `${fN(x.won)} ${x.won === 1 ? 'ganho' : 'ganhos'} ÷ ${fN(x.leads)} MQL do período`, f: 'pru'});
   const cls = q => q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
-  const card = m => { const q = m.v == null || !m.meta ? null : Math.min(100, m.v / m.meta * 100), F = m.fmt || fP;   // bateu a referência = 100%
-    return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${m.v == null ? '–' : F(m.v)}</b></div>
+  const card = m => { const F = m.fmt || fP, acima = !m.fmt && m.v != null && m.v > 100.05;   // conversão > 100% (eventos de leads de outros períodos / etapa pulada) aparece como 100% ⚠
+    if (acima) m = Object.assign({}, m, {v: 100, sub: m.sub + ' · ⚠ mais eventos que a etapa anterior no período (leads que entraram antes ou etapa pulada no Pipedrive)'});
+    const q = m.v == null || !m.meta ? null : Math.min(100, m.v / m.meta * 100);   // bateu a referência = 100%
+    return `<div class="mt-i ${cls(q)}" data-tip="${ESC(`Referência: ${INS_REF_FONTE[m.f]}`)}"><div class="mt-h"><span>${m.t}</span><b>${m.v == null ? '–' : F(m.v)}${acima ? ' ⚠' : ''}</b></div>
       <div class="mt-bar"><i style="width:${Math.min(100, q || 0)}%"></i></div>
       <div class="mt-f"><span><b>${q == null ? '–' : fP(q)}</b> da ${m.f === 'meta' ? 'meta' : 'referência'}</span><span>${m.f === 'meta' ? 'Meta' : 'Referência'} <b>${F(m.meta)}</b></span></div>
       <div class="mt-n">${q >= 100 ? `<b class="mt-ok">✔ ${m.f === 'meta' ? 'meta' : 'referência'} atingida</b> · ` : ''}${m.sub}</div></div>`; };
