@@ -267,7 +267,7 @@ def semana(iso_dia):
     y, w, _ = date.fromisoformat(iso_dia).isocalendar(); return f"{y}-W{w:02d}"
 
 
-PD_CHAVES = ("full_day", "full_tentado", "last_run", "deals", "users", "labels", "stage_pipe", "per_deal")   # partes do cache que vêm do Pipedrive
+PD_CHAVES = ("full_day", "full_tentado", "last_run", "deals", "users", "labels", "stage_pipe", "per_deal", "rel_atraso")   # partes do cache que vêm do Pipedrive
 
 
 def sync(full=False):
@@ -338,7 +338,14 @@ def sync(full=False):
             if not cur: break
         # a v2 não devolve atividades APAGADAS: num negócio que teve atividade alterada, relê a lista inteira dele
         # (senão uma tarefa apagada/remarcada continua "vencida" no painel até a recarga semanal)
-        rel = sorted(mexidos - set(changed))
+        rel = set(mexidos) - set(changed)
+        # 1x por dia: relê também os negócios abertos com atividade VENCIDA (é onde uma tarefa apagada distorce o atraso)
+        if cache.get("rel_atraso") != today:
+            for d in deals:
+                v = per.get(d["id"])
+                if d.get("status") == "open" and v and any(not a["done"] and (a.get("due") or "9") < today for a in v["acts"]): rel.add(d["id"])
+            cache["rel_atraso"] = today
+        rel = sorted(rel - set(changed))
         if rel:
             for did, acts in fetch_paged_deal_items(rel, "acts").items():
                 per[did]["acts"] = [n for n in (norm_activity(a) for a in acts) if not n["deleted"]]
@@ -347,7 +354,7 @@ def sync(full=False):
     # mantém o que NÃO é do Pipedrive (Instagram, mídia, MP PRO, Aplicação…): sem isso, cada leitura do Pipedrive zerava
     # o histórico do Instagram (stories, dias mais antigos) e obrigava a reler a mídia inteira.
     resto = {k: v for k, v in cache.items() if k not in PD_CHAVES}
-    cache = {**resto, "full_day": today if full else cache.get("full_day"), "full_tentado": cache.get("full_tentado"),
+    cache = {**resto, "full_day": today if full else cache.get("full_day"), "full_tentado": cache.get("full_tentado"), "rel_atraso": cache.get("rel_atraso"),
              "last_run": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
              "deals": deals, "users": {str(k): v for k, v in users.items()}, "labels": {str(k): v for k, v in labels.items()},
              "stage_pipe": {str(k): v for k, v in stage_pipe.items()},

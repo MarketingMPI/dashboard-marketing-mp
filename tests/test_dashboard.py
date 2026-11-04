@@ -218,6 +218,19 @@ class AtividadeApagadaTests(unittest.TestCase):
             painel.get_many = lambda paths: {}
             cache, n, full = painel.sync(False)
             self.assertEqual([a["id"] for a in cache["per_deal"]["1"]["acts"]], [11])
+            # 2ª leitura no mesmo dia: sem atividade alterada, não relê de novo
+            chamadas = []
+            painel.get = lambda path, **p: {"data": []}
+            painel.fetch_paged_deal_items = lambda ids, kind: chamadas.append(list(ids)) or {i: [] for i in ids}
+            painel.sync(False)
+            self.assertEqual(chamadas, [])
+            # vencida no dia seguinte: relê 1x (pega tarefa apagada mesmo sem alteração recente)
+            c = json.loads(tmp.read_text(encoding="utf-8")); c["rel_atraso"] = "2000-01-01"
+            c["per_deal"]["1"]["acts"] = [velha]; tmp.write_text(json.dumps(c), encoding="utf-8")
+            deal["status"] = "open"
+            cache, *_ = painel.sync(False)
+            self.assertEqual(chamadas, [[1]]); self.assertEqual(cache["per_deal"]["1"]["acts"], [])
+            self.assertEqual(cache["rel_atraso"], hoje)
         finally:
             for k, v in orig.items(): setattr(painel, k, v)
 
