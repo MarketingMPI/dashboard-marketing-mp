@@ -199,5 +199,28 @@ class CachePreservaTests(unittest.TestCase):
             for k, v in orig.items(): setattr(painel, k, v)
 
 
+class AtividadeApagadaTests(unittest.TestCase):
+    """Atividade apagada no Pipedrive (a v2 não lista) some do painel quando o negócio tem outra atividade alterada."""
+    def test_relê_lista_do_negocio(self):
+        import json, tempfile, datetime as dt
+        orig = {k: getattr(painel, k) for k in ("CACHE", "fetch_deals", "get", "fetch_paged_deal_items", "get_many")}
+        try:
+            tmp = Path(tempfile.mkdtemp()) / "c.json"; painel.CACHE = tmp
+            hoje = dt.datetime.now(painel.BRT).date().isoformat()
+            deal = {"id": 1, "update_time": "x", "owner_id": 7, "stage_id": 345, "label_ids": [], "person_id": None}
+            velha = {"id": 10, "type": "call", "done": False, "done_at": None, "due": "2026-11-02", "due_t": None, "add": None, "subj": "", "deleted": False}
+            tmp.write_text(json.dumps({"full_day": hoje, "last_run": "2026-01-01T00:00:00Z", "users": {"7": "A"}, "labels": {},
+                "stage_pipe": {"345": "Funil"}, "per_deal": {"1": {"u": "x", "acts": [velha], "log": [], "ent": None, "pk": None}}}), encoding="utf-8")
+            nova = {"id": 11, "deal_id": 1, "type": "call", "done": True, "marked_as_done_time": "2026-11-04 13:51:00", "due_date": "2026-11-03"}
+            painel.fetch_deals = lambda: [deal]
+            painel.get = lambda path, **p: {"data": [nova]} if path == "/v2/activities" else {"data": []}
+            painel.fetch_paged_deal_items = lambda ids, kind: {i: [nova] for i in ids}
+            painel.get_many = lambda paths: {}
+            cache, n, full = painel.sync(False)
+            self.assertEqual([a["id"] for a in cache["per_deal"]["1"]["acts"]], [11])
+        finally:
+            for k, v in orig.items(): setattr(painel, k, v)
+
+
 if __name__ == "__main__":
     unittest.main()

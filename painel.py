@@ -321,7 +321,7 @@ def sync(full=False):
     # Atividades concluídas/alteradas sem mexer no negócio (garantia extra entre as recargas diárias)
     if not full and cache.get("last_run"):
         since = (parse_utc(cache["last_run"]) - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        ids = {d["id"] for d in deals}; cur = None
+        ids = {d["id"] for d in deals}; cur = None; mexidos = set()
         while True:
             p = {"updated_since": since, "limit": 500}
             if cur: p["cursor"] = cur
@@ -333,8 +333,15 @@ def sync(full=False):
                     n = norm_activity(a)
                     if not n["deleted"]: lst.append(n)
                     per[did]["acts"] = lst
+            mexidos.update(did for did in (a.get("deal_id") for a in r.get("data") or []) if did in ids and did in per)
             cur = (r.get("additional_data") or {}).get("next_cursor")
             if not cur: break
+        # a v2 não devolve atividades APAGADAS: num negócio que teve atividade alterada, relê a lista inteira dele
+        # (senão uma tarefa apagada/remarcada continua "vencida" no painel até a recarga semanal)
+        rel = sorted(mexidos - set(changed))
+        if rel:
+            for did, acts in fetch_paged_deal_items(rel, "acts").items():
+                per[did]["acts"] = [n for n in (norm_activity(a) for a in acts) if not n["deleted"]]
     ids = {d["id"] for d in deals}
     per = {k: v for k, v in per.items() if k in ids}
     # mantém o que NÃO é do Pipedrive (Instagram, mídia, MP PRO, Aplicação…): sem isso, cada leitura do Pipedrive zerava
