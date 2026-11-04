@@ -235,5 +235,20 @@ class AtividadeApagadaTests(unittest.TestCase):
             for k, v in orig.items(): setattr(painel, k, v)
 
 
+class BusinessSuiteImportTests(unittest.TestCase):
+    def test_le_csv_utf16_e_mapeia_perfil(self):
+        import tempfile
+        orig = painel.IG_BS_ENC
+        try:
+            d = Path(tempfile.mkdtemp()); painel.IG_BS_ENC = d / "bs.enc.json"
+            arq = d / "REDE Principais formatos de conteúdo.csv"
+            arq.write_bytes(chr(10).join(['sep=,', '"Conteúdo publicado"', '"Stories","Posts"', '"74","34"', '']).encode("utf-16"))
+            painel.ig_bs_import("2026-01-01", [str(arq)])
+            v = painel.ig_bs_load()["rede.meupatrimonio"]
+            self.assertEqual((v["de"], v["stories"], v["posts"]), ("2026-01-01", 74, 34))
+        finally:
+            painel.IG_BS_ENC = orig
+
+
 if __name__ == "__main__":
     unittest.main()

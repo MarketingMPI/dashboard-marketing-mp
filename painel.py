@@ -1014,6 +1014,20 @@ def sync_instagram(old):
                               likes=m.get("like_count"), com=m.get("comments_count"))
                 after = ((r.get("paging") or {}).get("cursors") or {}).get("after") if (r.get("paging") or {}).get("next") else None
                 if not after: fim_lista = True
+            # collabs: quem aceitou o convite tem o post no próprio perfil (o Business Suite conta como post dele também)
+            def col_de(mid):
+                try: r = ig_get(f"{mid}/collaborators", tok, uso, fields="username,invite_status")
+                except urllib.error.HTTPError: return mid, None
+                return mid, [x.get("username") for x in r.get("data") or [] if x.get("invite_status") == "Accepted"]
+            fcol = []
+            for mid, po in c["posts"].items():
+                idade = (agora - datetime.fromisoformat(po["ts"]).replace(tzinfo=BRT)).days
+                cu = po.get("col_upd")
+                if not cu or (idade <= 14 and cu[:10] < hoje.isoformat()): fcol.append(mid)
+            if uso[0] <= 75 and fcol:
+                with ThreadPoolExecutor(6) as ex:
+                    for mid, cl in ex.map(col_de, fcol[:150]):
+                        if cl is not None: c["posts"][mid]["col"] = cl; c["posts"][mid]["col_upd"] = agora.strftime("%Y-%m-%dT%H:%M:%S")
             fila = []
             for mid, po in c["posts"].items():
                 idade = (agora - datetime.fromisoformat(po["ts"]).replace(tzinfo=BRT)).total_seconds() / 3600
@@ -1056,6 +1070,8 @@ def ig_seguidores_por_dia(c):
 
 def ig_payload(ig):
     out = {"contas": [], "erro": (ig or {}).get("erro"), "atualizado_em": (ig or {}).get("atualizado_em"), "sem_permissao": IG_SEM_PERMISSAO}
+    todas = ((ig or {}).get("contas") or {})
+    bs = ig_bs_load()
     for cid, user, nome in IG_CONTAS:
         c = ((ig or {}).get("contas") or {}).get(cid)
         if not c: continue
@@ -1086,6 +1102,10 @@ def ig_payload(ig):
         out["contas"].append({"id": cid, "user": user, "nome": nome, "seguidores": c.get("seguidores"), "seguindo": c.get("seguindo"),
                               "midias": c.get("midias"), "seg": ig_seguidores_por_dia(c),
                               "dias": dias, "posts": posts, "stories_desde": c.get("stories_desde"),
+                              # posts de OUTRO perfil nosso em que este entrou como colaborador (aceito): [data, dono, link]
+                              "colab": sorted([po["ts"], o.get("user"), po.get("link")] for ocid, o in todas.items() if ocid != cid
+                                              for po in (o.get("posts") or {}).values() if user in (po.get("col") or [])),
+                              "bs": bs.get(user),
                               "stories": [[so["ts"], so.get("tipo"), (so.get("ins") or {}).get("reach"), (so.get("ins") or {}).get("views"),
                                            (so.get("ins") or {}).get("replies"), (so.get("ins") or {}).get("total_interactions")]
                                           for so in sorted((c.get("stories") or {}).values(), key=lambda x: x["ts"])]})
@@ -1336,6 +1356,37 @@ def youtube_dias_import(arq):
     YT_ENC.write_bytes(crypt("enc", json.dumps(Y, ensure_ascii=False).encode("utf-8")))
     ks = sorted(novos)
     return len(novos), ks[0], ks[-1], len(Y["diario"])
+
+
+# `python painel.py ig-bs-import <de> <csv...>`: "Principais formatos de conteúdo.csv" do Meta Business Suite
+# (Insights › Conteúdo, 1 arquivo por perfil, nome com MP NACIONAL / REDE / Gabriel / Renan). Traz só o TOTAL de stories
+# e de posts do período filtrado (de <de> até a hora da exportação = data do arquivo). Grava cifrado em fontes/.
+IG_BS_ENC = ROOT / "fontes" / "ig_business_suite.enc.json"
+IG_BS_NOMES = {"nacional": "meupatrimonio.nacional", "rede": "rede.meupatrimonio", "gabriel": "gabriel.meupatrimonio", "renan": "renanlimacfp"}
+
+
+def ig_bs_import(de, arqs):
+    import csv, io
+    out = ig_bs_load()
+    for arq in arqs:
+        b = pathlib.Path(arq).read_bytes()
+        txt = b.decode("utf-16") if b[:2] in (b"\xff\xfe", b"\xfe\xff") else b.decode("utf-8-sig")
+        linhas = [r for r in csv.reader(io.StringIO(txt)) if r and not r[0].startswith("sep=")]
+        cab = next(i for i, r in enumerate(linhas) if "Stories" in r)
+        val = dict(zip(linhas[cab], linhas[cab + 1]))
+        user = next(u for k, u in IG_BS_NOMES.items() if k in pathlib.Path(arq).name.lower())
+        ate = datetime.fromtimestamp(pathlib.Path(arq).stat().st_mtime, BRT).strftime("%Y-%m-%dT%H:%M:%S")
+        out[user] = {"de": de, "ate_ts": ate, "stories": int(val["Stories"]), "posts": int(val["Posts"]),
+                     "importado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M")}
+    IG_BS_ENC.parent.mkdir(exist_ok=True)
+    IG_BS_ENC.write_bytes(crypt("enc", json.dumps(out, ensure_ascii=False).encode("utf-8")))
+    return {u: (v["stories"], v["posts"]) for u, v in out.items()}
+
+
+def ig_bs_load():
+    if not IG_BS_ENC.exists(): return {}
+    try: return json.loads(crypt("dec", IG_BS_ENC.read_bytes()))
+    except Exception: return {}
 
 
 def youtube_payload():
@@ -1648,6 +1699,7 @@ if __name__ == "__main__":
     elif cmd == "rede-import": print("ok", rede_import(sys.argv[2]), "pessoas da rede")
     elif cmd == "alunos-import": print("ok", alunos_import(sys.argv[2]))
     elif cmd == "youtube-import": print("ok", youtube_import(sys.argv[2]))
+    elif cmd == "ig-bs-import": print("ok", ig_bs_import(sys.argv[2], sys.argv[3:]))
     elif cmd == "youtube-dias": print("ok", youtube_dias_import(sys.argv[2]))
     elif cmd == "dev": print("ok", build_dev(sys.argv[2] if len(sys.argv) > 2 else None))
     elif cmd in ("refresh", "publish"): refresh()

@@ -588,6 +588,9 @@ def instagram(IGP, f, agora_day):
                and (x[0][:10] >= de or _no_ar_ate(x[0]) >= f"{de}T00:00:00")]
         st_desde = c.get("stories_desde")
         st_views = [x[3] for x in sts if x[3] is not None]
+        n_col = sum(1 for x in c.get("colab") or [] if inP(x[0][:10]))
+        bs = c.get("bs"); bs_cobre = bool(bs) and de <= bs["de"] and ate >= bs["ate_ts"][:10]
+        st_pub = (bs["stories"] + sum(1 for x in c.get("stories") or [] if x[0] > bs["ate_ts"] and inP(x[0][:10]))) if bs_cobre             else (len(sts_pub) if st_desde else None)
         por = {}
         for x in ps:
             t = {"REELS": "Reels", "CAROUSEL_ALBUM": "Carrossel", "VIDEO": "Vídeo"}.get(x[1], "Imagem")
@@ -607,10 +610,11 @@ def instagram(IGP, f, agora_day):
             "deixaram_de_seguir": sum(r[IGD["saiu"]] or 0 for r in ds) if any(r[IGD["saiu"]] is not None for r in ds) else None,
             "seguidores_inicio": seg_ini, "seguidores_fim": seg_fim,
             "crescimento": seg_fim - seg_ini if seg_ini is not None and seg_fim is not None else None,
-            "posts": len(ps), "views_por_post": pv / len(ps) if ps else None, "interacoes_por_post": pi / len(ps) if ps else None,
+            "posts": len(ps) + n_col, "posts_proprios": len(ps), "posts_colab": n_col, "views_por_post": pv / len(ps) if ps else None, "interacoes_por_post": pi / len(ps) if ps else None,
             "engajamento_posts": pi / pr * 100 if pr else None,
-            "stories": len(sts) if st_desde else None, "stories_publicados": len(sts_pub) if st_desde else None, "stories_desde": st_desde,
+            "stories": len(sts) if st_desde else None, "stories_publicados": st_pub, "stories_desde": st_desde,
             "stories_completo": bool(st_desde) and de >= st_desde,
+            "stories_pub_completo": bs_cobre or (bool(st_desde) and de >= st_desde), "stories_pub_fonte": "bs" if bs_cobre else "painel", "bs": bs,
             "views_por_story": sum(st_views) / len(st_views) if st_views else None,
             "formatos": sorted(por.values(), key=lambda o: (-o["posts"], o["formato"])),
             "top": [{"data": x[0], "formato": x[1], "link": x[2], "legenda": x[3], "alcance": x[4], "views": x[5], "curtidas": x[6],
