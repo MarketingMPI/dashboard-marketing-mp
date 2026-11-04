@@ -267,6 +267,9 @@ def semana(iso_dia):
     y, w, _ = date.fromisoformat(iso_dia).isocalendar(); return f"{y}-W{w:02d}"
 
 
+PD_CHAVES = ("full_day", "full_tentado", "last_run", "deals", "users", "labels", "stage_pipe", "per_deal")   # partes do cache que vêm do Pipedrive
+
+
 def sync(full=False):
     """Atualiza o cache gastando o mínimo da cota diária da API (tokens: lista = 20, item = 2).
     Leitura normal: lista de negócios + atividades alteradas; atividades/histórico/notas/pessoa só dos negócios
@@ -334,7 +337,10 @@ def sync(full=False):
             if not cur: break
     ids = {d["id"] for d in deals}
     per = {k: v for k, v in per.items() if k in ids}
-    cache = {"full_day": today if full else cache.get("full_day"), "full_tentado": cache.get("full_tentado"),
+    # mantém o que NÃO é do Pipedrive (Instagram, mídia, MP PRO, Aplicação…): sem isso, cada leitura do Pipedrive zerava
+    # o histórico do Instagram (stories, dias mais antigos) e obrigava a reler a mídia inteira.
+    resto = {k: v for k, v in cache.items() if k not in PD_CHAVES}
+    cache = {**resto, "full_day": today if full else cache.get("full_day"), "full_tentado": cache.get("full_tentado"),
              "last_run": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
              "deals": deals, "users": {str(k): v for k, v in users.items()}, "labels": {str(k): v for k, v in labels.items()},
              "stage_pipe": {str(k): v for k, v in stage_pipe.items()},

@@ -172,5 +172,32 @@ class ReuniaoTests(unittest.TestCase):
         self.assertEqual(painel.tipo_efetivo(self.a("meeting", "Fulano")), "meeting")
 
 
+class CachePreservaTests(unittest.TestCase):
+    """Leitura do Pipedrive não pode apagar o resto do cache (Instagram, mídia, MP PRO)."""
+    def test_sync_mantem_instagram_e_midia(self):
+        import json, tempfile, datetime as dt
+        orig = {k: getattr(painel, k) for k in ("CACHE", "fetch_deals", "get", "fetch_paged_deal_items", "get_many")}
+        try:
+            tmp = Path(tempfile.mkdtemp()) / "c.json"; painel.CACHE = tmp
+            hoje = dt.datetime.now(painel.BRT).date().isoformat()
+            deal = {"id": 1, "update_time": "x", "owner_id": 7, "stage_id": 345, "label_ids": [], "person_id": None}
+            tmp.write_text(json.dumps({"full_day": hoje, "last_run": "2026-01-01T00:00:00Z", "users": {"7": "A"}, "labels": {},
+                "stage_pipe": {"345": "Funil"}, "per_deal": {"1": {"u": "x", "acts": [], "log": [], "ent": None, "pk": None}},
+                "ig": {"contas": {"9": {"stories_desde": "2026-10-01"}}}, "midia": {"dias": {"a": 1}}, "mppro": {"pedidos": [1]}}), encoding="utf-8")
+            painel.fetch_deals = lambda: [deal]
+            painel.get = lambda path, **p: {"data": []}
+            painel.fetch_paged_deal_items = lambda ids, kind: {}
+            painel.get_many = lambda paths: {}
+            cache, n, full = painel.sync(False)
+            self.assertFalse(full)
+            self.assertEqual(cache["ig"]["contas"]["9"]["stories_desde"], "2026-10-01")
+            self.assertEqual(cache["midia"], {"dias": {"a": 1}})
+            self.assertEqual(cache["mppro"], {"pedidos": [1]})
+            self.assertIn("1", cache["per_deal"])
+            self.assertIn("ig", json.loads(tmp.read_text(encoding="utf-8")))
+        finally:
+            for k, v in orig.items(): setattr(painel, k, v)
+
+
 if __name__ == "__main__":
     unittest.main()
