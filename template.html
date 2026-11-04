@@ -3534,6 +3534,7 @@ function igChart(serie, width, cor) {
   g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#c98a1b" stroke-width="2" stroke-linejoin="round"/>`;
   return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Visualizações e alcance por dia">${g}</svg></div>`;
 }
+const igStSem = c => !!(c && c.stories_desde && S.ate < c.stories_desde);   // período inteiro antes do início do registro de stories
 function igInsights(c, p) {
   const out = [], pc = (a, b) => b ? (a - b) / Math.abs(b) * 100 : null, sgn = v => (v > 0 ? 'subiram' : 'caíram'), abs = v => nf1.format(Math.abs(v)) + '%';
   const vv = pc(c.views, p.views); if (vv != null && Math.abs(vv) >= 5) out.push([vv > 0 ? 'pos' : 'neg', `Visualizações ${sgn(vv)} <b>${abs(vv)}</b> (${fN(c.views)} contra ${fN(p.views)} no período anterior).`]);
@@ -3579,7 +3580,7 @@ function viewInstagram() {
     row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no último dia do período, comparados com o último dia do período anterior. Reconstruído dia a dia pelo saldo informado pela Meta (começaram a seguir − deixaram de seguir).', c => c.seguidores_fim, true) +
     row('Visualizações', c => c.views) + row('Alcance médio por dia', c => c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia), fN, 'Média diária de contas alcançadas. A variação usa o valor sem arredondar.', c => c.alcance_medio_dia) +
     row('Interações', c => c.interacoes) + row(org ? 'Visualizações de stories' : 'Visualizações de stories (orgânico)', c => c.views_stories) +
-    row('Posts publicados', c => c.posts) + row('Stories publicados', c => c.stories_publicados, fN, 'Quantidade de stories publicados no período (data de publicação). A Meta só mostra os stories enquanto estão no ar (24 h): o painel registra cada um que encontra, desde ' + fDay((ig.contas[0] || {}).stories_desde || TODAY) + '; antes dessa data a contagem fica incompleta e não é comparada.', c => c.stories_completo ? c.stories_publicados : null) +
+    row('Posts publicados', c => c.posts) + row('Stories publicados', c => igStSem(c) ? null : c.stories_publicados, v => fN(v) + (ig.contas.some(c => !c.stories_completo) ? '*' : ''), 'Quantidade de stories publicados no período (data de publicação). A Meta só mostra os stories enquanto estão no ar (24 h): o painel registra cada um que encontra, desde ' + fDay((ig.contas[0] || {}).stories_desde || TODAY) + '; antes dessa data a contagem fica incompleta e não é comparada.', c => c.stories_completo ? c.stories_publicados : null) +
     row('Visualizações por post', c => c.views_por_post == null ? null : Math.round(c.views_por_post)) +
     row('Taxa de engajamento dos posts', c => c.engajamento_posts, fP) + row('Novos seguidores', c => c.novos_seguidores, fN, 'Contas que começaram a seguir o perfil no período', c => c.novos_cobertura >= 99.5 ? c.novos_seguidores : null, true) +
     row('Deixaram de seguir', c => c.deixaram_de_seguir, fN, 'Contas que deixaram de seguir (ou saíram do Instagram) no período', c => c.deixaram_de_seguir, true) +
@@ -3603,12 +3604,12 @@ function viewInstagram() {
       kpiCard({label: 'Taxa de engajamento', v: fP(c.engajamento_posts), sub: 'interações ÷ alcance dos posts', d: igDelta(c.engajamento_posts, p.engajamento_posts, fP), tip: 'Soma das interações dos posts do período ÷ soma do alcance desses posts'}),
       kpiCard({label: org ? 'Visualizações de stories' : 'Stories (orgânico)', v: fN(c.views_stories), sub: org ? `${fP(pctOf(c.views_stories, c.views))} das visualizações orgânicas` : 'stories não entram em anúncios', d: igDelta(c.views_stories, p.views_stories), tip: 'Visualizações orgânicas de stories no período'}),
       kpiCard({label: 'Cliques no link da bio', v: fN(c.cliques_site), sub: 'toques no link do perfil', d: igDelta(c.cliques_site, p.cliques_site), tip: 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)'}),
-      kpiCard({label: 'Stories no ar', v: c.stories == null ? '–' : fN(c.stories),
+      kpiCard({label: 'Stories no ar', cls: igStSem(c) ? 'off' : '', v: c.stories == null || igStSem(c) ? '–' : fN(c.stories),
         sub: c.stories == null ? 'ainda sem leitura de stories' : `inclui os publicados na véspera${c.stories_completo ? '' : ` · contados desde ${fDM(c.stories_desde)}`}`,
         d: c.stories_completo && p.stories_completo ? igDelta(c.stories, p.stories) : '<span class="dl na">sem comparação</span>',
         tip: `Stories que ficaram no ar no período — são eles que geram as visualizações de stories. Inclui os publicados na véspera, porque cada story fica 24 h no ar. A Meta só mostra os stories enquanto estão no ar (24 h); o painel registra cada um desde ${c.stories_desde ? fDay(c.stories_desde) : 'a próxima atualização'}.`}),
-      kpiCard({label: 'Stories publicados', v: c.stories_publicados == null ? '–' : fN(c.stories_publicados),
-        sub: c.stories_publicados == null ? 'ainda sem leitura de stories' : `no período${c.stories_completo ? '' : ` · contados desde ${fDM(c.stories_desde)}`}`,
+      kpiCard({label: 'Stories publicados', cls: igStSem(c) ? 'off' : '', v: c.stories_publicados == null || igStSem(c) ? '–' : fN(c.stories_publicados) + (c.stories_completo ? '' : '<sup class="mut">*</sup>'),
+        sub: c.stories_publicados == null ? 'ainda sem leitura de stories' : igStSem(c) ? `sem registro antes de ${fDM(c.stories_desde)} (a Meta não guarda stories antigos)` : `no período${c.stories_completo ? '' : ` · * só os publicados a partir de ${fDM(c.stories_desde)}`}`,
         d: c.stories_completo && p.stories_completo ? igDelta(c.stories_publicados, p.stories_publicados) : '<span class="dl na">sem comparação</span>',
         tip: `Quantidade de stories publicados no período (data de publicação). A Meta só mostra os stories enquanto estão no ar (24 h); o painel registra cada um desde ${c.stories_desde ? fDay(c.stories_desde) : 'a próxima atualização'}.`})
     ].join('') + '</div>';
