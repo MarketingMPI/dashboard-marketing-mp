@@ -3488,7 +3488,8 @@ function viewMPHub() {
   const lin = c.base.slice().sort((a, b) => (b[HU.ult] || '') > (a[HU.ult] || '') ? 1 : (b[HU.ult] || '') < (a[HU.ult] || '') ? -1 : (b[HU.criado] > a[HU.criado] ? 1 : -1));
   HUBCTX = {c, H, STN};
   const ini = n => String(n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join('') || '?';
-  h += `<div class="g g2 mt hubrow"><div class="card np"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} ${lin.length === 1 ? 'usuário' : 'usuários'}${hf === 'rede' ? ' da Rede Meu Patrimônio' : hf === 'ext' ? ' externos' : ''} · do acesso mais recente ao mais antigo · clique para ver os detalhes</p></div>
+  h += `<div class="g g2 mt hubrow"><div class="card np"><div class="ch"><div><h3>Usuários</h3><p>${fN(lin.length)} ${lin.length === 1 ? 'usuário' : 'usuários'}${hf === 'rede' ? ' da Rede Meu Patrimônio' : hf === 'ext' ? ' externos' : ''} · do acesso mais recente ao mais antigo · clique para ver os detalhes</p>
+      <div class="seg" style="margin-top:8px">${[['todos', 'Todos', tTot], ['rede', 'Rede', tRede], ['ext', 'Externos', tTot - tRede]].map(([k, l, n]) => `<button type="button" data-hubrede="${k}" class="${hf === k ? 'on' : ''}">${l}<small>${fN(n)}</small></button>`).join('')}</div></div>
       <div class="lg">${Object.values(STN).map(([t, k]) => `<span><i class="hubd ${k}"></i>${t}</span>`).join('')}</div></div><div class="hubl">` +
     (lin.length ? '' : emptyBox('Nenhum usuário neste filtro')) +
     lin.map(u => { const s2 = STN[c.st(u)], l = u[HU.ult], esc = u[HU.mp] ? (u[HU.rede] || 'Meu Patrimônio') : 'Externo';
