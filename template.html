@@ -850,7 +850,16 @@ table.t tr.tot td{background:#f8f9f9;border-top:1px solid var(--border)}
 #tip{background:var(--fg);color:#fafafa;border-radius:8px;padding:6px 10px;box-shadow:var(--sh-md)}
 .igacc td.igsep,.igacc th.igsep{border-right:1px solid #e3e8e6;padding-right:14px}
 .igacc .igd{font-size:11px;color:#69727d;margin-top:2px}
-.mprow{align-items:stretch}
+.mprow{align-items:stretch;margin-top:10px}
+.mprow>.card{padding:10px 16px 6px}
+.mprow .ch{margin-bottom:2px;align-items:center;flex-wrap:nowrap;gap:10px}
+.mprow .ch .lg{flex-wrap:nowrap;white-space:nowrap}
+.mprow h3{font-size:14.5px}
+.mprow h3 small{font-size:12px;font-weight:400;color:var(--cinza);margin-left:6px}
+.mprow .lg{font-size:11.5px}
+.mprow .mpmc{padding:12px 16px;gap:6px}
+.mprow .mpmc .mt-h b{font-size:22px}
+.mprow .mpmc-l{font-size:12.5px;padding-top:6px;gap:2px}
 .mprow .mpmc{justify-content:center}
 .mpmc .mt-h small{font-weight:500;font-size:11.5px;opacity:.8}
 .mpmc-l{display:flex;flex-direction:column;gap:3px;font-size:13px;border-top:1px solid var(--linha);padding-top:8px}
@@ -2501,18 +2510,18 @@ function mpMetaSerie(meta, g, ini) {
 const mpCls = p => p == null ? 'na' : p >= 100 ? 'ok' : p >= 80 ? 'quase' : 'longe';
 const MP_COR = {ok: '#00a611', quase: '#d9a441', longe: '#c0392b', na: '#cfd9d4'};
 function mpMetaChart(meta, S0, sel, W) {
-  const P = S0.pts, Hh = 250, pl = 66, pr = 14, pt = 26, pb = 34, pw = W - pl - pr, ph = Hh - pt - pb;
+  const P = S0.pts, Hh = S0.tipo === 'fluxo' ? 172 : 160, pl = 62, pr = 12, pt = 18, pb = S0.tipo === 'fluxo' ? 30 : 20, pw = W - pl - pr, ph = Hh - pt - pb;
   const tick = meta.k === 'mrr' || meta.k === 'cac' || meta.k === 'cpm' ? fRc0 : meta.k === 'ltvCac' ? (v => fX(v) + 'x') : (meta.k === 'churn' || meta.k === 'renov' || meta.k === 'reembPct') ? (v => fN(Math.round(v)) + '%') : (v => fN(Math.round(v * 10) / 10));
   const fmtA = v => v == null ? '–' : S0.tipo === 'fluxo' && !Number.isInteger(v) ? f1(v) : meta.fmt(v);
   const vals = P.flatMap(x => [x.v, S0.tipo === 'taxa' ? x.acc : null]).filter(x => x != null);
-  const mx = niceMax(Math.max(S0.alvo * 1.15, ...vals, 1e-9)), y = v => pt + ph - ph * Math.max(0, v) / mx, bw = pw / Math.max(1, P.length), w = Math.max(4, Math.min(bw * .6, 54));
+  const mx = niceMax(Math.max(S0.alvo * 1.08, ...vals, 1e-9)), y = v => pt + ph - ph * Math.max(0, v) / mx, bw = pw / Math.max(1, P.length), w = Math.max(4, Math.min(bw * .6, 54));
   const nomeG = (MPG.find(x => x[0] === S0.g) || [])[2];
   let g = '';
-  for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${tick(mx * i / 4)}</text>`; }
+  for (let i = 0; i <= 2; i++) { const yy = y(mx * i / 2); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${tick(mx * i / 2)}</text>`; }
   const step = Math.max(1, Math.ceil(P.length / Math.max(1, Math.floor(pw / 52)))), rotulo = bw >= 34, linha = [];
   P.forEach((x, i) => {
     const cx = pl + i * bw + bw / 2, op = x.parcial ? .55 : 1, on = i === sel;
-    if (on) g += `<rect x="${pl + i * bw + 1}" y="${pt - 18}" width="${bw - 2}" height="${ph + 18}" fill="#f1f6f3" rx="6"/>`;
+    if (on) g += `<rect x="${pl + i * bw + 1}" y="${pt - 14}" width="${bw - 2}" height="${ph + 14}" fill="#f1f6f3" rx="6"/>`;
     if (x.v != null) {
       if (S0.tipo === 'estoque') {
         const ant = Math.max(0, x.v - Math.max(0, x.delta || 0));
@@ -2522,20 +2531,20 @@ function mpMetaChart(meta, S0, sel, W) {
       if (rotulo) g += `<text class="ax" x="${cx}" y="${y(x.v) - 6}" text-anchor="middle" style="fill:#1c1c1c;font-weight:600">${tick(x.v)}${S0.tipo === 'estoque' && x.delta ? `<tspan style="fill:${x.delta > 0 ? '#00a611' : '#c0392b'}"> ${x.delta > 0 ? '+' : '−'}${tick(Math.abs(x.delta))}</tspan>` : ''}</text>`;
     }
     if (S0.tipo === 'taxa' && x.acc != null) linha.push([cx, y(x.acc)]);
-    if (i % step === 0 || on) g += `<text class="ax" x="${cx}" y="${Hh - pb + 15}" text-anchor="middle"${on ? ' style="font-weight:700;fill:#1c1c1c"' : ''}>${x.rot}</text>`;
-    if (S0.tipo === 'fluxo' && (i % step === 0 || on)) g += `<text class="ax" x="${cx}" y="${Hh - pb + 28}" text-anchor="middle" style="font-size:10px">acum. ${fN(x.acc)}</text>`;
+    if (i % step === 0 || on) g += `<text class="ax" x="${cx}" y="${Hh - pb + 14}" text-anchor="middle"${on ? ' style="font-weight:700;fill:#1c1c1c"' : ''}>${x.rot}</text>`;
+    if (S0.tipo === 'fluxo' && (i % step === 0 || on)) g += `<text class="ax" x="${cx}" y="${Hh - pb + 26}" text-anchor="middle" style="font-size:10px">acum. ${fN(x.acc)}</text>`;
     const tip = [`${x.nome}${x.parcial ? ' (em andamento)' : ''}${x.ini_dados ? ' · dados desde ' + fDay(D.mppro && mpMeses()[0] + '-01') : ''}`,
       `${meta.t}: ${fmtA(x.v)}`, S0.tipo === 'estoque' ? `No período: ${x.delta == null ? '–' : (x.delta > 0 ? '+' : x.delta < 0 ? '−' : '') + meta.fmt(Math.abs(x.delta))}` : null,
       S0.tipo !== 'estoque' ? `Acumulado até o fim do período: ${fmtA(x.acc)}` : null,
       meta.k === 'churn' && x.extra ? `${fN(x.extra.sairam)} de ${fN(x.extra.base)} não renovaram` : null,
       `Meta${S0.tipo === 'fluxo' ? ' do ' + nomeG : ''}: ${meta.bom === 'baixo' ? 'até ' : ''}${fmtA(S0.alvo)} · ${x.pct == null ? '–' : fP(x.pct)} atingido`, 'Clique para ver no card'].filter(Boolean).join('\n');
-    g += `<rect class="hit" x="${pl + i * bw}" y="${pt - 18}" width="${bw}" height="${ph + 18}" data-tip="${ESC(tip)}" data-mpmb="${i}" style="cursor:pointer"/>`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt - 14}" width="${bw}" height="${ph + 14}" data-tip="${ESC(tip)}" data-mpmb="${i}" style="cursor:pointer"/>`;
   });
   if (linha.length > 1) g += `<polyline points="${linha.map(p => p.join(',')).join(' ')}" fill="none" stroke="#1c1c1c" stroke-width="1.6" opacity=".7"/>`;
   g += linha.map(([a, b]) => `<circle cx="${a}" cy="${b}" r="2.6" fill="#1c1c1c" opacity=".75"/>`).join('');
   const ym = y(S0.alvo);
   g += `<line x1="${pl}" x2="${W - pr}" y1="${ym}" y2="${ym}" stroke="#a8701c" stroke-width="1.6" stroke-dasharray="6 5"/>
-    <text class="ax" x="${W - pr - 4}" y="${ym - 6}" text-anchor="end" style="fill:#a8701c;font-weight:600">Meta ${meta.bom === 'baixo' ? 'até ' : ''}${fmtA(S0.alvo)}${S0.tipo === 'fluxo' ? ' por ' + nomeG : ''}</text>`;
+    <text class="ax" x="${W - pr - 4}" y="${ym - 6 < pt ? ym + 12 : ym - 5}" text-anchor="end" style="fill:#a8701c;font-weight:600;stroke:#fff;stroke-width:3px;paint-order:stroke">Meta ${meta.bom === 'baixo' ? 'até ' : ''}${fmtA(S0.alvo)}${S0.tipo === 'fluxo' ? ' por ' + nomeG : ''}</text>`;
   return `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Evolução de ${ESC(meta.t)}">${g}</svg></div>`;
 }
 function mpMetaCard(meta, S0, x) {
@@ -2566,9 +2575,9 @@ function viewMPProMetas() {
     let ult = n - 1; while (ult > 0 && S0.pts[ult].v == null) ult--;   // padrão: último período com valor
     const sel = Number.isInteger(S.mpMB) && S.mpMB >= 0 && S.mpMB < n && !S0.mensalForcado ? S.mpMB : ult;
     const leg = S0.tipo === 'estoque' ? `<span><i style="background:#b4d6c6"></i>Já existia</span><span><i style="background:#00503c"></i>Ganho no período</span>`
-      : `<span><i style="background:#00a611"></i>bateu</span><span><i style="background:#d9a441"></i>80–99%</span><span><i style="background:#c0392b"></i>abaixo de 80%</span>${S0.tipo === 'taxa' ? '<span><i style="background:#1c1c1c;height:2px;vertical-align:middle"></i>Acumulado</span>' : ''}`;
-    const sub = S0.tipo === 'estoque' ? 'altura = total no fim do período' : S0.tipo === 'fluxo' ? `quantidade por ${(MPG.find(z => z[0] === S0.g) || [])[2]} · acum. = total desde o início` : 'valor de cada período · linha escura = acumulado desde o início';
-    h += `<div class="g g32 mt mprow"><div class="card"><div class="ch"><div><h3>${meta.t}</h3><p>${sub}${S0.mensalForcado ? ' · churn só existe por mês (mostrado mês a mês)' : ''}</p></div><div class="lg">${leg}<span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Meta</span></div></div>${mpMetaChart(meta, S0, sel, W)}</div>
+      : `<span><i style="background:#00a611"></i>bateu</span><span><i style="background:#d9a441"></i>80–99%</span><span><i style="background:#c0392b"></i>&lt;80%</span>${S0.tipo === 'taxa' ? '<span><i style="background:#1c1c1c;height:2px;vertical-align:middle"></i>acumulado</span>' : ''}`;
+    const sub = S0.tipo === 'estoque' ? 'total no fim do período' : S0.tipo === 'fluxo' ? `por ${(MPG.find(z => z[0] === S0.g) || [])[2]} · acum. desde o início` : 'por período · linha = acumulado';
+    h += `<div class="g g32 mprow"><div class="card"><div class="ch"><div><h3>${meta.t} <small>${sub}${S0.mensalForcado ? ' · só existe por mês' : ''}</small></h3></div><div class="lg">${leg}<span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Meta</span></div></div>${mpMetaChart(meta, S0, sel, W)}</div>
       ${mpMetaCard(meta, S0, S0.pts[sel])}</div>`;
   }
   return h;
