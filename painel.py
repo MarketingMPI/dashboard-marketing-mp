@@ -1002,7 +1002,7 @@ def sync_instagram(old):
             # posts (feed e reels) desde IG_DESDE
             after, fim_lista = None, False
             while not fim_lista:
-                q = dict(fields="id,timestamp,media_type,media_product_type,permalink,caption,like_count,comments_count", limit=50)
+                q = dict(fields="id,timestamp,media_type,media_product_type,permalink,caption,like_count,comments_count,media_url,thumbnail_url", limit=50)
                 if after: q["after"] = after
                 r = ig_get(f"{cid}/media", tok, uso, **q)
                 for m in r.get("data") or []:
@@ -1011,7 +1011,8 @@ def sync_instagram(old):
                     po = c["posts"].setdefault(m["id"], {})
                     po.update(ts=ts.strftime("%Y-%m-%dT%H:%M:%S"), tipo=m.get("media_product_type") if m.get("media_product_type") == "REELS" else m.get("media_type"),
                               link=m.get("permalink"), leg=re.sub(r"\s+", " ", (m.get("caption") or "")).strip()[:140],
-                              likes=m.get("like_count"), com=m.get("comments_count"))
+                              likes=m.get("like_count"), com=m.get("comments_count"),
+                              img=m.get("thumbnail_url") or m.get("media_url"))   # capa p/ prévia; link assinado da Meta, renovado a cada leitura
                 after = ((r.get("paging") or {}).get("cursors") or {}).get("after") if (r.get("paging") or {}).get("next") else None
                 if not after: fim_lista = True
             # collabs: quem aceitou o convite tem o post no próprio perfil (o Business Suite conta como post dele também)
@@ -1098,7 +1099,7 @@ def ig_payload(ig):
             i = po.get("ins") or {}
             posts.append([po["ts"], po.get("tipo"), po.get("link"), po.get("leg"), i.get("reach"), i.get("views"),
                           i.get("likes", po.get("likes")), i.get("comments", po.get("com")), i.get("shares"), i.get("saved"),
-                          i.get("total_interactions"), i.get("ig_reels_avg_watch_time")])
+                          i.get("total_interactions"), i.get("ig_reels_avg_watch_time"), po.get("img")])
         out["contas"].append({"id": cid, "user": user, "nome": nome, "seguidores": c.get("seguidores"), "seguindo": c.get("seguindo"),
                               "midias": c.get("midias"), "seg": ig_seguidores_por_dia(c),
                               "dias": dias, "posts": posts, "stories_desde": c.get("stories_desde"),

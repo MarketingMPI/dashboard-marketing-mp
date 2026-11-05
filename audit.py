@@ -619,7 +619,7 @@ def instagram(IGP, f, agora_day):
             "formatos": sorted(por.values(), key=lambda o: (-o["posts"], o["formato"])),
             "top": [{"data": x[0], "formato": x[1], "link": x[2], "legenda": x[3], "alcance": x[4], "views": x[5], "curtidas": x[6],
                      "comentarios": x[7], "compart": x[8], "salvos": x[9], "interacoes": x[10],
-                     "engajamento": (x[10] or 0) / x[4] * 100 if x[4] else None} for x in top],
+                     "engajamento": (x[10] or 0) / x[4] * 100 if x[4] else None, "img": (x[12] if len(x) > 12 else None) or None} for x in top],
             "serie": [[r[0], r[IGD["views"]] or 0, r[IGD["reach"]] or 0, r[IGD["inter"]] or 0] for r in ds],
             "anuncios": ig_bloco(ds, IG_ADS), "total": ig_bloco(ds, IG_TOT)})
     return {"contas": contas, "base_em": T}
