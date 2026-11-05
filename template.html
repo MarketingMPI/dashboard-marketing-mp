@@ -848,6 +848,8 @@ table.t tr.tot td{background:#f8f9f9;border-top:1px solid var(--border)}
 #pop .pf{background:var(--bg)}
 #pop .pf button{font-weight:500}
 #tip{background:var(--fg);color:#fafafa;border-radius:8px;padding:6px 10px;box-shadow:var(--sh-md)}
+.igacc td.igsep,.igacc th.igsep{border-right:1px solid #e3e8e6;padding-right:14px}
+.igacc .igd{font-size:11px;color:#69727d;margin-top:2px}
 #igprev{position:fixed;z-index:91;pointer-events:none;display:none;width:260px;background:#fff;border:1px solid #e3e8e6;border-radius:12px;padding:8px;box-shadow:0 14px 36px rgba(0,0,0,.22)}
 #igprev.on{display:block}
 #igprev img{display:block;width:100%;max-height:340px;object-fit:cover;border-radius:8px;background:#f1f4f3}
@@ -1201,7 +1203,8 @@ function computeFull(leads, f, agoraStr) {
   const eventos = computeEventos(leads, f);
   const mppro = computeMPPro(D && D.mppro, f, String(agoraStr || (D && D.gerado_em) || '').slice(0, 10));
   const instagram = computeIG(D && D.ig, f, String(agoraStr || (D && D.gerado_em) || '').slice(0, 10));
-  return {res: {kpis, etapas, consultores, perdidos, lead_time, performance, eventos, mppro, instagram}, rows, agora};
+  const instagram_hist = computeIGHist(D && D.ig, String(agoraStr || (D && D.gerado_em) || '').slice(0, 10));
+  return {res: {kpis, etapas, consultores, perdidos, lead_time, performance, eventos, mppro, instagram, instagram_hist}, rows, agora};
 }
 
 /* Performance: investimento em mídia (Meta Ads, B2C) × leads que ENTRARAM no Pipedrive no período.
@@ -1547,6 +1550,29 @@ function computeIG(IG, f, agoraDay) {
   return {contas, base_em: T};
 }
 
+/* Histórico do Instagram (independe do filtro de datas): mês a mês desde o 1º dia com dados da Meta e acumulados de
+   3, 6 e 12 meses FECHADOS comparados com os N meses imediatamente anteriores. Reaproveita computeIG por período. */
+const IG_HK = ['seguidores_fim', 'novos_seguidores', 'novos_cobertura', 'deixaram_de_seguir', 'crescimento', 'views', 'alcance_medio_dia', 'interacoes', 'posts', 'cliques_site', 'views_stories', 'dias_com_dados', 'dias_periodo'];
+const ymAdd = (ym, n) => { let y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + n; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return `${y}-${String(m + 1).padStart(2, '0')}`; };
+const ymFim = ym => addDays(ymAdd(ym, 1) + '-01', -1);
+function computeIGHist(IG, agoraDay) {
+  if (!IG || !IG.contas || !IG.contas.length || !agoraDay) return null;
+  const ini = IG.contas.map(c => (c.dias.find(r => r[IGD.views] != null) || [])[0]).filter(Boolean).sort()[0];
+  if (!ini) return null;
+  const pick = o => { const x = {id: o.id}; for (const k of IG_HK) x[k] = o[k] ?? null; return x; };
+  const per = (de, ate) => computeIG(IG, {de, ate}, agoraDay).contas.map(pick);
+  const meses = [], mAt = agoraDay.slice(0, 7);
+  for (let m = ini.slice(0, 7); m <= mAt; m = ymAdd(m, 1)) {
+    const de = m + '-01', ate = ymFim(m);
+    meses.push({mes: m, de, ate: ate < agoraDay ? ate : agoraDay, parcial: ate >= agoraDay || de < ini, contas: per(de, ate)});
+  }
+  const L = ymAdd(mAt, -1), janelas = [3, 6, 12].map(n => {
+    const de = ymAdd(L, -(n - 1)) + '-01', ate = ymFim(L), pde = ymAdd(L, -(2 * n - 1)) + '-01', pate = addDays(de, -1);
+    const a = per(de, ate), b = per(pde, pate);
+    return {n, de, ate, pde, pate, completo: de >= ini, prev_completo: pde >= ini, contas: a.map((x, i) => ({id: x.id, cur: x, prev: b[i]}))};
+  });
+  return {inicio: ini, meses, janelas};
+}
 window.MP_DASH = {
   compute(leads, filtros, agoraStr) { return computeFull(leads, filtros, agoraStr).res; },
   derive, makePred
@@ -3563,6 +3589,88 @@ function igInsights(c, p) {
   if (c.cliques_site) out.push(['inf', `${fN(c.cliques_site)} ${c.cliques_site === 1 ? 'clique' : 'cliques'} no link da bio.`]);
   return out.slice(0, 7);
 }
+// ---- histórico mês a mês + acumulados (aba Instagram)
+const IGH_MET = [['views', 'Visualizações'], ['interacoes', 'Interações'], ['alcance_medio_dia', 'Alcance médio/dia'], ['novos_seguidores', 'Novos seguidores'],
+  ['seguidores_fim', 'Seguidores'], ['posts', 'Posts'], ['cliques_site', 'Cliques no link']];
+function igHSoma(lst, k) { const v = lst.map(x => x[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) : null; }
+function igHVal(contas, perfil, k) { const l = perfil === 'todos' ? contas : contas.filter(x => x.id === perfil); return igHSoma(l, k); }
+const fMesAno = ym => `${MES[+ym.slice(5, 7) - 1]}/${ym.slice(2, 4)}`;
+const fFaixa = (de, ate) => de.slice(0, 7) === ate.slice(0, 7) ? fMesAno(de) : `${MES[+de.slice(5, 7) - 1]}${de.slice(0, 4) !== ate.slice(0, 4) ? '/' + de.slice(2, 4) : ''}–${fMesAno(ate)}`;
+function igHVar(c, p, fmt = fN) {   // variação em número e em %
+  if (c == null || p == null) return '<span class="mut">–</span>';
+  const d = c - p, pc = p ? d / Math.abs(p) * 100 : null;
+  if (Math.abs(d) < 1e-9) return '<span class="mut">= sem variação</span>';
+  return `<span class="igv ${d > 0 ? 'pos' : 'neg'}">${d > 0 ? '▲ +' : '▼ −'}${fmt(Math.abs(d))}${pc == null ? '' : ` (${nf1.format(Math.abs(pc))}%)`}</span>`;
+}
+function igHistChart(H, perfil, met, contasInfo, width) {
+  const ms = H.meses, W = Math.max(320, width), Hh = 236, pl = 52, pr = 16, pt = 20, pb = 36, pw = W - pl - pr, ph = Hh - pt - pb;
+  const lista = perfil === 'todos' ? contasInfo : contasInfo.filter(c => c.id === perfil);
+  const tot = ms.map(m => igHVal(m.contas, perfil, met) || 0);
+  const mx = niceMax(Math.max(1, ...tot)), y = v => pt + ph - ph * v / mx, bw = pw / ms.length, w = Math.max(6, Math.min(bw * .62, 46));
+  const fmt = met === 'alcance_medio_dia' ? (v => fN(Math.round(v))) : fN;
+  const nome = (IGH_MET.find(x => x[0] === met) || ['', ''])[1];
+  let g = '';
+  for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 4}" text-anchor="end">${fN(Math.round(mx * i / 4))}</text>`; }
+  ms.forEach((m, i) => {
+    const cx = pl + i * bw + bw / 2; let base = 0; const linhas = [];
+    for (const c of lista) {
+      const v = (m.contas.find(x => x.id === c.id) || {})[met] || 0;
+      if (v > 0) g += `<rect x="${cx - w / 2}" y="${y(base + v)}" width="${w}" height="${y(base) - y(base + v)}" fill="${IG_COR[c.user] || '#00503c'}" opacity="${m.parcial ? .45 : .9}"/>`;
+      base += v; if (lista.length > 1) linhas.push(`@${c.user}: ${fmt(v)}`);
+    }
+    if (tot[i]) g += `<text class="ax" x="${cx}" y="${y(tot[i]) - 5}" text-anchor="middle" style="font-weight:600;fill:#3e4b46">${fmt(tot[i])}</text>`;
+    g += `<text class="ax" x="${cx}" y="${Hh - pb + 15}" text-anchor="middle">${fMesAno(m.mes)}</text>`;
+    if (m.parcial) g += `<text class="ax" x="${cx}" y="${Hh - pb + 28}" text-anchor="middle" style="font-size:9.5px">parcial</text>`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${MES_LONGO[+m.mes.slice(5, 7) - 1]} de ${m.mes.slice(0, 4)}${m.parcial ? ' (parcial)' : ''}\n${nome}: ${fmt(tot[i])}${linhas.length ? '\n' + linhas.join('\n') : ''}`)}"/>`;
+  });
+  return `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Histórico mensal">${g}</svg></div>`;
+}
+function viewIGHist(H, contasInfo, vw) {
+  if (!H || !H.meses.length) return '';
+  const perfil = S.igHP && (S.igHP === 'todos' || contasInfo.some(c => c.id === S.igHP)) ? S.igHP : 'todos';
+  const met = IGH_MET.some(x => x[0] === S.igHM) ? S.igHM : 'views';
+  const V = (contas, k) => igHVal(contas, perfil, k);
+  const fAlc = v => fN(Math.round(v));
+  const segP = `<div class="seg">${[['todos', 'Todos os perfis'], ...contasInfo.map(c => [c.id, '@' + c.user])].map(([k, l]) => `<button type="button" data-ighp="${ESC(k)}" class="${perfil === k ? 'on' : ''}">${ESC(l)}</button>`).join('')}</div>`;
+  const segM = `<div class="seg">${IGH_MET.map(([k, l]) => `<button type="button" data-ighm="${k}" class="${met === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  let h = `<div class="card mt"><div class="ch"><div><h3>Histórico mês a mês</h3><p>Orgânico · não depende do filtro de datas · a Meta só tem os números diários desde ${fDay(H.inicio)}${perfil === 'todos' ? ' · perfis somados' : ''}</p></div></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">${segP}${segM}</div>${igHistChart(H, perfil, met, contasInfo, vw - 44)}`;
+  const ms = H.meses.slice().reverse();
+  const inv = s => s.replace(/igv (pos|neg)/, (x, c) => 'igv ' + (c === 'pos' ? 'neg' : 'pos'));   // subir é ruim (deixaram de seguir)
+  const FU = ['novos_seguidores', 'deixaram_de_seguir', 'seguidores_fim'];
+  const semFU = (m, k) => FU.includes(k) && (perfil === 'todos' ? m.contas : m.contas.filter(x => x.id === perfil)).every(x => !x.novos_cobertura);
+  const parcFU = m => (perfil === 'todos' ? m.contas : m.contas.filter(x => x.id === perfil)).some(x => x.novos_cobertura != null && x.novos_cobertura < 99.5);
+  const cel = (m, i, k, fmt = fN) => {
+    if (semFU(m, k) && k !== 'seguidores_fim') return '<td class="num" data-tip="A Meta só informa quem começou e deixou de seguir a partir de 30/10/2025"><span class="mut">–</span></td>';
+    const v = V(m.contas, k), prv = ms[i + 1] ? V(ms[i + 1].contas, k) : null, pf = FU.includes(k) && k !== 'seguidores_fim' && parcFU(m);
+    const vr = m.parcial || pf || !ms[i + 1] || ms[i + 1].parcial || (FU.includes(k) && parcFU(ms[i + 1])) ? '' : '<div style="margin-top:2px">' + (k === 'deixaram_de_seguir' ? inv(igVar(v, prv)) : igVar(v, prv)) + '</div>';
+    return `<td class="num"${pf ? ' data-tip="Parcial: a Meta só informa seguidores ganhos e perdidos a partir de 30/10/2025"' : ''}><b>${v == null ? '–' : fmt(v)}${pf ? '*' : ''}</b>${vr}</td>`; };
+  h += `<div class="tw mt"><table class="t igc"><thead><tr><th>Mês</th><th class="num" data-tip="Seguidores no último dia do mês">Seguidores</th><th class="num">Novos seguidores</th><th class="num">Deixaram de seguir</th><th class="num">Visualizações</th><th class="num" data-tip="Média diária de contas alcançadas${perfil === 'todos' ? ' (soma das médias dos perfis)' : ''}">Alcance médio/dia</th><th class="num">Interações</th><th class="num">Posts</th><th class="num">Cliques no link</th></tr></thead><tbody>` +
+    ms.map((m, i) => `<tr><td><b>${MES_LONGO[+m.mes.slice(5, 7) - 1]}/${m.mes.slice(2, 4)}</b>${m.parcial ? ` <span class="mut">${m.de < H.inicio ? `desde ${fDM(H.inicio)}` : `até ${fDM(m.ate)}`}</span>` : ''}</td>` +
+      cel(m, i, 'seguidores_fim') + cel(m, i, 'novos_seguidores') + cel(m, i, 'deixaram_de_seguir') + cel(m, i, 'views') + cel(m, i, 'alcance_medio_dia', fAlc) +
+      cel(m, i, 'interacoes') + cel(m, i, 'posts') + cel(m, i, 'cliques_site') + '</tr>').join('') +
+    `</tbody></table></div><p class="mut" style="font-size:12px;margin-top:6px">Cada mês é comparado com o mês anterior. Meses incompletos (o atual e o primeiro da série) ficam sem variação.</p></div>`;
+  const LIN = [['views', 'Visualizações', fN], ['interacoes', 'Interações', fN], ['alcance_medio_dia', 'Alcance médio/dia', fAlc], ['novos_seguidores', 'Novos seguidores', fN],
+    ['deixaram_de_seguir', 'Deixaram de seguir', fN], ['saldo', 'Saldo de seguidores', v => (v > 0 ? '+' : '') + fN(v)], ['posts', 'Posts publicados', fN], ['cliques_site', 'Cliques no link', fN]];
+  const VJ = (lst, k) => { if (k !== 'saldo') return V(lst, k); const a = V(lst, 'novos_seguidores'), b = V(lst, 'deixaram_de_seguir'); return a == null || b == null ? null : a - b; };
+  const varCel = (a, b, fmt) => {
+    if (a == null || b == null) return '<td class="num igsep"><span class="mut">–</span></td>';
+    const d = a - b, pc = b ? d / Math.abs(b) * 100 : null;
+    if (Math.abs(d) < 1e-9) return '<td class="num igsep"><span class="mut">=</span></td>';
+    return `<td class="num igsep"><span class="igv ${d > 0 ? 'pos' : 'neg'}">${d > 0 ? '▲' : '▼'} ${pc == null ? 'novo' : nf1.format(Math.abs(pc)) + '%'}</span><div class="igd">${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}</div></td>`;
+  };
+  const J = H.janelas;
+  h += `<div class="card np mt"><div class="ch"><div><h3>Acumulado de 3, 6 e 12 meses</h3><p>Meses fechados (o mês atual não entra), comparados com o mesmo número de meses imediatamente anterior${perfil === 'todos' ? ' · perfis somados' : ''}</p></div></div>
+    <div class="tw"><table class="t igc igacc"><thead><tr><th></th>${J.map(j => `<th colspan="3" class="num igsep" style="text-align:center">Últimos ${j.n} meses</th>`).join('')}</tr>
+    <tr><th></th>${J.map(j => `<th class="num">${fFaixa(j.de, j.ate)}</th><th class="num">${fFaixa(j.pde, j.pate)}</th><th class="num igsep">Variação</th>`).join('')}</tr></thead><tbody>` +
+    LIN.map(([k, l, fmt]) => `<tr><td><b>${l}</b></td>` + J.map(j => {
+      const a = VJ(j.contas.map(x => x.cur), k), b = j.prev_completo ? VJ(j.contas.map(x => x.prev), k) : null;
+      const vc = varCel(a, b, k === 'alcance_medio_dia' ? fAlc : fN);
+      return `<td class="num"><b>${a == null ? '–' : fmt(a)}</b></td><td class="num">${b == null ? '–' : fmt(b)}</td>` + (k === 'deixaram_de_seguir' ? inv(vc) : vc);
+    }).join('') + '</tr>').join('') + `</tbody></table></div>
+    <p class="mut" style="font-size:12px;margin:8px 16px 14px">Alcance médio/dia é a média do período, não a soma. Saldo de seguidores = novos − deixaram de seguir.${J.some(j => !j.prev_completo) ? ` ${J.filter(j => !j.prev_completo).map(j => `Últimos ${j.n} meses`).join(', ')} sem comparação: a Meta não guarda os números diários de antes de ${fDay(H.inicio)}.` : ''}</p></div>`;
+  return h;
+}
 function viewInstagram() {
   const C = cur(), P = prev(), igRaw = C.res.instagram, pg = P.res.instagram, IGP = D.ig || {};
   let h = viewHead('Instagram', `Redes Sociais · ${periodCaption().replace(/^Leads por data de entrada /, '')}`);
@@ -3573,7 +3681,7 @@ function viewInstagram() {
   const ig = {...igRaw, contas: igRaw.contas.map(aplica)};   // cópia: cur()/prev() ficam em cache e não podem ser alterados
   const pmap = new Map((pg ? pg.contas : []).map(c => [c.id, aplica(c)]));
   const incompleto = ig.contas.some(c => c.dias_periodo && c.dias_com_dados < c.dias_periodo);
-  if (incompleto) h += `<div class="note">Parte do período ainda não tem dados diários carregados (o histórico é completado aos poucos a cada atualização, desde 01/01/2026).</div>`;
+  if (incompleto) h += `<div class="note">Parte do período ainda não tem dados diários carregados (o histórico é completado aos poucos a cada atualização, desde 01/09/2025).</div>`;
   // ---- comparativo
   const sinal = (x, fmt) => x == null ? '' : `${x > 0 ? '+' : x < 0 ? '−' : ''}${fmt(Math.abs(x))}`;
   const row = (lab, f, fmt = fN, tip = '', fv = f, abs = false) => `<tr${tip ? ` data-tip="${ESC(tip)}"` : ''}><td><b>${lab}</b></td>` + ig.contas.map(c => { const p = pmap.get(c.id) || {}; const v = f(c);
@@ -3596,6 +3704,7 @@ function viewInstagram() {
     row('Cliques no link da bio', c => c.cliques_site, fN, 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)') + `</tbody></table></div></div>`;
   // ---- um bloco por perfil
   const vw = document.getElementById('view').clientWidth || 900;
+  h += viewIGHist(C.res.instagram_hist, ig.contas.map(c => ({id: c.id, user: c.user})), vw);
   for (const c of ig.contas) {
     const p = pmap.get(c.id) || {}, cor = IG_COR[c.user] || '#00503c';
     h += `<div class="igh mt" id="ig-${ESC(c.user)}"><span class="igdot lg" style="background:${cor}"></span><div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
@@ -4825,6 +4934,8 @@ function bindEvents() {
     if (t.closest('a')) return;
     const row = t.closest('[data-lead]');
     if (row) { openDrawer(row.dataset.lead); return; }
+    const ighp = t.closest('[data-ighp]'), ighm = t.closest('[data-ighm]');
+    if (ighp || ighm) { if (ighp) S.igHP = ighp.dataset.ighp; if (ighm) S.igHM = ighm.dataset.ighm; const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
     const hr = t.closest('[data-hubrede]');
     if (hr) { S.hubRede = hr.dataset.hubrede; const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
     const hu = t.closest('[data-hub]');

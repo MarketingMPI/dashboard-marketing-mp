@@ -764,7 +764,48 @@ def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
             "performance": performance(leads, filtros, agora, midia if midia is not None else MIDIA),
             "eventos": eventos(leads, filtros),
             "mppro": mppro(MPPRO, filtros, agora_str[:10]),
-            "instagram": instagram(IG, filtros, agora_str[:10])}
+            "instagram": instagram(IG, filtros, agora_str[:10]), "instagram_hist": instagram_hist(IG, agora_str[:10])}
+
+
+# ---- histórico do Instagram (espelho de computeIGHist)
+IG_HK = ["seguidores_fim", "novos_seguidores", "novos_cobertura", "deixaram_de_seguir", "crescimento", "views", "alcance_medio_dia", "interacoes", "posts",
+         "cliques_site", "views_stories", "dias_com_dados", "dias_periodo"]
+
+
+def _ym_add(ym, n):
+    y, m = int(ym[:4]), int(ym[5:7]) - 1 + n
+    y += m // 12; m %= 12
+    return f"{y}-{m + 1:02d}"
+
+
+def _ym_fim(ym):
+    return (_d(_ym_add(ym, 1) + "-01") - timedelta(days=1)).isoformat()
+
+
+def instagram_hist(IGP, agora_day):
+    if not IGP or not IGP.get("contas") or not agora_day:
+        return None
+    inis = [next((r[0] for r in c["dias"] if r[IGD["views"]] is not None), None) for c in IGP["contas"]]
+    inis = sorted(x for x in inis if x)
+    if not inis:
+        return None
+    ini = inis[0]
+    pick = lambda o: {"id": o["id"], **{k: o.get(k) for k in IG_HK}}
+    per = lambda de, ate: [pick(x) for x in instagram(IGP, {"de": de, "ate": ate}, agora_day)["contas"]]
+    meses, m_at = [], agora_day[:7]
+    m = ini[:7]
+    while m <= m_at:
+        de, ate = m + "-01", _ym_fim(m)
+        meses.append({"mes": m, "de": de, "ate": min(ate, agora_day), "parcial": ate >= agora_day or de < ini, "contas": per(de, ate)})
+        m = _ym_add(m, 1)
+    L = _ym_add(m_at, -1); janelas = []
+    for n in (3, 6, 12):
+        de, ate = _ym_add(L, -(n - 1)) + "-01", _ym_fim(L)
+        pde = _ym_add(L, -(2 * n - 1)) + "-01"; pate = (_d(de) - timedelta(days=1)).isoformat()
+        a, b = per(de, ate), per(pde, pate)
+        janelas.append({"n": n, "de": de, "ate": ate, "pde": pde, "pate": pate, "completo": de >= ini, "prev_completo": pde >= ini,
+                        "contas": [{"id": x["id"], "cur": x, "prev": y} for x, y in zip(a, b)]})
+    return {"inicio": ini, "meses": meses, "janelas": janelas}
 
 
 # ----------------------------------------------------------------------------- cenários

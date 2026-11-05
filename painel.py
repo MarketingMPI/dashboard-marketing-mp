@@ -882,7 +882,8 @@ IG_CONTAS = [("17841444843479536", "meupatrimonio.nacional", "Meu Patrimônio"),
              ("17841425597508477", "gabriel.meupatrimonio", "Gabriel · Meu Patrimônio"),
              ("17841407560835140", "renanlimacfp", "Renan Lima")]
 IG_SEM_PERMISSAO = []                          # perfis visíveis no Business sem insights liberados
-IG_DESDE = "2026-01-01"
+IG_DESDE = "2025-09-01"      # a Meta só tem visualizações/interações diárias a partir do fim de ago/2025
+IG_FU_DESDE = "2025-10-30"   # seguiram × deixaram de seguir: a Meta só tem a partir desta data (antes vem vazio = desconhecido, não zero)
 IG_DIA = ["reach", "views", "accounts_engaged", "total_interactions", "likes", "comments", "shares", "saves", "reposts",
           "profile_links_taps", "website_clicks"]
 IG_ORG = ["views", "reach", "total_interactions", "likes", "comments", "shares", "saves"]   # aceitam breakdown=media_product_type
@@ -1064,8 +1065,9 @@ def ig_seguidores_por_dia(c):
     for k in sorted(c["dias"], reverse=True):
         if v is None: break
         out.append([k, v])
-        f = fu.get(k)
+        f = fu.get(k) if k >= IG_FU_DESDE else None
         v = None if f is None else v - (f[0] - f[1])
+        if v is not None and v < 0: break      # saldo da Meta não fecha (ex.: antes de o perfil existir): não inventa
     return sorted(out)
 
 
@@ -1079,7 +1081,7 @@ def ig_payload(ig):
         dias = []
         for k, v in sorted(c["dias"].items()):
             org = (c.get("org") or {}).get(k)
-            f = (c.get("fu") or {}).get(k)
+            f = (c.get("fu") or {}).get(k) if k >= IG_FU_DESDE else None
             linha = [k] + list(v) + [f[0] if f else c["novos"].get(k)]          # 12 = começaram a seguir no dia
             if org is None:
                 linha += [None] * 15
@@ -1087,6 +1089,7 @@ def ig_payload(ig):
                 def organico(m):
                     b = org.get(m) or {}
                     if m == "reach":      # alcance não soma: alcance orgânico ≈ soma dos tipos não pagos, limitada ao total
+                        if not any(t != "_total" for t in b) and b.get("_total"): return None   # Meta ainda sem a quebra (antes de 05/11/2025)
                         n = sum(val for t, val in b.items() if t not in ("AD", "_total"))
                         return min(n, b.get("_total") or n)
                     return (b.get("_total") or 0) - (b.get("AD") or 0)
