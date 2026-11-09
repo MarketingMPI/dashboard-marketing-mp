@@ -1631,7 +1631,7 @@ def verificar_agora(s):
         cache = json.loads(CACHE.read_text(encoding="utf-8"))
         pd_em = parse_utc(s["meta"].get("pipedrive_em"))
         gerado = datetime.fromisoformat(s["gerado_em"])
-        lido = bool(pd_em) and not s["meta"].get("erro_pipedrive") and abs((gerado - pd_em).total_seconds()) < 20 * 60
+        lido = bool(pd_em) and not s["meta"].get("erro_pipedrive") and abs((gerado - pd_em).total_seconds()) < 180   # só quando o Pipedrive foi relido NESTA execução (poupa a cota)
         res, st = verificar.verificar(s, cache.get("verif"), pipedrive_lido=lido)
         s["verificacao"] = res
         cache["verif"] = st
