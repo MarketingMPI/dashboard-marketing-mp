@@ -68,6 +68,9 @@ class VeracidadeTests(unittest.TestCase):
         out = painel.dedupe([mk(1, "lost", "2026-09-12T10:00:00", []), mk(2, "open", "2026-10-13T10:00:00", [])])
         self.assertEqual(sorted(l["e"][:10] for l in out), ["2026-09-12", "2026-10-13"])
         self.assertEqual([l.get("re") for l in out if l["id"] == 2], ["2026-09-12"])
+        # ganho nunca some dentro de um negócio aberto recriado depois (caso real 09/11/2026)
+        out = painel.dedupe([mk(1, "won", "2026-11-03T12:00:00", []), mk(2, "open", "2026-11-09T10:00:00", [])])
+        self.assertEqual((len(out), out[0]["id"], out[0]["s"], out[0]["dd"]), (1, 1, "won", [2]))
 
     def test_each_done_contact_counts(self):
         cache = {"users": {"1": "Consultor"}, "labels": {}, "stage_pipe": {}, "deals": [

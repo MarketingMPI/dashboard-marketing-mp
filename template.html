@@ -202,6 +202,20 @@ ul.igi{margin:0;padding:0;list-style:none}ul.igi li{position:relative;padding:8p
 ul.igi li:before{content:'';position:absolute;left:4px;top:14px;width:8px;height:8px;border-radius:50%;background:#8a958f}ul.igi li.pos:before{background:var(--vivo)}ul.igi li.neg:before{background:var(--verm)}ul.igi li.inf:before{background:#c9a94f}
 .pdinfo{display:block;flex-basis:100%;margin-top:4px;font-size:11.5px;opacity:.8}
 .pdwarn{display:block;flex-basis:100%;margin-top:6px;background:#fff6e5;border:1px solid #f0d49b;color:#7a5306;border-radius:8px;padding:6px 10px;font-size:12px}
+.vfy{border:1px solid var(--v200);background:var(--v50);color:var(--verde);border-radius:999px;padding:3px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.vfy:hover{border-color:var(--verde)}.vfy.warn{background:#fff6e5;border-color:#f0d49b;color:#7a5306}.vfy.off{background:#f4f5f5;border-color:#e4e7e6;color:#69727d}
+#vfyd{max-width:780px;width:calc(100% - 32px);max-height:86vh;border:1px solid #e4e7e6;border-radius:14px;padding:0;color:#1c1c1c;box-shadow:0 18px 50px rgba(0,40,30,.18)}
+#vfyd::backdrop{background:rgba(0,30,22,.35)}
+#vfyd .vh{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:18px 22px 12px;border-bottom:1px solid #e4e7e6;position:sticky;top:0;background:#fff}
+#vfyd h3{margin:0 0 4px;font-size:17px;color:var(--verde)}#vfyd .vh p{margin:0;font-size:12.5px;color:#69727d;max-width:600px}
+#vfyd .vx{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:#69727d}
+#vfyd .vb{padding:8px 22px 20px}
+#vfyd .vr{border-bottom:1px solid #eef1f0;padding:10px 0}#vfyd .vr:last-child{border-bottom:0}
+#vfyd .vt{display:flex;justify-content:space-between;gap:12px;font-size:13.5px}#vfyd .vt b{font-weight:600}
+#vfyd .vs{font-size:12.5px;font-weight:600;white-space:nowrap}#vfyd .vs.ok{color:var(--verde)}#vfyd .vs.dv{color:var(--verm)}#vfyd .vs.nv{color:#69727d}
+#vfyd ul{margin:6px 0 0;padding-left:18px;font-size:12.5px}#vfyd li{margin:3px 0}#vfyd li.dv{color:var(--verm)}
+#vfyd details{margin-top:4px;font-size:12px;color:#69727d}#vfyd summary{cursor:pointer}
+#vfyd a{color:inherit}
 .hsep{margin:0 10px;color:#b9c5bf;font-weight:400}.hsplit{display:block;height:6px;border-radius:99px;background:#e0e7e3;margin:2px 0 6px;overflow:hidden}.hsplit i{display:block;height:100%;background:#00503c;border-radius:99px}
 .igmodo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}.igmodo .mut{font-size:12.5px;max-width:720px}
 .igd{font-size:11px;color:var(--cinza);font-weight:500;margin-top:2px}
@@ -5154,6 +5168,44 @@ function bindEvents() {
 /* =========================================================================
    11. BOOT
    ========================================================================= */
+/* Agente de verificação (verificar.py): resultado da conferência campo a campo feita a cada atualização */
+function verifUI(V) {
+  const nDiv = V.divergencias || 0, B = V.blocos || [];
+  const hora = String(V.em || '').slice(11, 16);
+  const btn = document.createElement('button'); btn.type = 'button';
+  btn.className = 'vfy' + (nDiv ? ' warn' : '');
+  btn.textContent = nDiv ? `⚠ Verificação: ${fN(nDiv)} ${nDiv === 1 ? 'divergência' : 'divergências'}`
+                         : `✔ Dados verificados às ${hora} · ${fN(V.checagens)} checagens`;
+  btn.title = 'Ver o que foi conferido nesta atualização';
+  document.getElementById('upd').closest('.upd').appendChild(btn);
+  const dlg = document.createElement('dialog'); dlg.id = 'vfyd';
+  const el = (tag, cls, txt) => { const x = document.createElement(tag); if (cls) x.className = cls; if (txt != null) x.textContent = txt; return x; };
+  const head = el('div', 'vh'), hl = el('div');
+  hl.append(el('h3', '', 'Verificação automática dos dados'),
+    el('p', '', `Feita em ${fDay(String(V.em || '').slice(0, 10))} às ${hora}, logo depois da atualização. Cada número que vai para o painel é conferido de novo direto nas fontes (Pipedrive, Meta, Kiwify e Instagram), e o cálculo da tela é refeito por um auditor independente. ${fN(V.checagens)} checagens · ${nDiv ? fN(nDiv) + ' divergência(s)' : 'nenhuma divergência'}.`));
+  const x = el('button', 'vx', '×'); x.type = 'button'; x.setAttribute('aria-label', 'Fechar'); x.onclick = () => dlg.close();
+  head.append(hl, x);
+  const body = el('div', 'vb');
+  const link = id => { const a = el('a', '', '#' + id); a.href = `https://meupatrimoniob2c.pipedrive.com/deal/${id}`; a.target = '_blank'; a.rel = 'noopener'; return a; };
+  const item = (d, cls) => { const li = el('li', cls, d.txt + ((d.ids || []).length ? ' — ' : ''));
+    (d.ids || []).forEach((id, i) => { if (i) li.append(', '); li.append(link(id)); }); return li; };
+  for (const b of B) {
+    const r = el('div', 'vr'), top = el('div', 'vt');
+    const st = b.status === 'ok' ? ['ok', '✔ ok'] : b.status === 'divergente' ? ['dv', `⚠ ${b.divergencias.length} divergência(s)`]
+             : ['nv', b.status === 'pulado' ? '— não conferido nesta hora' : '— fonte indisponível'];
+    const nm = el('span'); nm.append(el('b', '', b.nome), ` · ${fN(b.checagens)} checagens`);
+    top.append(nm, el('span', 'vs ' + st[0], st[1])); r.append(top);
+    if (b.divergencias.length) { const ul = el('ul'); b.divergencias.forEach(d => ul.append(item(d, 'dv'))); r.append(ul); }
+    if ((b.avisos || []).length) {
+      const det = el('details'); det.append(el('summary', '', `${b.avisos.length} ${b.avisos.length === 1 ? 'observação' : 'observações'} (não são erro: mudanças depois da leitura, amostra da hora etc.)`));
+      const ul = el('ul'); b.avisos.forEach(d => ul.append(item(d, ''))); det.append(ul); r.append(det);
+    }
+    body.append(r);
+  }
+  dlg.append(head, body); document.body.append(dlg);
+  btn.onclick = () => dlg.showModal();
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+}
 function boot(data) {
   D = data;
   STAGES = Array.isArray(D.stages) && D.stages.length ? D.stages : DEFAULT_STAGES;
@@ -5177,6 +5229,7 @@ function boot(data) {
     el.textContent = `Pipedrive: ${PDM.erro_pipedrive}. Leads e funil mostram a leitura de ${fDay(loc.slice(0, 10))} ${loc.slice(11, 16)}; Meta, Kiwify e Instagram estão atualizados.`;
     document.getElementById('upd').closest('.upd').appendChild(el);
   }
+  if (D.verificacao) verifUI(D.verificacao);
   const nt = D.meta && D.meta.excluidos_teste; if (nt) document.getElementById('nteste').textContent = ` (${nt} nesta base)`;
   readHash();
   bindEvents();

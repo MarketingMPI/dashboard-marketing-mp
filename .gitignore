@@ -9,3 +9,4 @@ site/
 site-repair/
 __pycache__/
 *.pyc
+verificacao_status.json

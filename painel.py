@@ -27,6 +27,7 @@ WORKFLOW = "atualizar.yml"
 DATA.mkdir(exist_ok=True)
 CACHE = DATA / "dash_cache.json"
 SNAP = DATA / "dashboard.json"
+VERIF_STATUS = ROOT / "verificacao_status.json"   # resultado resumido p/ o passo de alerta do Actions (fora do site e do Git)
 ENV_FILES = [ROOT / ".env", pathlib.Path(r"C:\Users\phenr\Downloads\mp360-landing\.env")]
 BASE = "https://meupatrimoniob2c.pipedrive.com/api"
 REPO = "MarketingMPI/dashboard-marketing-mp"
@@ -547,7 +548,8 @@ def dedupe(leads, window_days=14):
             else:
                 clusters.append([l])
         for i, cl in enumerate(clusters):
-            cl_sorted = sorted(cl, key=lambda l: (l["s"] != "lost", l["ec"] or ""), reverse=True)
+            # canônico: GANHO > aberto > perdido (um ganho nunca pode sumir dentro de um negócio aberto recriado depois)
+            cl_sorted = sorted(cl, key=lambda l: ({"won": 2, "open": 1}.get(l["s"], 0), l["ec"] or ""), reverse=True)
             c = dict(cl_sorted[0])
             if len(cl) > 1:
                 first = cl[0]
@@ -1620,6 +1622,38 @@ def build_dev(out=None):
 
 
 # ---------------------------------------------------------------- nuvem (GitHub Actions)
+def verificar_agora(s):
+    """Agente de verificação (verificar.py): confere o payload recém-coletado contra as fontes antes de publicar.
+    Nunca impede a publicação. Resultado detalhado vai CIFRADO no painel; no log público, só contagens."""
+    VERIF_STATUS.unlink(missing_ok=True)
+    try:
+        import verificar
+        cache = json.loads(CACHE.read_text(encoding="utf-8"))
+        pd_em = parse_utc(s["meta"].get("pipedrive_em"))
+        gerado = datetime.fromisoformat(s["gerado_em"])
+        lido = bool(pd_em) and not s["meta"].get("erro_pipedrive") and abs((gerado - pd_em).total_seconds()) < 20 * 60
+        res, st = verificar.verificar(s, cache.get("verif"), pipedrive_lido=lido)
+        s["verificacao"] = res
+        cache["verif"] = st
+        tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
+        tmp = SNAP.with_suffix(".tmp"); tmp.write_text(json.dumps(s, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"); tmp.replace(SNAP)
+        VERIF_STATUS.write_text(json.dumps({"divergencias": res["divergencias"], "novas": res["novas"]}), encoding="utf-8")
+        print(verificar.resumo_publico(res))
+    except Exception as e:
+        print("verificação: não rodou nesta hora (" + type(e).__name__ + ")")
+
+
+def verificacao_alerta():
+    """Último passo do Actions: falha (o GitHub avisa por e-mail) só quando surgir divergência NOVA."""
+    if not VERIF_STATUS.exists(): print("verificação: sem resultado nesta hora"); return
+    v = json.loads(VERIF_STATUS.read_text(encoding="utf-8"))
+    if v.get("novas"):
+        print(f"ALERTA: a verificação automática achou {v['novas']} divergência(s) nova(s) ({v['divergencias']} no total). "
+              "Detalhes no painel: botão de verificação ao lado de 'Última atualização' (Ctrl+F5).")
+        sys.exit(1)
+    print(f"verificação: nenhuma divergência nova ({v.get('divergencias', 0)} já conhecida(s))")
+
+
 def ci():
     """Execução no Actions. O cache incremental (tem nomes de leads) só existe CIFRADO fora do runner."""
     if CACHE_ENC.exists():
@@ -1628,6 +1662,7 @@ def ci():
         except Exception:
             print("cache ilegível; coleta completa")
     s = collect()
+    verificar_agora(s)
     CACHE_ENC.parent.mkdir(exist_ok=True)
     CACHE_ENC.write_bytes(crypt("enc", CACHE.read_bytes()))
     build_pages()
@@ -1697,6 +1732,7 @@ def refresh():
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "collect"
     if cmd == "ci": ci()
+    elif cmd == "verificacao-alerta": verificacao_alerta()
     elif cmd == "collect": print(stable_summary(collect(full="--full" in sys.argv)))
     elif cmd == "pages": build_pages(); print("ok", OUT)
     elif cmd == "mphub-import": print("ok", mphub_import(sys.argv[2]), "usuários")
