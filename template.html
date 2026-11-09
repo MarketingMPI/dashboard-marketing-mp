@@ -4542,14 +4542,20 @@ async function indCarregar(forcar) {
   IND.carregando = false;
   if (S.tab === 'indicacoes') renderView();
 }
+/* Sem botão de atualizar: enquanto a aba estiver aberta (e a janela visível), relê o banco a cada 2 min sozinha */
+let IND_TIMER = null;
+function indAuto() {
+  if (IND_TIMER) return;
+  IND_TIMER = setInterval(() => { if (S.tab === 'indicacoes' && !document.hidden) { IND.erro = ''; indCarregar(true); } }, 120000);
+}
 function indStats(L) {
   const c = k => L.filter(l => indSit(l) === k).length;
   return {n: L.length, pessoas: new Set(L.map(l => norm(l.indicador_nome))).size, cli: L.filter(l => l.indicador_cliente).length,
     and: c('andamento'), won: c('ganho'), lost: c('perdido'), sem: c('sem')};
 }
 function viewIndicacoes() {
-  const btn = `<button type="button" class="btn sm" data-indrel="1"${IND.carregando ? ' disabled' : ''}>${IND.carregando ? 'Atualizando…' : '↻ Atualizar'}</button>`;
-  let h = viewHead('Indique e Ganhe', `Programas · formulário do site <a href="https://www.meupatrimonio.com/indique-e-ganhe/" target="_blank" rel="noopener">/indique-e-ganhe/</a> · ${periodCaption().replace(/^Leads por data de entrada /, 'indicações recebidas ')}`, btn);
+  indAuto();
+  let h = viewHead('Indique e Ganhe', `Programas · formulário do site <a href="https://www.meupatrimonio.com/indique-e-ganhe/" target="_blank" rel="noopener">/indique-e-ganhe/</a> · ${periodCaption().replace(/^Leads por data de entrada /, 'indicações recebidas ')} · atualiza sozinha a cada 2 min`);
   if (!IND.linhas) {
     if (!IND.carregando && !IND.erro) setTimeout(() => indCarregar(), 0);
     return h + `<div class="card">${IND.erro ? emptyBox('Não foi possível carregar as indicações', IND.erro) : emptyBox('Carregando indicações…', 'Lendo os dados do banco de indicações.')}</div>`;
@@ -5014,7 +5020,6 @@ function bindEvents() {
     if (POP) closePop();
     const indf = t.closest('[data-indf]');
     if (indf) { IND.filtro = indf.dataset.indf; renderView(); return; }
-    if (t.closest('[data-indrel]')) { IND.erro = ''; indCarregar(true); renderView(); return; }
     const apx = t.closest('[data-aplpx]');
     if (apx) { S.aplPx = apx.dataset.aplpx; update({anim: true}); return; }
     const insm = t.closest('[data-insmodo]');
