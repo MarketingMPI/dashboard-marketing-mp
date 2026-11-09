@@ -512,6 +512,16 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .cm-a{font-style:normal;font-size:10.5px;font-weight:600;background:#fbe9e6;color:#a3362a;border-radius:99px;padding:1px 7px;white-space:nowrap}
 .cm-bar{margin-top:2px}.cm-list{margin-top:10px;font-size:12.5px}.cm-list summary{cursor:pointer;color:var(--verde);font-weight:600}.cm-list .tw{margin-top:8px}
 .sec-t{font-size:15px;margin:22px 0 10px;color:var(--txt)}
+.cm-perf{margin-top:12px;padding-top:12px;border-top:1px dashed var(--linha);display:flex;flex-direction:column;gap:6px}
+.cm-pt{font-size:12.5px;font-weight:600;color:var(--txt);margin-bottom:2px}.cm-pt small{font-weight:400;color:var(--cinza);margin-left:4px}
+.cm-pf{display:grid;grid-template-columns:168px minmax(0,1fr) 84px 82px;gap:8px;align-items:center;font-size:12px}
+.cm-pn{color:var(--txt)}.cm-pb{position:relative;height:8px;background:#f1f5f3;border-radius:99px}
+.cm-pb i{display:block;height:100%;border-radius:99px;background:#c0392b}.cm-pb s{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-2px;background:#1c1c1c;opacity:.35}
+.cm-pf.quase .cm-pb i{background:#d9a441}.cm-pf.ok .cm-pb i{background:#00a611}
+.cm-pv{text-align:right;line-height:1.15}.cm-pv b{display:block;font-size:13px}.cm-pv small{font-size:10.5px;color:var(--cinza)}
+.cm-pq{font-size:11px;font-weight:600;text-align:right;white-space:nowrap}
+.cm-pf.ok .cm-pq,.cm-pf.ok .cm-pv b{color:#0b7a3b}.cm-pf.quase .cm-pq,.cm-pf.quase .cm-pv b{color:#a8741a}.cm-pf.longe .cm-pq,.cm-pf.longe .cm-pv b{color:#b03a2e}.cm-pf.na .cm-pq{color:var(--cinza)}
+@media (max-width:760px){.cm-pf{grid-template-columns:minmax(0,1fr) 80px 70px}.cm-pf .cm-pb{grid-column:1/-1;order:5}}
 @media (max-width:760px){.cm-k{grid-template-columns:repeat(2,minmax(0,1fr))}.cm-r{grid-template-columns:96px minmax(0,1fr) 98px}}
 .cadmini span{display:block;font-size:12px;color:var(--cinza);font-weight:600}
 .cadmini b{display:block;font-size:24px;font-weight:700;color:var(--txt);margin:4px 0 2px;line-height:1.1}.cadmini b small{font-size:12px;font-weight:500;color:var(--cinza);margin-left:4px}
@@ -2230,6 +2240,33 @@ function viewMacro() {
    em dia, sem próxima) e a lista dos leads. "Carteira inteira" = todos os abertos de qualquer data de entrada;
    "Só do período" = abertos que entraram no período do topo. Os demais filtros do topo valem nos dois. */
 const MAPA_CORES = ['#003326', '#00503c', '#1f7a58', '#3d9a6f', '#00a611', '#9fb8ad'];
+/* Performance do consultor no período do topo × metas do funil (REF_PRU sobre MQL; contato em < 1 dia: 80%).
+   Mesmas contas da tabela "Conversão do funil por consultor × referência" (leads que entraram no período e,
+   desses, agendados / reuniões / ganhos), para os números baterem entre os blocos. */
+function consPerf(nome) {
+  const X = run(filtros({consultores: [nome]})), k = X.res.kpis, L = k.leads;
+  const rap = X.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length, pc = (a, b) => b ? a / b * 100 : null;
+  return {L, itens: [
+    ['Contato em menos de 1 dia', pc(rap, L), 80, `${fN(rap)} de ${fN(L)} leads`],
+    ['MQL → reunião agendada', pc(k.agendados, L), REF_PRU.ag, `${fN(k.agendados)} agendados de ${fN(L)}`],
+    ['Agendada → realizada', pc(k.reunioes, k.agendados), REF_PRU.re / REF_PRU.ag * 100, `${fN(k.reunioes)} reuniões de ${fN(k.agendados)} agendadas`],
+    ['Realizada → fechamento', pc(k.ganhos, k.reunioes), REF_PRU.ga / REF_PRU.re * 100, `${fN(k.ganhos)} ganhos de ${fN(k.reunioes)} reuniões`],
+    ['MQL → fechamento', pc(k.ganhos, L), REF_PRU.ga, `${fN(k.ganhos)} ganhos de ${fN(L)} leads`]]};
+}
+function consPerfHtml(nome) {
+  const P = consPerf(nome);
+  const linha = ([t, v0, ref, sub]) => {
+    const acima = v0 != null && v0 > 100.05, v = acima ? 100 : v0, q = v == null ? null : Math.min(100, v / ref * 100);
+    const cls = q == null ? 'na' : q >= 100 ? 'ok' : q >= 80 ? 'quase' : 'longe';
+    const tip = `${t}\n${sub}\nMeta: ${fP(ref)}${q == null ? '' : `\nAtingido: ${fP(q)} da meta`}${acima ? '\nHá mais negócios nesta etapa do que na anterior (etapas puladas no Pipedrive)' : ''}`;
+    return `<div class="cm-pf ${cls}" data-tip="${ESC(tip)}"><span class="cm-pn">${t}</span>
+      <span class="cm-pb"><i style="width:${q == null ? 0 : q}%"></i><s style="left:100%"></s></span>
+      <span class="cm-pv"><b>${v == null ? '–' : fP(v)}${acima ? ' ⚠' : ''}</b><small>meta ${fP(ref)}</small></span>
+      <span class="cm-pq">${q == null ? 'sem base' : q >= 100 ? '✔ meta' : fP(q) + ' da meta'}</span></div>`;
+  };
+  return `<div class="cm-perf"><div class="cm-pt">Performance no período <small>${fDM(S.de)} a ${fDM(S.ate)} · ${fN(P.L)} ${P.L === 1 ? 'lead entrou' : 'leads entraram'}</small></div>
+    ${P.L ? P.itens.map(linha).join('') : '<div class="mut">Nenhum lead entrou para este consultor no período.</div>'}</div>`;
+}
 function mapaConsHtml(opt) {
   opt = opt || {};
   const modo = S.mapaM === 'periodo' ? 'periodo' : 'carteira';
@@ -2240,7 +2277,7 @@ function mapaConsHtml(opt) {
   const hj = dkey(AGORA);
   const segBtn = `<div class="seg">${[['carteira', 'Carteira inteira', 'todos os leads em aberto, de qualquer data de entrada'], ['periodo', 'Só do período', 'só os leads em aberto que entraram no período do topo']]
     .map(([v, tx, tip]) => `<button type="button" data-mapam="${v}" class="${modo === v ? 'on' : ''}" data-tip="${ESC(tip)}">${tx}</button>`).join('')}</div>`;
-  const head = `<div class="ch"><div><h3>Mapa da carteira por consultor</h3><p>Onde está cada lead em aberto e como está a cadência · situação em ${fDay(hj)} · ${modo === 'carteira' ? 'carteira inteira (qualquer data de entrada)' : 'só leads que entraram no período'} · atraso = atividade pendente no Pipedrive com data anterior a hoje</p></div>
+  const head = `<div class="ch"><div><h3>Mapa da carteira por consultor</h3><p>Onde está cada lead em aberto e como está a cadência · situação em ${fDay(hj)} · ${modo === 'carteira' ? 'carteira inteira (qualquer data de entrada)' : 'só leads que entraram no período'} · atraso = atividade pendente no Pipedrive com data anterior a hoje · performance = conversão de cada etapa no período do topo × metas do funil</p></div>
     <div class="mapa-acoes">${segBtn}<button type="button" class="btn gh" data-atraso="1">Ver atrasados no Lead a Lead</button></div></div>`;
   if (!ab.length) return `<div class="card mt mapa">${head}${emptyBox('Nenhum lead em aberto', 'Nenhum lead em aberto com os filtros atuais.')}</div>`;
   const atrT = ab.filter(r => r.d.cad === 'atraso');
@@ -2271,6 +2308,7 @@ function mapaConsHtml(opt) {
       <div class="cm-k"><div class="${c.leads_em_atraso ? 'red' : ''}"><b>${fN(c.leads_em_atraso)}</b>em atraso</div><div class="${c.atividades_atrasadas ? 'red' : ''}"><b>${fN(c.atividades_atrasadas)}</b>atividades vencidas</div>
         <div><b>${mxC ? fN(mxC) + '<small> d</small>' : '–'}</b>maior atraso</div><div class="${c.leads_sem_proxima ? 'amb' : ''}"><b>${fN(c.leads_sem_proxima)}</b>sem próxima</div></div>
       <div class="cm-et">${etapas}</div>${bar}
+      ${consPerfHtml(c.consultor)}
       <details class="cm-list" data-mapak="${ESC(key)}"${aberto ? ' open' : ''}><summary>Ver os ${fN(rs.length)} ${rs.length === 1 ? 'lead' : 'leads'} (atrasados primeiro)</summary>
         <div class="tw" style="max-height:360px"><table class="t"><thead><tr><th>Lead</th><th>Etapa</th><th>Cadência</th><th>Próxima / vencida</th><th class="num">Sem contato</th></tr></thead><tbody>
         ${lista.map(r => `<tr data-lead="${r.l.id}"><td style="max-width:200px">${leadCell(r.l)}</td><td>${stagePill(r.l.sg)}</td><td>${cadPill(r.d)}</td><td class="wrap" style="max-width:220px">${ativ(r.d)}</td><td class="num">${fD(r.d.dSem)}</td></tr>`).join('')}
