@@ -648,10 +648,15 @@ def bloco(P, M):
         "leads_em_atraso": sum(1 for m in ms if m["cadencia"] == "atraso"),
         "atividades_atrasadas": sum(m["atividades_atrasadas"] for m in ms),
         "leads_sem_proxima": sum(1 for m in ms if m["cadencia"] == "sem"),
+        "leads_vence_hoje": sum(1 for m in ms if m["cadencia"] == "hoje"),
+        "leads_em_dia": sum(1 for m in ms if m["cadencia"] == "dia"),
+        # mapa da carteira: leads em aberto por etapa (chaves = ids das etapas, como no JS)
+        "abertos_por_etapa": {str(sid): sum(1 for l in P if l["s"] == "open" and l["sg"] == sid) for sid in ETAPAS_MAPA},
     }
 
 
 FLOW = [345, 346, 348, 349, 350]  # ordem do funil; Cultivo fora
+ETAPAS_MAPA = [345, 346, 348, 349, 350, 438]   # mapa da carteira por consultor (todas as etapas do Alpha)
 
 
 def avanco(P, sid):

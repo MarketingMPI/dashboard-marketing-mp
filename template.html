@@ -498,6 +498,21 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .cad.atr{background:#fbe9e6;color:#a3362a}.cad.hoj{background:#fbf1dc;color:#8a5d10}.cad.dia{background:#e3f3ea;color:#0b6b3a}.cad.sem{background:#eef1f0;color:#69727d}
 .cadmini{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:4px 0 16px}
 .cadmini > div{border:1px solid var(--linha);border-radius:12px;padding:12px 14px;background:#fff}
+.mapa .ch{flex-wrap:wrap}.mapa-acoes{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:14px}
+.cm-card{border:1px solid var(--linha);border-radius:12px;padding:14px 16px;background:#fff;min-width:0}.cm-card.cm-atr{border-color:#f0cfc9}
+.cm-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}.cm-h h4{margin:0;font-size:15px;cursor:pointer}.cm-h h4:hover{color:var(--verde)}
+.cm-tot{font-size:12.5px;color:var(--cinza)}.cm-tot b{font-size:18px;color:var(--txt)}
+.cm-k{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}.cm-k div{background:#f7f9f8;border-radius:8px;padding:7px 9px;font-size:11px;color:var(--cinza);line-height:1.25}
+.cm-k b{display:block;font-size:17px;color:var(--txt);font-weight:600}.cm-k .red b{color:var(--verm)}.cm-k .amb b{color:var(--amb)}.cm-k small{font-size:11px;font-weight:400}
+.cm-et{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.cm-r{display:grid;grid-template-columns:118px minmax(0,1fr) 112px;gap:8px;align-items:center;font-size:12.5px}.cm-r.z{opacity:.55}
+.cm-r .t{height:14px;background:#f1f5f3;border-radius:4px;overflow:hidden}.cm-r .t i{display:block;height:100%;border-radius:4px;animation:growx .6s ease both;transform-origin:left}
+.cm-r .v{display:flex;gap:6px;align-items:center;justify-content:flex-end;font-variant-numeric:tabular-nums}
+.cm-a{font-style:normal;font-size:10.5px;font-weight:600;background:#fbe9e6;color:#a3362a;border-radius:99px;padding:1px 7px;white-space:nowrap}
+.cm-bar{margin-top:2px}.cm-list{margin-top:10px;font-size:12.5px}.cm-list summary{cursor:pointer;color:var(--verde);font-weight:600}.cm-list .tw{margin-top:8px}
+.sec-t{font-size:15px;margin:22px 0 10px;color:var(--txt)}
+@media (max-width:760px){.cm-k{grid-template-columns:repeat(2,minmax(0,1fr))}.cm-r{grid-template-columns:96px minmax(0,1fr) 98px}}
 .cadmini span{display:block;font-size:12px;color:var(--cinza);font-weight:600}
 .cadmini b{display:block;font-size:24px;font-weight:700;color:var(--txt);margin:4px 0 2px;line-height:1.1}.cadmini b small{font-size:12px;font-weight:500;color:var(--cinza);margin-left:4px}
 .cadmini > div > small{display:block;font-size:11.5px;color:var(--cinza)}
@@ -1199,18 +1214,22 @@ function computeFull(leads, f, agoraStr) {
   });
   const byC = new Map();
   for (const r of rows) { if (!byC.has(r.l.c)) byC.set(r.l.c, []); byC.get(r.l.c).push(r); }
+  // mapa da carteira: leads EM ABERTO em cada etapa do funil (situação de hoje)
+  const porEtapa = rs => { const o = {}; for (const s of STAGES) o[s.id] = 0; for (const r of rs) if (r.l.s === 'open' && o[r.l.sg] != null) o[r.l.sg]++; return o; };
   const consultores = [...byC].map(([c, rs]) => {
     const s = groupStats(rs);
     return {consultor: c, leads: s.n, contatados: s.cont, pct_contatados: s.pct, media_dias_1o_contato: s.m1,
       mediana_dias_1o_contato: s.md1, contatos_por_lead: s.cpl, agendados: s.ag, reunioes: s.reu, ganhos: s.won,
       perdidos: s.lost, abertos: s.open, abertos_sem_contato: s.openSem, parados_7d: s.par,
-      leads_em_atraso: s.atrL, atividades_atrasadas: s.atrA, leads_sem_proxima: s.semP};
+      leads_em_atraso: s.atrL, atividades_atrasadas: s.atrA, leads_sem_proxima: s.semP,
+      leads_vence_hoje: s.hojeL, leads_em_dia: s.diaL, abertos_por_etapa: porEtapa(rs)};
   });
   // equipe atual aparece sempre (zerada), salvo se o filtro de consultor a excluir
   const fc = Array.isArray(f.consultores) && f.consultores.length ? new Set(f.consultores) : null;
   for (const c of ((D && D.equipe) || [])) if (!byC.has(c) && (!fc || fc.has(c))) consultores.push({consultor: c, leads: 0, contatados: 0,
     pct_contatados: null, media_dias_1o_contato: null, mediana_dias_1o_contato: null, contatos_por_lead: null, agendados: 0, reunioes: 0,
-    ganhos: 0, perdidos: 0, abertos: 0, abertos_sem_contato: 0, parados_7d: 0, leads_em_atraso: 0, atividades_atrasadas: 0, leads_sem_proxima: 0});
+    ganhos: 0, perdidos: 0, abertos: 0, abertos_sem_contato: 0, parados_7d: 0, leads_em_atraso: 0, atividades_atrasadas: 0, leads_sem_proxima: 0,
+    leads_vence_hoje: 0, leads_em_dia: 0, abertos_por_etapa: porEtapa([])});
   consultores.sort((a, b) => b.leads - a.leads || (a.consultor < b.consultor ? -1 : a.consultor > b.consultor ? 1 : 0));
   const lostRows = rows.filter(r => r.d.lost), motivos = {};
   for (const {l} of lostRows) { const m = l.lr || SEM_MOTIVO; motivos[m] = (motivos[m] || 0) + 1; }
@@ -1849,7 +1868,7 @@ const S = {
   tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: false, camp: '', igModo: 'org',
   consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [],
   ll: {sort: 'e', dir: -1, page: 0, quick: 'todos'}, lost: {sort: 'l', dir: -1, page: 0},
-  cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false
+  cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false, mapaM: 'carteira', mapaOpen: {}
 };
 
 function presetRange(p) {
@@ -2203,8 +2222,64 @@ function viewMacro() {
     <div class="card"><div class="ch"><div><h3>Leads por origem</h3><p>Verde = contatados · cinza = sem contato · clique para filtrar</p></div></div>${hbars(oItems, {dim: 'origens'})}</div>
     <div class="card"><div class="ch"><div><h3>Leads por consultor</h3><p>Verde = contatados · cinza = sem contato · clique para filtrar</p></div></div>${hbars(cItems, {dim: 'consultores'})}</div>
   </div>`;
-  h += blocoAtraso(C, k);
+  h += mapaConsHtml({onde: 'macro'});
   return h;
+}
+/* ---- Mapa da carteira por consultor (Visão Macro e Consultores) ----
+   Para cada consultor: quantos leads em aberto, em que etapa do funil cada um está, a cadência (em atraso, vence hoje,
+   em dia, sem próxima) e a lista dos leads. "Carteira inteira" = todos os abertos de qualquer data de entrada;
+   "Só do período" = abertos que entraram no período do topo. Os demais filtros do topo valem nos dois. */
+const MAPA_CORES = ['#003326', '#00503c', '#1f7a58', '#3d9a6f', '#00a611', '#9fb8ad'];
+function mapaConsHtml(opt) {
+  opt = opt || {};
+  const modo = S.mapaM === 'periodo' ? 'periodo' : 'carteira';
+  const X = modo === 'carteira' ? run(filtros({de: MIN_DAY, ate: TODAY})) : cur();
+  const k = X.res.kpis, ab = X.rows.filter(r => r.d.open);
+  const cs = X.res.consultores.filter(c => c.abertos).slice().sort((a, b) => b.abertos - a.abertos || (a.consultor < b.consultor ? -1 : 1));
+  const zerados = X.res.consultores.filter(c => !c.abertos).map(c => c.consultor);
+  const hj = dkey(AGORA);
+  const segBtn = `<div class="seg">${[['carteira', 'Carteira inteira', 'todos os leads em aberto, de qualquer data de entrada'], ['periodo', 'Só do período', 'só os leads em aberto que entraram no período do topo']]
+    .map(([v, tx, tip]) => `<button type="button" data-mapam="${v}" class="${modo === v ? 'on' : ''}" data-tip="${ESC(tip)}">${tx}</button>`).join('')}</div>`;
+  const head = `<div class="ch"><div><h3>Mapa da carteira por consultor</h3><p>Onde está cada lead em aberto e como está a cadência · situação em ${fDay(hj)} · ${modo === 'carteira' ? 'carteira inteira (qualquer data de entrada)' : 'só leads que entraram no período'} · atraso = atividade pendente no Pipedrive com data anterior a hoje</p></div>
+    <div class="mapa-acoes">${segBtn}<button type="button" class="btn gh" data-atraso="1">Ver atrasados no Lead a Lead</button></div></div>`;
+  if (!ab.length) return `<div class="card mt mapa">${head}${emptyBox('Nenhum lead em aberto', 'Nenhum lead em aberto com os filtros atuais.')}</div>`;
+  const atrT = ab.filter(r => r.d.cad === 'atraso');
+  const mx = atrT.reduce((a, r) => Math.max(a, r.d.dAtr), 0);
+  const resumo = [
+    ['Leads em aberto', fN(ab.length), `com ${fN(cs.length)} ${cs.length === 1 ? 'consultor' : 'consultores'}`, ''],
+    ['Leads em atraso', fN(k.leads_em_atraso), `${fP(pctOf(k.leads_em_atraso, ab.length))} dos abertos${mx ? ` · maior atraso ${fN(mx)} ${mx === 1 ? 'dia' : 'dias'}` : ''}`, 'red'],
+    ['Atividades vencidas', fN(k.atividades_atrasadas), 'pendentes com data anterior a hoje', 'red'],
+    ['Sem próxima atividade', fN(k.leads_sem_proxima), 'abertos sem nada agendado', 'amb']];
+  const ordemCad = {atraso: 0, hoje: 1, sem: 2, dia: 3};
+  const card = c => {
+    const rs = ab.filter(r => r.l.c === c.consultor);
+    const et = c.abertos_por_etapa || {}, mxE = Math.max(1, ...STAGES.map(s => et[s.id] || 0));
+    const etapas = STAGES.map((s, j) => {
+      const n = et[s.id] || 0, nA = rs.filter(r => Number(r.l.sg) === Number(s.id) && r.d.cad === 'atraso').length;
+      return `<div class="cm-r${n ? '' : ' z'}"><span class="cm-n">${ESC(s.nome)}</span><span class="t"><i style="width:${n / mxE * 100}%;background:${MAPA_CORES[j] || '#9fb8ad'}"></i></span><span class="v"><b>${fN(n)}</b>${nA ? `<em class="cm-a" data-tip="${ESC(`${fN(nA)} ${nA === 1 ? 'lead' : 'leads'} desta etapa com atividade vencida`)}">${fN(nA)} em atraso</em>` : ''}</span></div>`;
+    }).join('');
+    const cad = [['atraso', c.leads_em_atraso], ['hoje', c.leads_vence_hoje], ['dia', c.leads_em_dia], ['sem', c.leads_sem_proxima]];
+    const bar = `<div class="cadbar cm-bar">${cad.filter(x => x[1]).map(([x, n]) => `<i style="width:${n / c.abertos * 100}%;background:${CAD[x][1]}" data-tip="${ESC(`${CAD[x][0]}\n${fN(n)} de ${fN(c.abertos)} leads (${fP(n / c.abertos * 100)})`)}"></i>`).join('')}</div>
+      <div class="lg cadlg">${cad.map(([x, n]) => `<span><i style="background:${CAD[x][1]}"></i>${CAD[x][0]} <b>${fN(n)}</b></span>`).join('')}</div>`;
+    const mxC = rs.reduce((a, r) => r.d.cad === 'atraso' ? Math.max(a, r.d.dAtr) : a, 0);
+    const lista = rs.slice().sort((a, b) => ordemCad[a.d.cad] - ordemCad[b.d.cad] || (b.d.dAtr || 0) - (a.d.dAtr || 0) || STAGES.findIndex(s => s.id == b.l.sg) - STAGES.findIndex(s => s.id == a.l.sg));
+    const ativ = d => d.cad === 'atraso' ? `${ESC(d.vencS || 'Atividade')}<div class="muted" style="font-size:11px">venceu em ${fDay(d.venc)}${d.atr > 1 ? ` · +${fN(d.atr - 1)} vencida${d.atr > 2 ? 's' : ''}` : ''}</div>`
+      : d.prox ? `${ESC(d.proxS || 'Atividade')}<div class="muted" style="font-size:11px">${d.cad === 'hoje' ? 'vence hoje' : 'em ' + fDay(d.prox)}</div>` : '<span class="muted">nada agendado</span>';
+    const key = c.consultor, aberto = !!S.mapaOpen[key];
+    return `<div class="cm-card${c.leads_em_atraso ? ' cm-atr' : ''}"><div class="cm-h"><h4 data-xf="consultores" data-v="${ESC(c.consultor)}" data-tip="Clique para filtrar este consultor">${ESC(c.consultor)}</h4>
+        <span class="cm-tot"><b>${fN(c.abertos)}</b> ${c.abertos === 1 ? 'lead em aberto' : 'leads em aberto'}</span></div>
+      <div class="cm-k"><div class="${c.leads_em_atraso ? 'red' : ''}"><b>${fN(c.leads_em_atraso)}</b>em atraso</div><div class="${c.atividades_atrasadas ? 'red' : ''}"><b>${fN(c.atividades_atrasadas)}</b>atividades vencidas</div>
+        <div><b>${mxC ? fN(mxC) + '<small> d</small>' : '–'}</b>maior atraso</div><div class="${c.leads_sem_proxima ? 'amb' : ''}"><b>${fN(c.leads_sem_proxima)}</b>sem próxima</div></div>
+      <div class="cm-et">${etapas}</div>${bar}
+      <details class="cm-list" data-mapak="${ESC(key)}"${aberto ? ' open' : ''}><summary>Ver os ${fN(rs.length)} ${rs.length === 1 ? 'lead' : 'leads'} (atrasados primeiro)</summary>
+        <div class="tw" style="max-height:360px"><table class="t"><thead><tr><th>Lead</th><th>Etapa</th><th>Cadência</th><th>Próxima / vencida</th><th class="num">Sem contato</th></tr></thead><tbody>
+        ${lista.map(r => `<tr data-lead="${r.l.id}"><td style="max-width:200px">${leadCell(r.l)}</td><td>${stagePill(r.l.sg)}</td><td>${cadPill(r.d)}</td><td class="wrap" style="max-width:220px">${ativ(r.d)}</td><td class="num">${fD(r.d.dSem)}</td></tr>`).join('')}
+        </tbody></table></div></details></div>`;
+  };
+  return `<div class="card mt mapa">${head}
+    <div class="cadmini">${resumo.map(([a, v, s, c]) => `<div class="${c}"><span>${a}</span><b>${v}</b><small>${s}</small></div>`).join('')}</div>
+    <div class="cm-grid">${cs.map(card).join('')}</div>
+    ${zerados.length ? `<div class="mut" style="margin-top:10px">Sem leads em aberto${modo === 'periodo' ? ' no período' : ''}: ${zerados.map(ESC).join(', ')}.</div>` : ''}</div>`;
 }
 /* ---- Atividades em atraso (cadência) — situação na data de referência, leads abertos do filtro ---- */
 const CAD = {atraso: ['Em atraso', '#c0392b', 'atr'], hoje: ['Vence hoje', '#d9a441', 'hoj'], dia: ['Em dia', '#00a611', 'dia'], sem: ['Sem próxima atividade', '#b9c4bf', 'sem']};
@@ -4181,8 +4256,10 @@ const CONS_COLS = [
   {k: 'abertos', t: 'Abertos', num: 1}, {k: 'abertos_sem_contato', t: 'Abertos s/ contato', num: 1}, {k: 'parados_7d', t: 'Parados > 7d', num: 1}];
 function viewConsultores() {
   const C = cur(), cs = C.res.consultores;
-  let h = viewHead('Consultores', periodCaption() + ' · fluxo de eficiência por consultor (dono do negócio)');
-  if (!cs.length) return h + `<div class="card">${emptyBox()}</div>`;
+  let h = viewHead('Consultores', periodCaption() + ' · mapa da carteira e fluxo de eficiência por consultor (dono do negócio)');
+  h += mapaConsHtml({onde: 'consultores'}).replace('class="card mt mapa"', 'class="card mapa"');
+  if (!cs.length) return h + `<div class="card mt">${emptyBox()}</div>`;
+  h += `<h3 class="sec-t">Desempenho no período · ${ESC(periodCaption())}</h3>`;
   const steps = [['Leads', 'leads', '#003326'], ['Contatados', 'contatados', '#00503c'], ['Agendados', 'agendados', '#1f7a58'], ['Reuniões', 'reunioes', '#3d9a6f'], ['Ganhos', 'ganhos', '#00a611']];
   h += '<div class="cc">' + cs.map((c, i) => {
     const fl = steps.map(([nome, key, col], j) => `<div class="cfr"><span>${nome}</span><span class="t"><i style="width:${c.leads ? 100 * c[key] / c.leads : 0}%;background:${col};animation-delay:${j * 50}ms"></i></span><span class="v"><b>${fN(c[key])}</b>${j ? `<small>${fP(pctOf(c[key], c.leads))}</small>` : ''}</span></div>`).join('') +
@@ -5018,6 +5095,8 @@ function bindEvents() {
     const pb = t.closest('[data-pop]');
     if (pb) { openPop(pb.dataset.pop, pb, pb.dataset.k); return; }
     if (POP) closePop();
+    const mapam = t.closest('[data-mapam]');
+    if (mapam) { S.mapaM = mapam.dataset.mapam; renderView(); return; }
     const indf = t.closest('[data-indf]');
     if (indf) { IND.filtro = indf.dataset.indf; renderView(); return; }
     const apx = t.closest('[data-aplpx]');
@@ -5108,7 +5187,7 @@ function bindEvents() {
     for (const [p] of PRESETS) { const r = presetRange(p); if (r[0] === de && r[1] === ate) { S.preset = p; break; } }
     resetPages(); update();
   };
-  document.addEventListener('toggle', ev => { const c = ev.target.classList; if (!c) return; if (c.contains('consmc')) S.consMcOpen = ev.target.open; else if (c.contains('insmc')) S.insMcOpen = ev.target.open; }, true);
+  document.addEventListener('toggle', ev => { const c = ev.target.classList; if (!c) return; if (c.contains('consmc')) S.consMcOpen = ev.target.open; else if (c.contains('insmc')) S.insMcOpen = ev.target.open; else if (c.contains('cm-list')) S.mapaOpen[ev.target.dataset.mapak] = ev.target.open; }, true);
   document.addEventListener('change', ev => {   // seletor de período suspenso (perSelect)
     const sel = ev.target.closest && ev.target.closest('select[data-persel]'); if (!sel) return;
     if (sel.dataset.persel === 'insper') S.insPer = sel.value; else if (sel.dataset.persel === 'mpmes') S.mpMes = sel.value;

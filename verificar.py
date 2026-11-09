@@ -231,6 +231,10 @@ def calculo(S, B):
         for f in ("leads", "contatados", "agendados", "reunioes", "ganhos", "perdidos", "abertos", "leads_em_atraso", "atividades_atrasadas", "leads_sem_proxima"):
             ck(n, f"soma dos consultores = total ({f})", sum(x[f] for x in C), k[f])
         ck(n, "soma das etapas atuais = abertos", sum(e["atuais"] for e in r["etapas"]), k["abertos"])
+        for x in C:   # mapa da carteira por consultor
+            ck(n, f"{x['consultor']}: leads por etapa somam os abertos", sum((x.get("abertos_por_etapa") or {}).values()), x["abertos"])
+            ck(n, f"{x['consultor']}: atraso + vence hoje + em dia + sem próxima = abertos",
+               x["leads_em_atraso"] + x["leads_vence_hoje"] + x["leads_em_dia"] + x["leads_sem_proxima"], x["abertos"])
         P = r["perdidos"]
         ck(n, "perdidos (aba Perdidos) = perdidos (Macro)", P["total"], k["perdidos"])
         ck(n, "soma dos motivos = perdidos", sum(P["motivos"].values()), P["total"])
