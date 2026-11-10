@@ -2794,7 +2794,7 @@ function drvVal(k, x) {
   return x[k] ?? null;
 }
 function insDrvHtml(o) {
-  const {x, ant, P, modo, frac, rotAnt, CP} = o;
+  const {x, ant, P, modo, frac, rotAnt, rotMed, CP, gs = [], comCpl = [], cs: time = [], recente, pxRows} = o;
   const FM = {n: insN1, n1: v => v == null ? '–' : nf1.format(v), d: fD, p: fP, rs: v => v == null ? '–' : fR(v)};
   const rel = (c, p) => c == null || p == null || !p ? null : (c - p) / Math.abs(p);
   const subiu = (c, p, min = 0) => { const r = rel(c, p); return r != null && r > 0.15 && Math.max(c, p) >= min; };
@@ -2815,7 +2815,7 @@ function insDrvHtml(o) {
   const status = (v, esp) => v == null || esp == null ? null : v >= esp - 1e-9 ? 'bom' : v >= esp * 0.85 ? 'medida' : 'ruim';
   const ROT = {bom: 'Bom', medida: 'Na medida', ruim: 'Ruim'};
   const motTop = () => { const m = Object.entries(x.motivos || {}).filter(([k]) => k !== SEM_MOTIVO).sort((a, b) => b[1] - a[1])[0]; return m ? `"${ESC(m[0])}" (${fN(m[1])})` : null; };
-  const lista = (tit, cs) => cs.length ? `<div class="dvlt">${tit}</div><ul>${cs.slice(0, 3).map(c => `<li>${c.charAt(0).toUpperCase() + c.slice(1)}</li>`).join('')}</ul>` : '';
+  const lista = (tit, cs) => cs.length ? `<div class="dvlt">${tit}</div><ul>${cs.slice(0, 4).map(c => `<li>${c.charAt(0).toUpperCase() + c.slice(1)}</li>`).join('')}</ul>` : '';
   const vol = (k, volK) => REF_VOL[modo][volK] * frac;
   const sec = (t, v, alvo, f = insN1) => `<span class="dvsec ${v >= alvo - 1e-9 ? 'ok' : 'no'}">${ESC(t)} <b>${f(v)}</b> de ${f(alvo)}</span>`;
   const cards = [];
@@ -2834,7 +2834,14 @@ function insDrvHtml(o) {
     if (caiu(x.inv, ant && ant.inv)) cs.push(`menos verba na Meta (−${pct(rel(x.inv, ant.inv))})`);
     const q = drvVal('pMql', x), qa = drvVal('pMql', ant);
     if (q != null && qa != null && qa - q > 10) cs.push(`menos leads qualificados: ${fP(q)} dos leads contaram como MQL (antes ${fP(qa)})`);
-    if (subiu(x.leads, ant && ant.leads)) bons.push(`mais leads novos (+${pct(rel(x.leads, ant.leads))})`);
+    const gn = g => (PAGAS[g.id] || {}).nome || g.id;
+    for (const g of gs) if (g.investimento >= 50 && !g.leads) cs.unshift(`mídia sem resultado: ${gn(g)} com ${fR(g.investimento)} investidos e nenhum lead no Pipedrive`);
+    for (const r of pxRows || []) { if (!r.b) continue; const tl = insTom(r.x.leads, r.b.leads, 1);
+      if (tl === 'neg') cs.push(`${r.n} trouxe menos leads: ${fN(r.x.leads)} (${rotMed}: ${insN1(r.b.leads)})`);
+      else if (tl === 'pos') bons.push(`${r.n} trouxe mais leads: ${fN(r.x.leads)} (${rotMed}: ${insN1(r.b.leads)})`); }
+    if (comCpl.length >= 2 && comCpl[comCpl.length - 1].custo_lead > comCpl[0].custo_lead * 1.3)
+      bons.push(`${gn(comCpl[0])} teve o lead mais barato: ${fR(comCpl[0].custo_lead)}, contra ${fR(comCpl[comCpl.length - 1].custo_lead)} em ${gn(comCpl[comCpl.length - 1])}`);
+    if (subiu(x.leads, ant && ant.leads)) bons.unshift(`mais leads novos (+${pct(rel(x.leads, ant.leads))})`);
     if (caiu(x.cpl, ant && ant.cpl)) bons.push(`lead mais barato (${fR(ant.cpl)} → ${fR(x.cpl)})`);
     if (subiu(x.inv, ant && ant.inv) && !subiu(x.cpl, ant && ant.cpl)) bons.push(`mais verba (+${pct(rel(x.inv, ant.inv))})`);
     let L;
@@ -2861,6 +2868,9 @@ function insDrvHtml(o) {
     if (!x.leads) L = 'Nenhum lead novo no período.';
     else if (st === 'bom') L = `<b>Meta atingida:</b> ${fN(x.rapN)} de ${fN(x.leads)} leads tiveram contato em menos de 1 dia.` + lista('Atenção', cs);
     else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fN(late)} de ${fN(x.leads)} leads passaram de 1 dia sem contato.` + (cs.length ? lista('Fator provável', cs) : ' O tempo médio de contato está estável: os atrasos estão espalhados entre os consultores.');
+    const tz = time.filter(c => c.leads);
+    if (tz.length >= 2 && tz[0].pct_contatados - tz[tz.length - 1].pct_contatados >= 20)
+      L += `<div class="dvlt">Destaque do time</div>${ESC(tz[0].consultor)} contatou ${fP(tz[0].pct_contatados)} dos ${fN(tz[0].leads)} leads${tz[0].media_dias_1o_contato != null ? `, 1º contato em ${fD(tz[0].media_dias_1o_contato)} em média` : ''}.`;
     if (x.leads && x.leads < 5) L += '<div class="dvln">Poucos leads no período: 1 lead muda a taxa em mais de 20 pontos.</div>';
     card('Contato em menos de 1 dia', 'Leads novos contatados (ou agendados) em até 24 horas', fP(v), 'meta 80%', x.leads ? st : null, '',
       fator('1º contato médio', 't1', 'd', -1, 'Tempo médio da entrada até o 1º contato') + fator('Sem contato', 'semCont', 'n', -1, 'Leads novos sem nenhum contato registrado')
@@ -2877,6 +2887,8 @@ function insDrvHtml(o) {
     if (!x.leads) L = `Nenhum lead novo; ${fN(x.ag)} agendamentos de leads de períodos anteriores.`;
     else if (st === 'bom') L = `<b>Meta atingida:</b> ${fN(x.ag)} agendamentos para ${fN(x.leads)} leads novos.` + lista('Atenção', cs);
     else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fN(x.ag)} agendamentos para ${fN(x.leads)} leads novos.` + (cs.length ? lista('Fator provável', cs) : ' Contato e cadência estáveis: o gargalo está na conversa (convite para a reunião).');
+    if (recente && recente.leads_em_atraso) L += `<div class="dvlt">Hoje, na carteira toda</div>${fN(recente.leads_em_atraso)} ${recente.leads_em_atraso === 1 ? 'lead em aberto' : 'leads em aberto'} com atividade vencida${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${recente.leads_sem_proxima ? ` e ${fN(recente.leads_sem_proxima)} sem próxima atividade` : ''}: lead esquecido não agenda.`;
+    else if (recente) L += '<div class="dvlt">Hoje, na carteira toda</div>Nenhum lead em aberto com atividade vencida.';
     card('MQL → reunião agendada', 'Agendamentos ÷ leads novos do período', v != null && v > 100 ? '100% ⚠' : fP(v), `meta ${fP(REF_PRU.ag)}`, x.leads ? st : null,
       sec('Reuniões agendadas', x.ag, vol('ag', 'ag')),
       fator('Agendados em até 7 dias', 'pAg7', 'p', 1, 'Leads novos com reunião marcada em até 7 dias da entrada') + fator('Perdidos sem agendar', 'pSemAg', 'n', -1, 'Perdidos no período sem nunca ter marcado reunião')
@@ -2914,6 +2926,8 @@ function insDrvHtml(o) {
       + fator('Dias da reunião ao fechamento', 'dRG', 'd', -1, 'Mediana de dias entre a 1ª reunião e o ganho'), L);
   }
   const nS = s => (cards.join('').match(new RegExp(`dvst ${s}`, 'g')) || []).length;
+  if (o.out) Object.assign(o.out, {bom: nS('bom'), medida: nS('medida'), ruim: nS('ruim'),
+    ruins: cards.filter(c => c.includes('dvst ruim')).map(c => (c.match(/<h4>(.*?)<\/h4>/) || [])[1]).filter(Boolean).map(s => s.replace(/&gt;/g, '>').replace(/&amp;/g, '&'))});
   return `<div class="card mt insdrv"><div class="ch"><div><h3>🎯 Metas e o que influencia</h3><p>Cada meta, os fatores que mexem nela e a leitura do período · comparação com ${ESC(rotAnt)}${parcial ? ' (no mesmo ritmo de dias)' : ''}</p></div>
     <div class="dvr"><span class="dvst bom">${fN(nS('bom'))} bom</span><span class="dvst medida">${fN(nS('medida'))} na medida</span><span class="dvst ruim">${fN(nS('ruim'))} ruim</span></div></div>
     <div class="dvg">${cards.join('')}</div></div>`;
@@ -3057,8 +3071,8 @@ const insGap = (x, modo) => { const {cs} = insGrp(x, modo); return cs.length >= 
 function insResumo(c) {
   const {x, B, modo, CP, rotMed, nPos, nNeg, AT, AS, SG, parcial} = c, fRs = v => v == null ? '–' : fR(v);
   const QM = (modo === 'semanal' ? 'Semana' : 'Mês') + (CP ? ' ' + CP : '') + (parcial ? ' (parcial)' : '');
-  const l1 = !B ? `${QM}: sem histórico suficiente para comparar.`
-    : `${QM} ${nNeg > nPos ? 'abaixo do esperado' : nPos > nNeg ? 'acima do esperado' : 'dentro do esperado'}: ${fN(nPos)} ${nPos === 1 ? 'ponto positivo' : 'pontos positivos'} e ${fN(nNeg)} de atenção.`;
+  const l1 = !B ? `${QM}: sem histórico suficiente para comparar.` : !(nPos + nNeg + (c.nMed || 0)) ? `${QM}: pouco volume para avaliar as metas.`
+    : `${QM} ${nNeg > nPos ? 'abaixo do esperado' : nPos > nNeg ? 'acima do esperado' : 'dentro do esperado'}: ${fN(nPos)} ${nPos === 1 ? 'meta boa' : 'metas boas'}, ${fN(c.nMed || 0)} na medida e ${fN(nNeg)} ${nNeg === 1 ? 'ruim' : 'ruins'}.`;
   const MET = [['leads', 'entrada de leads', 1, insN1, 3], ['rap', 'contato em menos de 1 dia', 1, fP, 0], ['ag', 'agendamentos', 1, insN1, 3, 1],
     ['reu', 'reuniões realizadas', 1, insN1, 3, 1], ['won', 'ganhos', 1, insN1, 2, 1], ['cpl', 'custo por lead', -1, fRs, 0]];
   const mv = [];
@@ -3073,7 +3087,7 @@ function insResumo(c) {
   const qp = modo === 'mensal' ? 'do mês' : 'da semana', tot = c.recente && c.recente.leads_em_atraso;
   const hoje = [(AT.n ? `${fN(AT.n)} ${AT.n === 1 ? 'lead' : 'leads'} ${qp} com atraso` : `nenhum lead ${qp} com atraso`) + (tot && tot !== AT.n ? ` (${fN(tot)} na carteira toda)` : ''),
     AS.n ? `${fN(AS.n)} ${AS.n === 1 ? 'assumido' : 'assumidos'} sem movimentação` : ''].filter(Boolean).join(' e ');
-  const at = !neg.length && (c.negT || []).length ? `Atenção: ${c.negT.slice(0, 2).map(t => t.replace(/<[^>]+>/g, '').toLowerCase()).join(' e ')}.` : '';
+  const at = !neg.length && (c.negT || []).length ? `Abaixo da meta: ${c.negT.slice(0, 2).join(' e ')}.` : '';
   const l2 = [neg.length ? `Pesou: ${neg.map(m => m.txt).join('; ')}.` : at, pos.length ? `Melhorou: ${pos[0].txt}.` : '', `Hoje: ${hoje}.`].filter(Boolean).join(' ');
   const l3 = SG.length ? `Prioridade: ${SG[0].t.replace(/<[^>]+>/g, '')}${SG[1] ? `; em seguida, ${SG[1].t.replace(/<[^>]+>/g, '').toLowerCase()}` : ''}.` : 'Prioridade: manter o ritmo; nenhum indicador pede mudança.';
   return [l1, l2.charAt(0).toUpperCase() + l2.slice(1), l3];
@@ -3389,77 +3403,27 @@ function viewInsights() {
   ].join('') + '</div>';
   if (modo !== 'semanal') h += insMetasHtml(x, CP, P.parcial, modo, frac);   // semanal: metas ficam na aba Metas (pedido 10/11/2026)
   // Funil Consultores saiu dos Insights (pedido 10/11/2026): fica só na página Consultores
+  // Avaliação (pontos positivos/atenção) foi incorporada ao bloco "Metas e o que influencia" (pedido 10/11/2026)
+  const {gs, comCpl, cs} = insGrp(x, modo);
+  // cadência hoje (só para o período mais recente)
+  let recente = null;
+  if (i >= per.length - 2) { const A = run(insF({de: MIN_DAY, ate: TODAY})), ka = A.res.kpis;
+    recente = {leads_em_atraso: ka.leads_em_atraso, leads_sem_proxima: ka.leads_sem_proxima, top: A.res.consultores.filter(c => c.leads_em_atraso).sort((a, b) => b.leads_em_atraso - a.leads_em_atraso).slice(0, 3)}; }
+  // por campanha (prefixo), contra a média: só quando o seletor de campanha está em "Todos"
+  let pxRows = null;
+  if (!S.camp && ants.length) {
+    const PX = Object.keys(CAMPANHAS);
+    pxRows = PX.map(c => ({n: CAMPANHAS[c].nome.split(' · ')[0], x: insCalc(P.de, P.ate, c), b: insBase(per.slice(Math.max(0, i - nb), i).map(q => insCalc(q.de, q.fim, c)), frac)}));
+  }
+  const DST = {};
   {
     const xm = Object.assign({}, x, {mql: insMCalc(P.de, P.ate).mql});
     const pm = xPrev ? insAjusta(Object.assign({}, xPrev, {mql: insMCalc(per[i - 1].de, per[i - 1].fim).mql}), frac) : null;
-    const Bm = ants.length ? insBase(per.slice(Math.max(0, i - nb), i).map(p => insMCalc(p.de, p.fim)), frac) : null;
-    h += insDrvHtml({x: xm, ant: pm, B: Bm, per, i, P, modo, frac, rotAnt, rotMed, CP, nm});
+    h += insDrvHtml({x: xm, ant: pm, P, modo, frac, rotAnt, rotMed, CP, gs, comCpl, cs, recente, pxRows, out: DST});
   }
-  // avaliação
-  const pos = [], neg = [], neu = [];
-  const put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);
-  const vsB = (c, b, fmt) => b == null ? '' : fmt === insN1 && Math.min(Math.abs(c), Math.abs(b)) < 3
-    ? ` (${rotMed}: ${fmt(b)}${Math.abs(c - b) >= 0.05 ? `, ${c >= b ? '+' : '−'}${insN1(Math.abs(c - b))}` : ''})`
-    : ` (${rotMed}: ${fmt(b)}${b ? `, ${c >= b ? '+' : '−'}${nf1.format(Math.abs((c - b) / b * 100))}%` : ''})`;
-  if (B) {
-    put(insTom(x.leads, B.leads, 1), 'Entrada de leads', `<b>${fN(x.leads)}</b> leads novos${vsB(x.leads, B.leads, insN1)}.`);
-    const tr = insTom(x.rap, B.rap, 1, 0);
-    if (x.leads) put(x.rap != null && x.rap >= 80 && tr !== 'neg' ? 'pos' : x.rap != null && x.rap < 50 ? 'neg' : tr, 'Velocidade do 1º contato', `<b>${fP(x.rap)}</b> dos leads contatados em menos de 1 dia${B.rap != null ? ` (${rotMed}: ${fP(B.rap)})` : ''}; 1º contato médio de ${fD(x.t1)}${x.rap != null && x.rap < 50 ? ' · abaixo de 50%, longe da referência de 80%' : ''}.`);
-    put(insTom(x.ag, B.ag, 1), 'Agendamentos', `<b>${fN(x.ag)}</b> ${x.ag === 1 ? 'agendamento' : 'agendamentos'}${vsB(x.ag, B.ag, insN1)}${x.leads ? ` · ${nf1.format(x.ag / x.leads * 100)} para cada 100 leads novos` : ''}.`);
-    put(insTom(x.reu, B.reu, 1), 'Reuniões realizadas', `<b>${fN(x.reu)}</b> ${x.reu === 1 ? 'reunião' : 'reuniões'}${vsB(x.reu, B.reu, insN1)}${x.faltas ? ` · ${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'}` : ''}.`);
-    put(insTom(x.won, B.won, 1, 2), 'Ganhos', `<b>${fN(x.won)}</b> ${x.won === 1 ? 'negócio ganho' : 'negócios ganhos'}${vsB(x.won, B.won, insN1)}.`);
-    if (x.inv && x.cpl != null) put(insTom(x.cpl, B.cpl, -1, 0), 'Custo por lead', `<b>${fRs(x.cpl)}</b> por lead do período${B.cpl != null ? ` (${rotMed}: ${fRs(B.cpl)})` : ''}, com ${fRs(x.inv)} investidos.`);
-  }
-  const {gs, comCpl, cs} = insGrp(x, modo);
-  const gn = g => (PAGAS[g.id] || {}).nome || g.id;
-  if (comCpl.length >= 2 && comCpl[comCpl.length - 1].custo_lead > comCpl[0].custo_lead * 1.3)
-    put('pos', 'Campanha mais eficiente', `<b>${gn(comCpl[0])}</b> trouxe o lead mais barato: ${fRs(comCpl[0].custo_lead)} (${fN(comCpl[0].leads)} leads), contra ${fRs(comCpl[comCpl.length - 1].custo_lead)} em ${gn(comCpl[comCpl.length - 1])}.`);
-  for (const g of gs) if (g.investimento >= 50 && !g.leads) put('neg', `Mídia sem resultado`, `<b>${gn(g)}</b>: ${fRs(g.investimento)} investidos e nenhum lead no Pipedrive no período.`);
-  if (x.leads && x.semCont >= 3 && x.semCont / x.leads > 0.2) put('neg', 'Leads sem contato', `<b>${fN(x.semCont)}</b> dos ${fN(x.leads)} leads do período (${fP(x.semCont / x.leads * 100)}) ainda não tiveram nenhum contato.`);
-  if (cs.length >= 2 && cs[0].pct_contatados - cs[cs.length - 1].pct_contatados >= 20) {
-    const a = cs[0], z = cs[cs.length - 1];
-    put('pos', 'Destaque do time', `<b>${ESC(a.consultor)}</b> contatou ${fP(a.pct_contatados)} dos ${fN(a.leads)} leads${a.media_dias_1o_contato != null ? `, 1º contato médio de ${fD(a.media_dias_1o_contato)}` : ''}.`);
-    put('neg', 'Atenção no time', `<b>${ESC(z.consultor)}</b> contatou ${fP(z.pct_contatados)} dos ${fN(z.leads)} leads${z.media_dias_1o_contato != null ? `, 1º contato médio de ${fD(z.media_dias_1o_contato)}` : ''}.`);
-  }
-  if (x.lost) { const mot = Object.entries(x.motivos || {}).sort((a, b) => b[1] - a[1]);
-    const tl = mot.length ? (x.lostDet || []).filter(d => d.m === mot[0][0]).map(d => d.tent) : [], mt = tl.length ? tl.reduce((a, v) => a + v, 0) / tl.length : null;
-    put(B ? (insTom(x.lost, B.lost, -1) === 'neg' ? 'neg' : 'neu') : 'neu', 'Perdas', `<b>${fN(x.lost)}</b> ${x.lost === 1 ? 'lead perdido' : 'leads perdidos'}${B ? vsB(x.lost, B.lost, insN1) : ''}${mot.length ? `; principal motivo: <b>${ESC(mot[0][0])}</b> (${fN(mot[0][1])}${mt != null ? `, média de ${f1(mt)} tentativas antes da perda` : ''})` : ''}.`); }
-  // cadência hoje (só para o período mais recente)
-  let recente = null, A = null;
-  if (i >= per.length - 2) { A = run(insF({de: MIN_DAY, ate: TODAY})); const ka = A.res.kpis;
-    recente = {leads_em_atraso: ka.leads_em_atraso, leads_sem_proxima: ka.leads_sem_proxima, top: A.res.consultores.filter(c => c.leads_em_atraso).sort((a, b) => b.leads_em_atraso - a.leads_em_atraso).slice(0, 3)};
-    if (ka.leads_em_atraso) put('neg', 'Cadência (situação de hoje)', `<b>${fN(ka.leads_em_atraso)}</b> ${ka.leads_em_atraso === 1 ? 'lead' : 'leads'}${CP ? ' ' + CP : ''} em aberto com atividade vencida na carteira toda, de qualquer data de entrada${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${ka.leads_sem_proxima ? ` e ${fN(ka.leads_sem_proxima)} sem próxima atividade` : ''}.`);
-    else put('pos', 'Cadência (situação de hoje)', `Nenhum lead${CP ? ' ' + CP : ''} em aberto com atividade vencida.`); }
-  // por prefixo de campanha (TRD / DIAG / RCON / sem prefixo): só quando o seletor de campanha está em "Todos"
-  let pxRows = null;
-  if (!S.camp) {
-    const PX = Object.keys(CAMPANHAS);
-    const sub = (a, list, key) => a[key] == null ? null : list.reduce((v, y) => v - (y[key] || 0), a[key]);
-    const outros = (T, L) => { const o = {leads: sub(T, L, 'leads'), rapN: sub(T, L, 'rapN'), ag: sub(T, L, 'ag'), reu: sub(T, L, 'reu'), won: sub(T, L, 'won'), lost: sub(T, L, 'lost'), inv: sub(T, L, 'inv'), cpl: null};
-      o.rap = pctOf(o.rapN, o.leads); return o; };
-    const cur = PX.map(c => insCalc(P.de, P.ate, c)); cur.push(outros(x, cur));
-    const baseP = ants.length ? (() => { const byP = PX.map(c => per.slice(Math.max(0, i - nb), i).map(q => insCalc(q.de, q.fim, c)));
-      const oth = ants.map((T, j) => outros(T, byP.map(L => L[j]))); return byP.concat([oth]).map(L => insBase(L, frac)); })() : null;
-    const nomes = PX.map(c => CAMPANHAS[c].nome).concat(['Sem prefixo de campanha (indicações e cadastros manuais)']);
-    pxRows = nomes.map((n, j) => ({n, x: cur[j], b: baseP && baseP[j], camp: PX[j] || null}));
-    for (const r of pxRows.slice(0, PX.length)) {
-      if (!r.b) continue;
-      const tl = insTom(r.x.leads, r.b.leads, 1), ta = insTom(r.x.ag, r.b.ag, 1);
-      const pfx = r.n.split(' · ')[0];
-      if (tl !== 'neu') put(tl, `${pfx}: entrada de leads`, `<b>${fN(r.x.leads)}</b> leads ${pfx}${vsB(r.x.leads, r.b.leads, insN1)}${r.x.inv ? ` · ${fRs(r.x.inv)} investidos${r.x.cpl != null ? `, ${fRs(r.x.cpl)} por lead` : ''}` : ''}.`);
-      if (ta !== 'neu') put(ta, `${pfx}: agendamentos`, `<b>${fN(r.x.ag)}</b> agendamentos de leads ${pfx}${vsB(r.x.ag, r.b.ag, insN1)}.`);
-    }
-  }
-  const nPos = pos.length, nNeg = neg.length;
-  const QM = (modo === 'semanal' ? 'Semana' : 'Mês') + (CP ? ' ' + CP : '');
-  const veredito = !B ? 'Sem histórico suficiente para comparar.' : nPos > nNeg ? `${QM} <b>acima do normal</b>: ${fN(nPos)} ${nPos === 1 ? 'ponto positivo' : 'pontos positivos'} e ${fN(nNeg)} de atenção.`
-    : nNeg > nPos ? `${QM} <b>abaixo do normal</b>: ${fN(nNeg)} ${nNeg === 1 ? 'ponto de atenção' : 'pontos de atenção'} e ${fN(nPos)} positivos.` : `${QM} <b>dentro do normal</b>: ${fN(nPos)} positivos e ${fN(nNeg)} de atenção.`;
-  const lst = (L, cls) => L.length ? `<ul class="insl">${L.map(([t, s]) => `<li class="${cls}"><i></i><span><b class="inst">${t}</b> ${s}</span></li>`).join('')}</ul>` : `<p class="mut" style="margin:6px 0">${cls === 'pos' ? 'Nenhum indicador acima da média ou dentro da referência neste período.' : 'Nenhum ponto de atenção neste período.'}</p>`;
-  h += `<div class="mph mt"><span>AVALIAÇÃO</span><em class="insv">${veredito} <small>Normal = até 15% de diferença para a ${rotMed}.</small></em></div>`;
-  h += `<div class="g g2 insav"><div class="card insok"><div class="ch"><div><h3>✔ Pontos positivos</h3><p>Acima da média ou dentro da referência</p></div></div>${lst(pos, 'pos')}</div>
-    <div class="card insno"><div class="ch"><div><h3>⚠ Pontos de atenção</h3><p>Abaixo da média ou fora da referência: onde agir primeiro</p></div></div>${lst(neg, 'neg')}</div></div>`;
+  const nPos = DST.bom || 0, nNeg = DST.ruim || 0, neg = (DST.ruins || []).map(n => [n]);
   const SG = insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), AS = insAssumidos();
-  h = h.replace('<!--INSRES-->', insResumoHtml({x, B, modo, CP, rotMed, nPos, nNeg, AT, AS, SG, parcial: P.parcial, negT: neg.map(n => n[0]), recente}));
+  h = h.replace('<!--INSRES-->', insResumoHtml({x, B, modo, CP, rotMed, nPos, nNeg, nMed: DST.medida || 0, AT, AS, SG, parcial: P.parcial, negT: neg.map(n => n[0]), recente}));
   h += insAssumidosHtml();
   // Sugestões, acompanhamento das sugestões e tabela por campanha saíram dos Insights (pedido 10/11/2026)
   h += insRegistroHtml(P.de, P.fim, modo);
