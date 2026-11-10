@@ -2323,7 +2323,7 @@ function consPerfHtml(nome) {
 function consEvoChart(nome, g, W) {
   const ini = INS_METAS_DESDE < MIN_DAY ? MIN_DAY : INS_METAS_DESDE;
   const bs = mpBuckets(g, ini).slice(g === 'semanal' ? -12 : g === 'mensal' ? -12 : -8);
-  const SER = [['leads', 'Leads novos', '#b4d6c6'], ['ag', 'Agendadas', '#5f9c83'], ['reu', 'Realizadas', '#00503c'], ['won', 'Ganhos', '#00a611']];
+  const SER = [['leads', 'Leads novos', '#3b82c4'], ['ag', 'Agendadas', '#e2559a'], ['reu', 'Realizadas', '#f2b705'], ['won', 'Ganhos', '#00a611']];
   const pts = bs.map(b => { const ate = b.ate > TODAY ? TODAY : b.ate, X = run(filtros({consultores: [nome], de: b.de, ate})), e = X.res.eventos;
     return {...b, leads: X.res.kpis.leads, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; });
   const Hh = 176, pl = 34, pr = 8, pt = 18, pb = 24, pw = W - pl - pr, ph = Hh - pt - pb;
