@@ -1861,7 +1861,7 @@ const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20
    ========================================================================= */
 const TABS = [
   {id: 'macro', nome: 'Visão Macro'}, {id: 'insights', nome: 'Insights'}, {id: 'performance', nome: 'Performance'}, {id: 'lista', nome: 'Lead a Lead'}, {id: 'tempo', nome: 'Lead-time'},
-  {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'perdidos', nome: 'Perdidos'}, {id: 'consultores', nome: 'Consultores'}];
+  {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'consultores', nome: 'Consultores'}];   // Perdidos agora fica dentro do Lead a Lead (10/11/2026)
 // B2B: seções em construção (sem dados do Funil Alpha; filtros B2C ficam ocultos)
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
 const TABS_RS = [{id: 'instagram', nome: 'Instagram'}, {id: 'youtube', nome: 'YouTube', off: 'Em breve: aguardando a conexão com a API do YouTube do Gabriel'}];
@@ -1933,6 +1933,7 @@ function writeHash() {
   for (const dm of DIMS) if (S[dm.k].length) p.set(dm.h, S[dm.k].join('|'));
   if (S.busca.trim()) p.set('q', S.busca.trim());
   if (S.perdaData) p.set('pd', '1');
+  if (S.tab === 'lista' && S.ll.quick !== 'todos') p.set('lq', S.ll.quick);
   if (S.camp) p.set('camp', S.camp);
   if (S.tab === 'aplicacao' && S.aplPx) p.set('apx', S.aplPx);
   if (S.tab === 'insights') { if (S.insModo !== 'semanal') p.set('iv', S.insModo); if (S.insPer) p.set('ip', S.insPer); }
@@ -1945,6 +1946,8 @@ function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const ok = /^\d{4}-\d{2}-\d{2}$/;
   S.tab = TABS.concat(TABS_B2B, TABS_RS, TABS_CT, TABS_PG).some(t => t.id === p.get('aba') && !t.off) ? p.get('aba') : 'macro';
+  S.ll.quick = QUICK.some(q => q[0] === p.get('lq')) ? p.get('lq') : 'todos';
+  if (p.get('aba') === 'perdidos') { S.tab = 'lista'; S.ll.quick = 'perdidos'; }
   const pr = p.get('p');
   if (p.get('de') && ok.test(p.get('de')) && p.get('ate') && ok.test(p.get('ate'))) {
     S.preset = 'custom'; S.de = p.get('de'); S.ate = p.get('ate');
@@ -4166,18 +4169,21 @@ function viewYouTube() {
 }
 
 /* ---- Lead a Lead ---- */
-const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['sem', 'Sem contato', d => !d.cont], ['parados', 'Parados > 7d', d => d.parado],
+const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['ganhos', 'Ganhos', d => d.won], ['perdidos', 'Perdidos', d => d.lost], ['sem', 'Sem contato', d => !d.cont], ['parados', 'Parados > 7d', d => d.parado],
   ['fds', 'Entrada no FDS', d => d.fds], ['agendados', 'Agendados', d => d.agendado], ['atraso', 'Em atraso', d => d.cad === 'atraso'], ['semprox', 'Sem próxima atividade', d => d.cad === 'sem']];
 function listaRows() {
   const C = cur(), q = QUICK.find(x => x[0] === S.ll.quick) || QUICK[0];
   return sortRows(C.rows.filter(r => q[2](r.d)), LL_COLS, S.ll);
 }
 function viewLista() {
-  const C = cur(), list = listaRows(), per = 50;
+  const C = cur(), list = listaRows(), per = 50, perd = S.ll.quick === 'perdidos';
   const pages = Math.max(1, Math.ceil(list.length / per)); if (S.ll.page >= pages) S.ll.page = pages - 1;
   const pageRows = list.slice(S.ll.page * per, (S.ll.page + 1) * per);
-  let h = viewHead('Lead a Lead', periodCaption() + ' · clique numa linha para ver a jornada completa');
-  const seg = '<div class="seg">' + QUICK.map(([id, nome, fn]) => `<button data-quick="${id}" class="${S.ll.quick === id ? 'on' : ''}">${nome}<small>${fN(C.rows.filter(r => fn(r.d)).length)}</small></button>`).join('') + '</div>';
+  const tg = perd ? `<span class="tg${S.perdaData ? ' on' : ''}" data-act="perda-data" role="switch" aria-checked="${S.perdaData}" tabindex="0"><span class="sw"></span>Período pela data da perda</span>` : '';
+  let h = viewHead('Lead a Lead', (perd ? periodCaption(S.perdaData ? 'perda' : 'entrada') : periodCaption()) + ' · clique numa linha para ver a jornada completa', tg);
+  const nQ = (id, fn) => id === 'perdidos' && S.perdaData ? lostRun()[0].res.perdidos.total : C.rows.filter(r => fn(r.d)).length;
+  const seg = '<div class="seg">' + QUICK.map(([id, nome, fn]) => `<button data-quick="${id}" class="${S.ll.quick === id ? 'on' : ''}">${nome}<small>${fN(nQ(id, fn))}</small></button>`).join('') + '</div>';
+  if (perd) return h + `<div class="card np"><div class="tbar">${seg}</div></div>` + perdidosHtml();
   h += `<div class="card np"><div class="tbar">${seg}<button class="btn gh" data-act="csv-lista">${DL_ICON}Exportar CSV (${fN(list.length)})</button></div>`;
   h += list.length ? `<div class="tw tall"><table class="t stk">${thead(LL_COLS, S.ll, 'll')}${tableRows(LL_COLS, pageRows)}</table></div>${pager('ll', S.ll.page, list.length, per)}` : emptyBox();
   return h + '</div>';
@@ -4320,11 +4326,11 @@ const LOST_COLS = [
 ];
 function lostRun() { return S.perdaData ? [run(filtros({data_ref: 'l'})), run(filtros(Object.assign({data_ref: 'l'}, (([de, ate]) => ({de, ate}))(prevRange()))))] : [cur(), prev()]; }
 function lostList() { return sortRows(lostRun()[0].rows.filter(r => r.d.lost), LOST_COLS, S.lost); }
-function viewPerdidos() {
+function viewPerdidos() { S.tab = 'lista'; S.ll.quick = 'perdidos'; return viewLista(); }   // link antigo
+/* Perdidos (antes era aba própria; agora é o filtro "Perdidos" do Lead a Lead): análise + lista com motivo */
+function perdidosHtml() {
   const [C, P] = lostRun(), pr = C.res.perdidos, pp = P.res.perdidos, base = cur().res.kpis.leads, pbase = prev().res.kpis.leads;
-  const tg = `<span class="tg${S.perdaData ? ' on' : ''}" data-act="perda-data" role="switch" aria-checked="${S.perdaData}" tabindex="0"><span class="sw"></span>Período pela data da perda</span>`;
-  let h = viewHead('Perdidos', periodCaption(S.perdaData ? 'perda' : 'entrada'), tg);
-  h += '<div class="kpis">' + [
+  let h = '<div class="kpis mt">' + [
     kpiCard({label: 'Perdidos', cls: 'red', v: fN(pr.total), sub: S.perdaData ? 'perdidos dentro do período' : 'dos leads que entraram no período', d: delta(pr.total, pp.total, -1)}),
     kpiCard({label: '% do período', v: fP(pctOf(pr.total, base)), sub: `sobre ${fN(base)} leads que entraram no período`, d: delta(pctOf(pr.total, base), pctOf(pp.total, pbase), -1, fP), tip: 'Perdidos ÷ leads que entraram no período (mesmos filtros)'}),
     kpiCard({label: 'Tempo até a perda', v: `${f1(pr.media_dias_ate_perda)}<small>dias</small>`, sub: 'média desde a entrada', d: delta(pr.media_dias_ate_perda, pp.media_dias_ate_perda, 0, fD)}),
@@ -5255,7 +5261,7 @@ function bindEvents() {
     const pg = t.closest('[data-page]');
     if (pg && !pg.disabled) { (pg.dataset.tbl === 'll' ? S.ll : S.lost).page = Number(pg.dataset.page); renderView(); document.querySelector('.tw.tall')?.scrollTo({top: 0}); return; }
     const qk = t.closest('[data-quick]');
-    if (qk) { S.ll.quick = qk.dataset.quick; S.ll.page = 0; renderView(); return; }
+    if (qk) { S.ll.quick = qk.dataset.quick; S.ll.page = 0; writeHash(); renderView(); return; }
     const ag = t.closest('[data-aging]');
     if (ag) { const i = Number(ag.dataset.aging); S.aging = S.aging === i ? null : i; renderView(); return; }
     if (t.closest('a')) return;
