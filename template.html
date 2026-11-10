@@ -3196,7 +3196,7 @@ function viewInsights() {
     kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
       tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período. Inclui a verba de campanhas que não trouxeram lead'})
   ].join('') + '</div>';
-  h += insMetasHtml(x, CP, P.parcial, modo, frac);
+  if (modo !== 'semanal') h += insMetasHtml(x, CP, P.parcial, modo, frac);   // semanal: metas ficam na aba Metas (pedido 10/11/2026)
   h += insMetasConsHtml(P, modo, x, CP);
   // avaliação
   const pos = [], neg = [], neu = [];
