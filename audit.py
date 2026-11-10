@@ -178,7 +178,7 @@ def filtra(leads, f):
 def eventos(leads, f):
     """O que ACONTECEU no período, com lead de qualquer data de entrada (os demais filtros valem):
     agendamento = reunião MARCADA no período (entrada no bloco Reunião+ ou atividade de reunião criada; o lead conta
-    uma vez); reunião = 1ª atividade de reunião concluída (tipo_efetivo no painel.py); ganho/perda = data do ganho/perda; contatos = atividades de contato concluídas no período."""
+    uma vez); reunião = CADA atividade de reunião concluída no período (tipo_efetivo no painel.py); ganho/perda = data do ganho/perda; contatos = atividades de contato concluídas no período."""
     de, ate = f.get("de") or "0000-00-00", f.get("ate") or "9999-99-99"
     P = filtra(leads, dict(f, de=None, ate=None))
     dentro = lambda s: bool(s) and de <= str(s)[:10] <= ate
@@ -187,8 +187,7 @@ def eventos(leads, f):
     for l in P:
         k, h = l["k"] or [], l["h"] or []
         if any(dentro(t) for t in agenda_tempos(l)): ag += 1
-        rs = [x[0] for x in k if x[1] in REUNIAO_TIPOS]
-        if rs and dentro(min(rs)): reu += 1
+        reu += sum(1 for x in k if x[1] in REUNIAO_TIPOS and dentro(x[0]))   # cada reunião concluída no período
         if l["s"] == "won" and dentro(l["w"]): won += 1
         if l["s"] == "lost" and dentro(l["l"]):
             lost += 1; motivos[l.get("lr") or "Sem motivo informado"] += 1

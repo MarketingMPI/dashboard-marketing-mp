@@ -1125,7 +1125,7 @@ function makePred(f, skip) {
     ST = skip === 'status' ? null : set(f.status), E = skip === 'etapas' ? null : set(f.etapas, true),
     LB = skip === 'etiquetas' ? null : set(f.etiquetas), MT = skip === 'motivos' ? null : set(f.motivos);
   const q = skip === 'busca' ? '' : norm(f.busca || '');
-  const ref = f.data_ref === 'l' ? 'l' : 'e', de = f.de || '', ate = f.ate || '';
+  const ref = f.data_ref === 'l' ? 'l' : f.data_ref === 'w' ? 'w' : 'e', de = f.de || '', ate = f.ate || '';
   const base = f.incluir_base !== false;  // padrão: funil inteiro
   const op = f.operacao === true;         // Insights: só a operação (sem base importada/reativada e sem lançamento retroativo)
   const camp = CAMPANHAS[f.campanha || (f.so_trd ? 'trd' : '')] || null;  // campanha = prefixo do título
@@ -1281,8 +1281,7 @@ function computeEventos(leads, f) {
     if (!pred(l)) continue;
     const k = l.k || [], h = l.h || [];
     if (agendaTempos(l).some(dentro)) ag++;   // reunião marcada no período (lead conta 1 vez)
-    let r = null; for (const x of k) if (MEETING_TYPES.has(x[1]) && (r === null || x[0] < r)) r = x[0];
-    if (r !== null && dentro(r)) reu++;
+    for (const x of k) if (MEETING_TYPES.has(x[1]) && dentro(x[0])) reu++;   // cada reunião concluída no período conta (pedido 10/11/2026)
     if (l.s === 'won' && dentro(l.w)) won++;
     if (l.s === 'lost' && dentro(l.l)) { lost++; const m = l.lr || SEM_MOTIVO; motivos[m] = (motivos[m] || 0) + 1; }
     let n = 0; for (const x of k) if (dentro(x[0])) n++;
@@ -1876,7 +1875,7 @@ const DIMS = [
   {k: 'etapas', nome: 'Etapa', h: 'et'}, {k: 'etiquetas', nome: 'Etiqueta', h: 'lb'}, {k: 'motivos', nome: 'Motivo da perda', h: 'mt', hidden: true}];
 let LEADS = [], BYID = new Map(), AGORA_STR = '', AGORA = 0, TODAY = '', MIN_DAY = '';
 const S = {
-  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: false, camp: '', igModo: 'org',
+  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: true, camp: '', igModo: 'org',
   consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [],
   ll: {sort: 'e', dir: -1, page: 0, quick: 'todos'}, lost: {sort: 'l', dir: -1, page: 0},
   cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false, mapaM: 'carteira', mapaOpen: {}
@@ -1932,7 +1931,7 @@ function writeHash() {
   if (S.preset !== 'custom') { if (S.preset !== '7d') p.set('p', S.preset); } else { p.set('de', S.de); p.set('ate', S.ate); }
   for (const dm of DIMS) if (S[dm.k].length) p.set(dm.h, S[dm.k].join('|'));
   if (S.busca.trim()) p.set('q', S.busca.trim());
-  if (S.perdaData) p.set('pd', '1');
+  if (!S.perdaData) p.set('pd', '0');
   if (S.tab === 'lista' && S.ll.quick !== 'todos') p.set('lq', S.ll.quick);
   if (S.camp) p.set('camp', S.camp);
   if (S.tab === 'aplicacao' && S.aplPx) p.set('apx', S.aplPx);
@@ -1962,7 +1961,7 @@ function readHash() {
     if (dm.k === 'etapas') S.etapas = S.etapas.map(Number).filter(n => !isNaN(n));
   }
   S.busca = '';   // campo de busca removido do Painel (pedido do usuário, 23/10/2026)
-  S.perdaData = p.get('pd') === '1';
+  S.perdaData = p.get('pd') !== '0';   // padrão: ganhos/perdidos pela data do ganho/perda (como os Insights)
   S.camp = CAMPANHAS[p.get('camp')] ? p.get('camp') : (p.get('trd') === '1' ? 'trd' : '');
   S.igModo = IG_MODOS[p.get('ig')] ? p.get('ig') : 'org';
   S.mpModo = ['mensal', 'metas'].includes(p.get('mpv')) ? p.get('mpv') : 'periodo';
@@ -3193,7 +3192,7 @@ function viewInsights() {
     kpiCard({label: 'Agendamentos', v: fN(x.ag), sub: `no período, lead de qualquer data`, extra: pa('ag', insN1), d: insVarN(x.ag, B && B.ag, 1, rotMed, ['agendamento', 'agendamentos']),
       tip: 'Leads que tiveram reunião MARCADA no período (entraram na etapa Reunião ou além, ou ganharam uma atividade de reunião em aberto/concluída), independentemente de quando entraram. Remarcação no período conta de novo; o lead conta 1 vez por período'}),
     kpiCard({label: 'Reuniões realizadas', v: fN(x.reu), sub: x.faltas ? `${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'} · comparecimento ${fP(x.comp)}` : 'nenhuma falta registrada', extra: pa('reu', insN1), d: insVarN(x.reu, B && B.reu, 1, rotMed, ['reunião', 'reuniões']),
-      tip: 'Leads com a 1ª atividade de reunião CONCLUÍDA dentro do período (reunião só marcada conta em Agendamentos). Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
+      tip: 'Reuniões CONCLUÍDAS dentro do período: cada reunião conta, inclusive a 2ª ou 3ª reunião do mesmo lead (reunião só marcada conta em Agendamentos). Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
     kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: pa('won', insN1), d: insVarN(x.won, B && B.won, 1, rotMed, ['ganho', 'ganhos']),
       tip: 'Negócios marcados como ganhos dentro do período (sem lançamentos retroativos)'}),
     kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
@@ -4171,17 +4170,18 @@ function viewYouTube() {
 /* ---- Lead a Lead ---- */
 const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['ganhos', 'Ganhos', d => d.won], ['perdidos', 'Perdidos', d => d.lost], ['sem', 'Sem contato', d => !d.cont], ['parados', 'Parados > 7d', d => d.parado],
   ['fds', 'Entrada no FDS', d => d.fds], ['agendados', 'Agendados', d => d.agendado], ['atraso', 'Em atraso', d => d.cad === 'atraso'], ['semprox', 'Sem próxima atividade', d => d.cad === 'sem']];
+function ganhosRun() { return S.perdaData ? run(filtros({data_ref: 'w'})) : cur(); }
 function listaRows() {
-  const C = cur(), q = QUICK.find(x => x[0] === S.ll.quick) || QUICK[0];
+  const q = QUICK.find(x => x[0] === S.ll.quick) || QUICK[0], C = q[0] === 'ganhos' ? ganhosRun() : cur();
   return sortRows(C.rows.filter(r => q[2](r.d)), LL_COLS, S.ll);
 }
 function viewLista() {
-  const C = cur(), list = listaRows(), per = 50, perd = S.ll.quick === 'perdidos';
+  const C = cur(), list = listaRows(), per = 50, perd = S.ll.quick === 'perdidos', gan = S.ll.quick === 'ganhos';
   const pages = Math.max(1, Math.ceil(list.length / per)); if (S.ll.page >= pages) S.ll.page = pages - 1;
   const pageRows = list.slice(S.ll.page * per, (S.ll.page + 1) * per);
-  const tg = perd ? `<span class="tg${S.perdaData ? ' on' : ''}" data-act="perda-data" role="switch" aria-checked="${S.perdaData}" tabindex="0"><span class="sw"></span>Período pela data da perda</span>` : '';
-  let h = viewHead('Lead a Lead', (perd ? periodCaption(S.perdaData ? 'perda' : 'entrada') : periodCaption()) + ' · clique numa linha para ver a jornada completa', tg);
-  const nQ = (id, fn) => id === 'perdidos' && S.perdaData ? lostRun()[0].res.perdidos.total : C.rows.filter(r => fn(r.d)).length;
+  const tg = perd || gan ? `<span class="tg${S.perdaData ? ' on' : ''}" data-act="perda-data" role="switch" aria-checked="${S.perdaData}" tabindex="0" data-tip="${ESC('Ligado: ganhos e perdidos pela data em que foram ganhos/perdidos (bate com os Insights).\nDesligado: pela data de entrada do lead.')}"><span class="sw"></span>Pela data do ganho/perda</span>` : '';
+  let h = viewHead('Lead a Lead', ((perd || gan) && S.perdaData ? periodCaption(perd ? 'perda' : 'ganho') : periodCaption()) + ' · clique numa linha para ver a jornada completa', tg);
+  const nQ = (id, fn) => id === 'perdidos' && S.perdaData ? lostRun()[0].res.perdidos.total : id === 'ganhos' ? ganhosRun().rows.filter(r => r.d.won).length : C.rows.filter(r => fn(r.d)).length;
   const seg = '<div class="seg">' + QUICK.map(([id, nome, fn]) => `<button data-quick="${id}" class="${S.ll.quick === id ? 'on' : ''}">${nome}<small>${fN(nQ(id, fn))}</small></button>`).join('') + '</div>';
   if (perd) return h + `<div class="card np"><div class="tbar">${seg}</div></div>` + perdidosHtml();
   h += `<div class="card np"><div class="tbar">${seg}<button class="btn gh" data-act="csv-lista">${DL_ICON}Exportar CSV (${fN(list.length)})</button></div>`;
@@ -5230,7 +5230,7 @@ function bindEvents() {
       else if (a === 'csv-lista') exportCsv(listaRows(), 'leads');
       else if (a === 'csv-lost') exportCsv(lostList(), 'perdidos');
       else if (a === 'camp') { S.camp = act.dataset.v || ''; resetPages(); update(); }
-      else if (a === 'perda-data') { S.perdaData = !S.perdaData; S.lost.page = 0; update(); }
+      else if (a === 'perda-data') { S.perdaData = !S.perdaData; S.lost.page = 0; S.ll.page = 0; update(); }
       else if (a === 'ins-pdf') insPrint();
       else if (a === 'ins-copy') { const t = (document.querySelector('.insrt') || {}).value || ''; const ok = () => { act.textContent = '✔ Copiado'; setTimeout(() => { act.textContent = '⧉ Copiar'; }, 1800); };
         if (navigator.clipboard) navigator.clipboard.writeText(t).then(ok, () => {}); else { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); ok(); } }
