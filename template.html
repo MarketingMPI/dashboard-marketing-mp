@@ -2268,14 +2268,19 @@ const MAPA_CORES = ['#003326', '#00503c', '#1f7a58', '#3d9a6f', '#00a611', '#9fb
    Mesmas contas da tabela "Conversão do funil por consultor × referência" (leads que entraram no período e,
    desses, agendados / reuniões / ganhos), para os números baterem entre os blocos. */
 const evCons = nome => run(filtros({consultores: [nome]})).res.eventos;   // movimento do consultor no período do topo
+/* Carteira inteira (padrão do mapa): TODOS os leads do consultor (abertos, ganhos e perdidos, qualquer data de entrada,
+   só a operação) — % de cada lead dele que chegou a cada etapa. Só do período: mesma conta dos Insights/Funil Consultores. */
 function consPerf(nome) {
-  const X = run(filtros({consultores: [nome]})), e = X.res.eventos, k = {leads: X.res.kpis.leads, agendados: e.agendamentos, reunioes: e.reunioes, ganhos: e.ganhos}, L = k.leads;
+  const cart = S.mapaM !== 'periodo';
+  const X = run(filtros(cart ? {consultores: [nome], de: MIN_DAY, ate: TODAY} : {consultores: [nome]})), kk = X.res.kpis, e = X.res.eventos;
+  const k = cart ? {leads: kk.leads, agendados: kk.agendados, reunioes: kk.reunioes, ganhos: kk.ganhos}
+    : {leads: kk.leads, agendados: e.agendamentos, reunioes: e.reunioes, ganhos: e.ganhos}, L = k.leads;
   const rap = X.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length, pc = (a, b) => b ? a / b * 100 : null;
-  return {L, itens: [
+  return {L, cart, abertos: kk.abertos, won: kk.ganhos, lost: kk.perdidos, itens: [
     ['Contato em menos de 1 dia', pc(rap, L), 80, `${fN(rap)} de ${fN(L)} leads`],
     ['MQL → reunião agendada', pc(k.agendados, L), REF_PRU.ag, `${fN(k.agendados)} agendados de ${fN(L)}`],
-    ['Agendada → realizada', pc(k.reunioes, k.agendados), REF_PRU.re / REF_PRU.ag * 100, `${fN(k.reunioes)} reuniões de ${fN(k.agendados)} agendadas`],
-    ['Realizada → fechamento', pc(k.ganhos, k.reunioes), REF_PRU.ga / REF_PRU.re * 100, `${fN(k.ganhos)} ganhos de ${fN(k.reunioes)} reuniões`],
+    ['Agendada → realizada', pc(k.reunioes, k.agendados), REF_PRU.re / REF_PRU.ag * 100, `${fN(k.reunioes)} ${cart ? 'com reunião realizada' : 'reuniões'} de ${fN(k.agendados)} agendad${cart ? 'os' : 'as'}`],
+    ['Realizada → fechamento', pc(k.ganhos, k.reunioes), REF_PRU.ga / REF_PRU.re * 100, `${fN(k.ganhos)} ganhos de ${fN(k.reunioes)} ${cart ? 'leads com reunião' : 'reuniões'}`],
     ['MQL → fechamento', pc(k.ganhos, L), REF_PRU.ga, `${fN(k.ganhos)} ganhos de ${fN(L)} leads`]]};
 }
 function consPerfHtml(nome) {
@@ -2289,7 +2294,7 @@ function consPerfHtml(nome) {
       <span class="cm-pv"><b>${v == null ? '–' : fP(v)}${acima ? ' ⚠' : ''}</b><small>meta ${fP(ref)}</small></span>
       <span class="cm-pq">${q == null ? 'sem base' : q >= 100 ? '✔ meta' : fP(q) + ' da meta'}</span></div>`;
   };
-  return `<div class="cm-perf"><div class="cm-pt">Performance no período <small>${fDM(S.de)} a ${fDM(S.ate)} · ${fN(P.L)} ${P.L === 1 ? 'lead entrou' : 'leads entraram'}</small></div>
+  return `<div class="cm-perf"><div class="cm-pt">${P.cart ? `Performance da carteira <small>todos os ${fN(P.L)} leads sob responsabilidade · ${fN(P.abertos)} em aberto, ${fN(P.won)} ${P.won === 1 ? 'ganho' : 'ganhos'}, ${fN(P.lost)} ${P.lost === 1 ? 'perdido' : 'perdidos'}</small>` : `Performance no período <small>${fDM(S.de)} a ${fDM(S.ate)} · ${fN(P.L)} ${P.L === 1 ? 'lead entrou' : 'leads entraram'}</small>`}</div>
     ${P.L ? P.itens.map(linha).join('') : '<div class="mut">Nenhum lead entrou para este consultor no período.</div>'}</div>`;
 }
 function mapaConsHtml(opt) {
@@ -2302,7 +2307,7 @@ function mapaConsHtml(opt) {
   const hj = dkey(AGORA);
   const segBtn = `<div class="seg">${[['carteira', 'Carteira inteira', 'todos os leads em aberto, de qualquer data de entrada'], ['periodo', 'Só do período', 'só os leads em aberto que entraram no período do topo']]
     .map(([v, tx, tip]) => `<button type="button" data-mapam="${v}" class="${modo === v ? 'on' : ''}" data-tip="${ESC(tip)}">${tx}</button>`).join('')}</div>`;
-  const head = `<div class="ch"><div><h3>Mapa da carteira por consultor</h3><p>Onde está cada lead em aberto e como está a cadência · situação em ${fDay(hj)} · ${modo === 'carteira' ? 'carteira inteira (qualquer data de entrada)' : 'só leads que entraram no período'} · atraso = atividade pendente no Pipedrive com data anterior a hoje · performance = conversão de cada etapa no período do topo × metas do funil</p></div>
+  const head = `<div class="ch"><div><h3>Mapa da carteira por consultor</h3><p>Onde está cada lead em aberto e como está a cadência · situação em ${fDay(hj)} · ${modo === 'carteira' ? 'carteira inteira (qualquer data de entrada)' : 'só leads que entraram no período'} · atraso = atividade pendente no Pipedrive com data anterior a hoje · performance = conversão de cada etapa × metas do funil (Carteira inteira: sobre todos os leads do consultor; Só do período: período do topo)</p></div>
     <div class="mapa-acoes">${segBtn}<button type="button" class="btn gh" data-atraso="1">Ver atrasados no Lead a Lead</button></div></div>`;
   if (!ab.length) return `<div class="card mt mapa">${head}${emptyBox('Nenhum lead em aberto', 'Nenhum lead em aberto com os filtros atuais.')}</div>`;
   const atrT = ab.filter(r => r.d.cad === 'atraso');
