@@ -549,7 +549,8 @@ def dedupe(leads, window_days=14):
                 clusters.append([l])
         for i, cl in enumerate(clusters):
             # canônico: GANHO > aberto > perdido (um ganho nunca pode sumir dentro de um negócio aberto recriado depois)
-            cl_sorted = sorted(cl, key=lambda l: ({"won": 2, "open": 1}.get(l["s"], 0), l["ec"] or ""), reverse=True)
+            # entre perdidos, vale o ÚLTIMO a ser perdido (o negócio trabalhado; os outros costumam ser duplicados descartados)
+            cl_sorted = sorted(cl, key=lambda l: ({"won": 2, "open": 1}.get(l["s"], 0), (l.get("l") or "") if l["s"] == "lost" else "", l["ec"] or ""), reverse=True)
             c = dict(cl_sorted[0])
             if len(cl) > 1:
                 first = cl[0]
