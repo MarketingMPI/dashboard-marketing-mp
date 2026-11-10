@@ -3295,23 +3295,8 @@ function viewInsights() {
   const SG = insSugestoes({x, B, gs, comCpl, cs, modo, CP, rotMed, recente}), AS = insAssumidos();
   h = h.replace('<!--INSRES-->', insResumoHtml({x, B, modo, CP, rotMed, nPos, nNeg, AT, AS, SG, parcial: P.parcial, negT: neg.map(n => n[0]), recente}));
   h += insAssumidosHtml();
-  h += insSugHtml(SG, CP);
-  // acompanhamento das sugestões do período anterior
-  if (xPrev && i >= 1) {
-    const antsP = per.slice(Math.max(0, i - 1 - nb), i - 1).map(p => insCalc(p.de, p.fim)), BP = antsP.length ? insBase(antsP, 1) : null;
-    const gp = insGrp(xPrev, modo), LP = insSugestoes({x: xPrev, B: BP, ...gp, modo, CP, rotMed: `média ${antsP.length} ${antsP.length === 1 ? nm[0] : nm[1]}`, recente: null});
-    h += insFollowHtml(LP, xPrev, x, frac, modo, modo === 'semanal' ? `${fDM(per[i - 1].de)} a ${fDM(per[i - 1].fim)}` : mesNome(per[i - 1].k));
-  }
+  // Sugestões, acompanhamento das sugestões e tabela por campanha saíram dos Insights (pedido 10/11/2026)
   h += insRegistroHtml(P.de, P.fim, modo);
-  // tabela por prefixo
-  if (pxRows) {
-    const vv = (c, b, good, fmt) => { if (c == null || b == null) return ''; const d = c - b; if (Math.abs(d) < 1e-9) return '<span class="dl neu">=</span>';
-      const tone = (d > 0) === (good > 0) ? 'pos' : 'neg'; return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${b ? nf1.format(Math.abs(d / b * 100)) + '%' : 'novo'} (${d > 0 ? '+' : '−'}${fmt(Math.abs(d))})</span>`; };
-    const cel = (r, key, fmt, good) => `<td class="num"><b>${fmt(r.x[key])}</b>${r.b ? `<div class="mut">${rotMed}: ${fmt(r.b[key])}</div>${good ? vv(r.x[key], r.b[key], good, fmt) : ''}` : ''}</td>`;
-    h += `<div class="card mt np"><div class="ch" style="padding:16px 18px 0"><div><h3>Por campanha (prefixo do negócio)</h3><p>TRD, DIAG e RCON pelo prefixo do título no Pipedrive · clique no nome para filtrar a página pela campanha · variação contra a ${rotMed}</p></div></div><div class="tw"><table class="t inspx"><thead><tr><th>Campanha</th><th class="num">Leads novos</th><th class="num">Contato &lt; 1 dia</th><th class="num">Agendamentos</th><th class="num">Reuniões</th><th class="num">Ganhos</th><th class="num">Investimento Meta</th><th class="num">Custo por lead</th></tr></thead><tbody>` +
-      pxRows.map(r => `<tr><td class="wrap" style="max-width:220px">${r.camp ? `<b data-act="camp" data-v="${r.camp}" style="cursor:pointer">${ESC(r.n)}</b>` : `<b>${ESC(r.n)}</b>`}</td>${cel(r, 'leads', insN1, 1)}<td class="num"><b>${fP(r.x.rap)}</b>${r.b ? `<div class="mut">${rotMed}: ${fP(r.b.rap)}</div>` : ''}</td>${cel(r, 'ag', insN1, 1)}${cel(r, 'reu', insN1, 1)}${cel(r, 'won', insN1, 1)}<td class="num">${r.x.inv ? fRs(r.x.inv) : '–'}</td><td class="num">${r.x.cpl != null ? fRs(r.x.cpl) : '–'}</td></tr>`).join('') +
-      `</tbody></table></div></div>`;
-  }
   // comparativo
   if (B) {
     const rows = [['Leads novos', 'leads', 1, insN1], ['Contato em menos de 1 dia', 'rap', 1, fP], ['1º contato médio', 't1', -1, fD],
