@@ -204,7 +204,7 @@ PAGAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "isca": r"^\s*\[ISCA"
 
 
 def performance(leads, f, agora, midia):
-    """Investimento (Meta, B2C, centavos) ÷ resultados no Pipedrive dos leads que ENTRARAM no período.
+    """Investimento (Meta, B2C, centavos) ÷ leads que ENTRARAM no período; agendados/reuniões/ganhos = eventos do período.
     Só período e campanha valem; leads da Meta são ignorados."""
     midia = midia or {"camps": [], "dias": []}
     camp = f.get("campanha") or ("trd" if f.get("so_trd") else "")
@@ -218,15 +218,18 @@ def performance(leads, f, agora, midia):
         g = G.get(midia["camps"][ci]["grupo"])
         if g is None: continue
         g["investimento_centavos"] += cent; g["impressoes"] += imp; g["cliques"] += cl
+    dentro = lambda x: bool(x) and (not de or str(x)[:10] >= de) and (not ate or str(x)[:10] <= ate)
     for l in leads:
-        day = (l.get("e") or "")[:10]
-        if not day or (de and day < de) or (ate and day > ate): continue
         if f.get("operacao") is True and (l.get("b") or retroativo(l)): continue
         gid = next((k for k in ("trd", "diag", "isca") if re.match(PAGAS[k], l.get("n") or "", re.I)), None)
         if not gid: continue
-        m = lead_metrics(l, agora); g = G[gid]
-        g["leads"] += 1; g["contatados"] += m["contatado"]; g["agendados"] += m["agendado"]
-        g["reunioes"] += m["reuniao"]; g["ganhos"] += l["s"] == "won"
+        g = G[gid]
+        if dentro(l.get("e")):      # entrada = coorte do período
+            g["leads"] += 1; g["contatados"] += lead_metrics(l, agora)["contatado"]
+        # movimento = o que aconteceu no período (mesma regra dos eventos/Insights)
+        g["agendados"] += 1 if any(dentro(x) for x in agenda_tempos(l)) else 0
+        g["reunioes"] += sum(1 for x in (l["k"] or []) if x[1] in REUNIAO_TIPOS and dentro(x[0]))
+        g["ganhos"] += 1 if l["s"] == "won" and dentro(l.get("w")) else 0
     def fin(g):
         inv = g["investimento_centavos"] / 100
         by = lambda n: inv / n if n else None

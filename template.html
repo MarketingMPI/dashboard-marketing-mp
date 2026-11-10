@@ -1303,14 +1303,17 @@ function computePerf(leads, f, agora) {
     const c = M.camps[r[1]], g = c && G[c.grupo]; if (!g) continue;
     g.investimento_centavos += r[2]; g.impressoes += r[3]; g.cliques += r[4];
   }
+  const dentro = s => { if (!s) return false; const x = String(s).slice(0, 10); return (!de || x >= de) && (!ate || x <= ate); };
   for (const l of leads || []) {
-    const day = String(l.e || '').slice(0, 10);
-    if (!day || (de && day < de) || (ate && day > ate)) continue;
     if (f.operacao === true && (l.b || isRetro(l))) continue;
     let id = null; for (const k of ['trd', 'diag', 'isca']) if (PAGAS[k].rx.test(l.n || '')) { id = k; break; }
     if (!id) continue;
-    const d = derive(l, agora), g = G[id];
-    g.leads++; if (d.cont) g.contatados++; if (d.agendado) g.agendados++; if (d.reuniao) g.reunioes++; if (d.won) g.ganhos++;
+    const g = G[id];
+    if (dentro(l.e)) { g.leads++; if (derive(l, agora).cont) g.contatados++; }   // entrada = coorte do período
+    // movimento = o que aconteceu no período (mesma regra dos Insights e da Visão Macro)
+    if (agendaTempos(l).some(dentro)) g.agendados++;
+    for (const x of l.k || []) if (MEETING_TYPES.has(x[1]) && dentro(x[0])) g.reunioes++;
+    if (l.s === 'won' && dentro(l.w)) g.ganhos++;
   }
   const fin = g => {
     const inv = g.investimento_centavos / 100, by = n => n ? inv / n : null;
@@ -1913,7 +1916,8 @@ function prevRange() { const n = diffDays(S.de, S.ate) + 1; return [addDays(S.de
 
 function filtros(over) {
   return Object.assign({de: S.de, ate: S.ate, consultores: S.consultores.slice(), origens: S.origens.slice(), status: S.status.slice(),
-    etapas: S.etapas.slice(), etiquetas: S.etiquetas.slice(), busca: S.busca.trim(), motivos: S.motivos.slice(), incluir_base: true, campanha: S.camp || null}, over || {});
+    etapas: S.etapas.slice(), etiquetas: S.etiquetas.slice(), busca: S.busca.trim(), motivos: S.motivos.slice(), incluir_base: true, campanha: S.camp || null,
+    operacao: true}, over || {});   // painel inteiro = só a operação: sem base importada e sem lançamentos retroativos (10/11/2026)
 }
 const MEMO = new Map();
 function run(f) {
@@ -1931,7 +1935,7 @@ function writeHash() {
   if (S.preset !== 'custom') { if (S.preset !== '7d') p.set('p', S.preset); } else { p.set('de', S.de); p.set('ate', S.ate); }
   for (const dm of DIMS) if (S[dm.k].length) p.set(dm.h, S[dm.k].join('|'));
   if (S.busca.trim()) p.set('q', S.busca.trim());
-  if (!S.perdaData) p.set('pd', '0');
+
   if (S.tab === 'lista' && S.ll.quick !== 'todos') p.set('lq', S.ll.quick);
   if (S.camp) p.set('camp', S.camp);
   if (S.tab === 'aplicacao' && S.aplPx) p.set('apx', S.aplPx);
@@ -1961,7 +1965,7 @@ function readHash() {
     if (dm.k === 'etapas') S.etapas = S.etapas.map(Number).filter(n => !isNaN(n));
   }
   S.busca = '';   // campo de busca removido do Painel (pedido do usuário, 23/10/2026)
-  S.perdaData = p.get('pd') !== '0';   // padrão: ganhos/perdidos pela data do ganho/perda (como os Insights)
+  S.perdaData = true;   // ganhos/perdidos sempre pela data em que aconteceram (regra única do painel, 10/11/2026)
   S.camp = CAMPANHAS[p.get('camp')] ? p.get('camp') : (p.get('trd') === '1' ? 'trd' : '');
   S.igModo = IG_MODOS[p.get('ig')] ? p.get('ig') : 'org';
   S.mpModo = ['mensal', 'metas'].includes(p.get('mpv')) ? p.get('mpv') : 'periodo';
@@ -2190,13 +2194,19 @@ function metaMqlHtml() {
     <div class="mmq-n">${n >= META_MQL_MES ? '<b class="mt-ok">✔ meta atingida</b>' : `faltam <b>${fN(falta)}</b> em ${fN(rest)} ${rest === 1 ? 'dia' : 'dias'}`} · esperado até hoje: ${f1(esp)} · no ritmo atual o mês fecha com ~${fN(Math.round(proj))}</div></div>`;
 }
 function viewMacro() {
-  const C = cur(), P = prev(), k = C.res.kpis, pk = P.res.kpis;
+  const C = cur(), P = prev(), k0 = C.res.kpis, pk0 = P.res.kpis, e = C.res.eventos, pe = P.res.eventos;
+  // agendados, reuniões, ganhos e perdidos = o que ACONTECEU no período (mesma conta dos Insights); entrada = leads do período
+  const mov = (kk, ee) => Object.assign({}, kk, {agendados: ee.agendamentos, reunioes: ee.reunioes, ganhos: ee.ganhos, perdidos: ee.perdidos,
+    taxa_conversao: kk.leads ? ee.ganhos / kk.leads * 100 : 0});
+  const k = mov(k0, e), pk = mov(pk0, pe);
   const pctK = (v, n) => n ? fP(v / n * 100) + ' dos leads' : '';
   const nBase = C.rows.reduce((a, r) => a + (r.l.b ? 1 : 0), 0);
-  let h = viewHead('Visão Macro', periodCaption());
+  let h = viewHead('Visão Macro', periodCaption() + ' · agendados, reuniões, ganhos e perdidos = o que aconteceu no período');
   h += metaMqlHtml();
+  const EXm = insExcl(S.de, S.ate);
+  if (EXm.base || EXm.retro) h += `<div class="note insexc">Fora do painel neste período: ${[EXm.base ? `<b>${fN(EXm.base)}</b> ${EXm.base === 1 ? 'contato importado da base/reativado' : 'contatos importados da base/reativados'}` : '', EXm.retro ? `<b>${fN(EXm.retro)}</b> ${EXm.retro === 1 ? 'lançamento retroativo' : 'lançamentos retroativos'} (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade)` : ''].filter(Boolean).join(' e ')}. Todas as abas do B2C contam só a operação.</div>`;
   h += '<div class="kpis k6 kmac">' + [
-    kpiCard({label: 'Entraram no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k.abertos)} abertos · ${fN(k.ganhos)} ganhos · ${fN(k.perdidos)} perdidos`,
+    kpiCard({label: 'Entraram no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k0.abertos)} ainda em aberto hoje`,
       extra: nBase > 0 ? `<div class="kx">inclui ${fN(nBase)} ex-clientes e contatos antigos reativados</div>` : '',
       d: delta(k.leads, pk.leads, 0), tip: 'Todos os leads que entraram no período (abertos, ganhos e perdidos), com os filtros aplicados'}),
     kpiCard({label: 'Com contato', v: `${fN(k.contatados)}<small>${fP(k.pct_contatados)}</small>`, sub: `${f1(k.contatos_por_lead)} contatos por lead contatado`,
@@ -2207,11 +2217,11 @@ function viewMacro() {
       tip: 'Leads em aberto com atividade pendente no Pipedrive vencida (data anterior a hoje).\nÉ a situação de hoje, não tem comparação com o período anterior.\nClique para ver a lista no Lead a Lead'}),
     kpiCard({label: 'Entraram no FDS', v: fN(k.fim_de_semana), sub: pctK(k.fim_de_semana, k.leads), d: delta(k.fim_de_semana, pk.fim_de_semana, 0), tip: 'Leads que entraram no sábado ou domingo'}),
     kpiCard({label: 'Tempo até 1º contato', cls: 'm2', v: `${f1(k.media_dias_1o_contato)}<small>dias</small>`, sub: `mediana ${fD(k.mediana_dias_1o_contato)}`, d: delta(k.media_dias_1o_contato, pk.media_dias_1o_contato, -1, fD), tip: 'Média de dias entre a entrada e o 1º contato (só leads contatados)'}),
-    kpiCard({label: 'Agendados', v: fN(k.agendados), sub: pctK(k.agendados, k.leads), d: delta(k.agendados, pk.agendados), tip: 'Têm reunião marcada: chegaram à etapa Reunião ou além, ou têm atividade de reunião (aberta ou concluída) — ou ganhos'}),
-    kpiCard({label: 'Reuniões', v: fN(k.reunioes), sub: pctK(k.reunioes, k.leads), d: delta(k.reunioes, pk.reunioes), tip: 'Leads com atividade de reunião CONCLUÍDA (reunião só marcada, remarcada ou cancelada não conta)'}),
-    kpiCard({label: 'Ganhos', v: fN(k.ganhos), sub: pctK(k.ganhos, k.leads), d: delta(k.ganhos, pk.ganhos), tip: 'Leads do período já ganhos'}),
-    kpiCard({label: 'Taxa de conversão', v: fP(k.taxa_conversao), sub: `${fN(k.ganhos)} ${k.ganhos === 1 ? 'ganho' : 'ganhos'} de ${fN(k.leads)} leads gerados`, d: delta(k.taxa_conversao, pk.taxa_conversao, 1, fP), tip: 'Leads gerados no período que já foram fechados como ganho ÷ total de leads gerados no período. Mostra 0% quando ainda não há ganho.'}),
-    kpiCard({label: 'Perdidos', cls: 'red', v: fN(k.perdidos), sub: pctK(k.perdidos, k.leads), d: delta(k.perdidos, pk.perdidos, -1), tip: 'Leads do período já perdidos'})
+    kpiCard({label: 'Agendados', v: fN(k.agendados), sub: 'reuniões marcadas no período', d: delta(k.agendados, pk.agendados), tip: 'Leads que tiveram reunião MARCADA no período (entraram na etapa Reunião ou além, ou ganharam atividade de reunião), de qualquer data de entrada. Mesma conta dos Insights'}),
+    kpiCard({label: 'Reuniões', v: fN(k.reunioes), sub: 'realizadas no período', d: delta(k.reunioes, pk.reunioes), tip: 'Reuniões CONCLUÍDAS no período, cada uma conta (inclusive a 2ª reunião do mesmo lead). Mesma conta dos Insights'}),
+    kpiCard({label: 'Ganhos', v: fN(k.ganhos), sub: 'ganhos no período', d: delta(k.ganhos, pk.ganhos), tip: 'Negócios ganhos dentro do período, de qualquer data de entrada. Mesma conta dos Insights'}),
+    kpiCard({label: 'Taxa de conversão', v: fP(k.taxa_conversao), sub: `${fN(k.ganhos)} ${k.ganhos === 1 ? 'ganho' : 'ganhos'} ÷ ${fN(k.leads)} leads do período`, d: delta(k.taxa_conversao, pk.taxa_conversao, 1, fP), tip: 'Ganhos no período ÷ leads que entraram no período (mesma conta do MQL → fechamento dos Insights)'}),
+    kpiCard({label: 'Perdidos', cls: 'red', v: fN(k.perdidos), sub: 'perdidos no período', d: delta(k.perdidos, pk.perdidos, -1), tip: 'Negócios perdidos dentro do período, de qualquer data de entrada'})
   ].join('') + '</div>';
   const vw = document.getElementById('view').clientWidth || 900;
   const dailyW = window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44;
@@ -2246,8 +2256,9 @@ const MAPA_CORES = ['#003326', '#00503c', '#1f7a58', '#3d9a6f', '#00a611', '#9fb
 /* Performance do consultor no período do topo × metas do funil (REF_PRU sobre MQL; contato em < 1 dia: 80%).
    Mesmas contas da tabela "Conversão do funil por consultor × referência" (leads que entraram no período e,
    desses, agendados / reuniões / ganhos), para os números baterem entre os blocos. */
+const evCons = nome => run(filtros({consultores: [nome]})).res.eventos;   // movimento do consultor no período do topo
 function consPerf(nome) {
-  const X = run(filtros({consultores: [nome]})), k = X.res.kpis, L = k.leads;
+  const X = run(filtros({consultores: [nome]})), e = X.res.eventos, k = {leads: X.res.kpis.leads, agendados: e.agendamentos, reunioes: e.reunioes, ganhos: e.ganhos}, L = k.leads;
   const rap = X.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length, pc = (a, b) => b ? a / b * 100 : null;
   return {L, itens: [
     ['Contato em menos de 1 dia', pc(rap, L), 80, `${fN(rap)} de ${fN(L)} leads`],
@@ -3043,8 +3054,7 @@ function insMetasConsHtml(P, modo, xT, CP, opt) {
   const calc = nome => { const f = mk({de: P.de, ate: P.ate, consultores: nome ? [nome] : []}), X = nome ? run(f) : R, e = X.res.eventos;
     const L = X.res.kpis.leads, rap = X.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length;
     const k = X.res.kpis;
-    return opt.cons ? {L, rap: L ? rap / L * 100 : null, rapN: rap, ag: k.agendados, reu: k.reunioes, won: k.ganhos}
-      : {L, rap: L ? rap / L * 100 : null, rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; };
+    return {L, rap: L ? rap / L * 100 : null, rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; };   // mesma conta em todo o painel
   for (const n of extra) if (!nomes.includes(n)) { const c = calc(n); if (c.L || c.ag || c.reu || c.won) nomes.push(n); }
   if (opt.cons && S.consultores.length) { const fc = new Set(S.consultores); for (let i = nomes.length - 1; i >= 0; i--) if (!fc.has(nomes[i])) nomes.splice(i, 1); }
   const pc = (a, b) => b ? a / b * 100 : null;
@@ -3062,7 +3072,7 @@ function insMetasConsHtml(P, modo, xT, CP, opt) {
   return `<details class="card mt np inscmp insmc${opt.cons ? ' consmc' : ''}"${aberto ? ' open' : ''}><summary class="ch"><div><h3>${opt.titulo || 'Funil Consultores'}${CP ? ` · ${ESC(CP)}` : ''}</h3><p>${opt.sub || 'As mesmas contas do bloco acima e dos cards, separadas por consultor (o total do funil é o bloco Metas)'} · ${fN(linhas.length)} ${linhas.length === 1 ? 'consultor' : 'consultores'} · clique para abrir ou fechar</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
     <div class="tw"><table class="t"><thead><tr><th>Consultor</th><th class="num">${opt.cons ? 'Leads' : 'MQL'}</th><th class="num">Agend.</th><th class="num">Reun.</th>${cols.map(k => `<th class="num">${k[0]}<div class="mut" style="font-weight:400">ref. ${fP(k[2])}</div></th>`).join('')}</tr></thead>
     <tbody>${linhas.map(o => tr(o.n, o.c)).join('')}</tbody></table></div>
-    <div class="mt-n" style="padding:0 18px 14px">${opt.cons ? 'Leads = entraram no período (filtros do topo); agendados, reuniões e ganhos = desses leads, os mesmos números dos cartões e do ranking desta aba. Referência do funil: tabela de conversão sobre MQL (30% / 15% / 5%); contato em menos de 1 dia: 80%.' : 'MQL = leads que entraram no período; agendamentos, reuniões e ganhos = o que aconteceu no período (lead de qualquer data de entrada), como nos cards.'} % da ref. = quanto da referência cada consultor atingiu (até 100%). A meta de 40 MQL é do B2C inteiro, por isso não é dividida por consultor.${modo === 'semanal' ? ' As taxas etapa a etapa ficam na visão Mensal.' : ''}</div></details>`;
+    <div class="mt-n" style="padding:0 18px 14px">${opt.cons ? 'Leads = entraram no período (filtros do topo); agendados, reuniões e ganhos = o que aconteceu no período (lead de qualquer data), os mesmos números dos cartões, do ranking e dos Insights. Referência do funil: tabela de conversão sobre MQL (30% / 15% / 5%); contato em menos de 1 dia: 80%.' : 'MQL = leads que entraram no período; agendamentos, reuniões e ganhos = o que aconteceu no período (lead de qualquer data de entrada), como nos cards.'} % da ref. = quanto da referência cada consultor atingiu (até 100%). A meta de 40 MQL é do B2C inteiro, por isso não é dividida por consultor.${modo === 'semanal' ? ' As taxas etapa a etapa ficam na visão Mensal.' : ''}</div></details>`;
 }
 function insMetasHtml(x, CP, parcial, modo, frac) {
   const pc = (a, b) => b ? a / b * 100 : null, V = REF_VOL[modo] || REF_VOL.semanal, ff = frac || 1;
@@ -3124,7 +3134,7 @@ function insAssumidosHtml() {
     <small>Regra: assumiu o lead, faz o contato e move a etapa (ou registra a atividade). Situação de hoje · conta quem foi assumido há mais de 1 dia.</small></div>`;
 }
 function insExcl(de, ate) {
-  const pr = makePred(filtros({de, ate}), 'periodo'), inW = s => { if (!s) return false; const d = String(s).slice(0, 10); return d >= de && d <= ate; };
+  const pr = makePred(filtros({de, ate, operacao: false}), 'periodo'), inW = s => { if (!s) return false; const d = String(s).slice(0, 10); return d >= de && d <= ate; };
   let base = 0, retro = 0;
   for (const l of LEADS) { if (!pr(l) || !(l.b || isRetro(l))) continue;
     if (!(inW(l.e) || (l.s === 'won' && inW(l.w)) || (l.s === 'lost' && inW(l.l)))) continue;
@@ -4170,19 +4180,27 @@ function viewYouTube() {
 /* ---- Lead a Lead ---- */
 const QUICK = [['todos', 'Todos', () => true], ['abertos', 'Abertos', d => d.open], ['ganhos', 'Ganhos', d => d.won], ['perdidos', 'Perdidos', d => d.lost], ['sem', 'Sem contato', d => !d.cont], ['parados', 'Parados > 7d', d => d.parado],
   ['fds', 'Entrada no FDS', d => d.fds], ['agendados', 'Agendados', d => d.agendado], ['atraso', 'Em atraso', d => d.cad === 'atraso'], ['semprox', 'Sem próxima atividade', d => d.cad === 'sem']];
-function ganhosRun() { return S.perdaData ? run(filtros({data_ref: 'w'})) : cur(); }
-function listaRows() {
-  const q = QUICK.find(x => x[0] === S.ll.quick) || QUICK[0], C = q[0] === 'ganhos' ? ganhosRun() : cur();
-  return sortRows(C.rows.filter(r => q[2](r.d)), LL_COLS, S.ll);
+/* Agendados, Ganhos e Perdidos = o que ACONTECEU no período (lead de qualquer data de entrada), a mesma conta da
+   Visão Macro, dos Insights e dos Consultores. Os demais filtros rápidos são dos leads que entraram no período. */
+const LL_EVENTO = {
+  agendados: (l, inP) => agendaTempos(l).some(inP),
+  ganhos: (l, inP) => l.s === 'won' && inP(l.w),
+  perdidos: (l, inP) => l.s === 'lost' && inP(l.l)};
+function quickRows(id) {
+  const q = QUICK.find(x => x[0] === id) || QUICK[0];
+  if (!LL_EVENTO[q[0]]) return cur().rows.filter(r => q[2](r.d));
+  const inP = s => { if (!s) return false; const d = String(s).slice(0, 10); return d >= S.de && d <= S.ate; };
+  return run(filtros({de: '', ate: ''})).rows.filter(r => LL_EVENTO[q[0]](r.l, inP));
 }
+function listaRows() { return sortRows(quickRows(S.ll.quick), LL_COLS, S.ll); }
 function viewLista() {
-  const C = cur(), list = listaRows(), per = 50, perd = S.ll.quick === 'perdidos', gan = S.ll.quick === 'ganhos';
+  const list = listaRows(), per = 50, perd = S.ll.quick === 'perdidos', ev = !!LL_EVENTO[S.ll.quick];
   const pages = Math.max(1, Math.ceil(list.length / per)); if (S.ll.page >= pages) S.ll.page = pages - 1;
   const pageRows = list.slice(S.ll.page * per, (S.ll.page + 1) * per);
-  const tg = perd || gan ? `<span class="tg${S.perdaData ? ' on' : ''}" data-act="perda-data" role="switch" aria-checked="${S.perdaData}" tabindex="0" data-tip="${ESC('Ligado: ganhos e perdidos pela data em que foram ganhos/perdidos (bate com os Insights).\nDesligado: pela data de entrada do lead.')}"><span class="sw"></span>Pela data do ganho/perda</span>` : '';
-  let h = viewHead('Lead a Lead', ((perd || gan) && S.perdaData ? periodCaption(perd ? 'perda' : 'ganho') : periodCaption()) + ' · clique numa linha para ver a jornada completa', tg);
-  const nQ = (id, fn) => id === 'perdidos' && S.perdaData ? lostRun()[0].res.perdidos.total : id === 'ganhos' ? ganhosRun().rows.filter(r => r.d.won).length : C.rows.filter(r => fn(r.d)).length;
-  const seg = '<div class="seg">' + QUICK.map(([id, nome, fn]) => `<button data-quick="${id}" class="${S.ll.quick === id ? 'on' : ''}">${nome}<small>${fN(nQ(id, fn))}</small></button>`).join('') + '</div>';
+  const evNome = {agendados: 'agendamento', ganhos: 'ganho', perdidos: 'perda'}[S.ll.quick];
+  let h = viewHead('Lead a Lead', (ev ? periodCaption(evNome) + ' · lead de qualquer data de entrada' : periodCaption()) + ' · clique numa linha para ver a jornada completa');
+  const nQ = id => quickRows(id).length;
+  const seg = '<div class="seg">' + QUICK.map(([id, nome]) => `<button data-quick="${id}" class="${S.ll.quick === id ? 'on' : ''}"${LL_EVENTO[id] ? ` data-tip="${ESC('Pela data em que aconteceu no período (lead de qualquer data de entrada) · mesma conta da Visão Macro e dos Insights')}"` : ''}>${nome}<small>${fN(nQ(id))}</small></button>`).join('') + '</div>';
   if (perd) return h + `<div class="card np"><div class="tbar">${seg}</div></div>` + perdidosHtml();
   h += `<div class="card np"><div class="tbar">${seg}<button class="btn gh" data-act="csv-lista">${DL_ICON}Exportar CSV (${fN(list.length)})</button></div>`;
   h += list.length ? `<div class="tw tall"><table class="t stk">${thead(LL_COLS, S.ll, 'll')}${tableRows(LL_COLS, pageRows)}</table></div>${pager('ll', S.ll.page, list.length, per)}` : emptyBox();
@@ -4361,7 +4379,8 @@ const CONS_COLS = [
   {k: 'agendados', t: 'Agendados', num: 1}, {k: 'reunioes', t: 'Reuniões', num: 1}, {k: 'ganhos', t: 'Ganhos', num: 1}, {k: 'perdidos', t: 'Perdidos', num: 1},
   {k: 'abertos', t: 'Abertos', num: 1}, {k: 'abertos_sem_contato', t: 'Abertos s/ contato', num: 1}, {k: 'parados_7d', t: 'Parados > 7d', num: 1}];
 function viewConsultores() {
-  const C = cur(), cs = C.res.consultores;
+  const C = cur(), cs = C.res.consultores.map(c => { const e = evCons(c.consultor);
+    return Object.assign({}, c, {agendados: e.agendamentos, reunioes: e.reunioes, ganhos: e.ganhos, perdidos: e.perdidos}); });
   let h = viewHead('Consultores', periodCaption() + ' · mapa da carteira e fluxo de eficiência por consultor (dono do negócio)');
   h += mapaConsHtml({onde: 'consultores'}).replace('class="card mt mapa"', 'class="card mapa"');
   if (!cs.length) return h + `<div class="card mt">${emptyBox()}</div>`;
