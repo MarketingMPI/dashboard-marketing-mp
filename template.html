@@ -498,7 +498,7 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .cad.atr{background:#fbe9e6;color:#a3362a}.cad.hoj{background:#fbf1dc;color:#8a5d10}.cad.dia{background:#e3f3ea;color:#0b6b3a}.cad.sem{background:#eef1f0;color:#69727d}
 .cadmini{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:4px 0 16px}
 .cadmini > div{border:1px solid var(--linha);border-radius:12px;padding:12px 14px;background:#fff}
-.mapa .ch{flex-wrap:wrap}.mapa .cadmini{grid-template-columns:repeat(3,minmax(0,1fr))}@media (max-width:760px){.mapa .cadmini{grid-template-columns:1fr}}.mapa-acoes{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mapa .ch{flex-wrap:wrap}.insdrv .drv td{vertical-align:middle}.insdrv tr.dg td{background:var(--suave);color:var(--verde);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:9px;padding-bottom:9px}.insdrv tr.dm td{background:var(--v50)}.insdrv tr.di td:first-child{padding-left:30px}.insdrv .hw{display:block;font-size:11.5px;color:var(--cinza);font-weight:400;margin-top:2px;white-space:normal;max-width:380px}.insdrv .tagm{font-size:10px;font-weight:700;color:#fff;background:var(--verde);border-radius:4px;padding:1px 5px;margin-right:2px}.insdrv .mtp{font-size:11px;padding:1px 7px;border-radius:9px;font-weight:600;white-space:nowrap}.insdrv .mtp.ok{background:var(--v100);color:var(--verde)}.insdrv .mtp.no{background:var(--verm-bg);color:var(--verm)}.insdrv .spk{display:block}.drvres{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 18px 12px}.drvres .drvw{font-size:12.5px;color:var(--cinza)}.mapa .cadmini{grid-template-columns:repeat(3,minmax(0,1fr))}@media (max-width:760px){.mapa .cadmini{grid-template-columns:1fr}}.mapa-acoes{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .cm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:14px}
 .cm-card{border:1px solid var(--linha);border-radius:12px;padding:14px 16px;background:#fff;min-width:0}.cm-card.cm-atr{border-color:#f0cfc9}
 .cm-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}.cm-h h4{margin:0;font-size:15px;cursor:pointer}.cm-h h4:hover{color:var(--verde)}
@@ -1045,6 +1045,7 @@ const isRetro = l => { const h = l.h || []; return (h.length > 0 && AGENDA_STAGE
 const DEFAULT_STAGES = [{id: 345, nome: 'MQL - 1º Contato'}, {id: 346, nome: 'Agendar'}, {id: 348, nome: 'Reunião'},
   {id: 349, nome: 'Negociação'}, {id: 350, nome: 'Fechamento'}, {id: 438, nome: 'Cultivo'}];
 const SEM_MOTIVO = 'Sem motivo informado';
+const NEGOC_ID = 349;   // etapa Negociação do Funil Alpha
 const TRD_RX = /^\s*TRD\s*\|/i;  // prefixo exato da Tríade (exclui TRD-INT)
 // Campanhas pelo prefixo do título do negócio. Para adicionar outra, inclua aqui (e em audit.CAMPANHAS).
 const CAMPANHAS = {trd: {rx: TRD_RX, nome: 'TRD · Tríade', tip: "Negócios cujo título começa com 'TRD |' (campanha Tríade). TRD-INT fica de fora."},
@@ -1277,9 +1278,26 @@ function computeEventos(leads, f) {
   const dentro = s => { if (!s) return false; const d = String(s).slice(0, 10); return d >= de && d <= ate; };
   let ag = 0, reu = 0, won = 0, lost = 0, cont = 0, contL = 0, faltas = 0;
   const motivos = {};
+  // indicadores que movem as metas (espelho: audit.eventos)
+  let neg = 0, semAg = 0, posReu = 0, ag7 = 0; const dAR = [], dRG = [], tent = [];
   for (const l of leads || []) {
     if (!pred(l)) continue;
     const k = l.k || [], h = l.h || [];
+    const at = agendaTempos(l);
+    if (dentro(l.e) && at.some(t2 => t2 >= l.e && (tms(t2) - tms(l.e)) / DAY <= 7)) ag7++;   // lead novo com reunião marcada em até 7 dias
+    for (const x of k) if (MEETING_TYPES.has(x[1]) && dentro(x[0])) {     // agendamento → cada reunião realizada no período
+      let u = null; for (const t of at) if (t <= x[0]) u = t;
+      if (u) dAR.push(Math.max(0, (tms(x[0]) - tms(u)) / DAY));
+    }
+    if (h.some(s => Number(s[0]) === NEGOC_ID && dentro(s[1]))) neg++;   // avançou para Negociação no período
+    if (l.s === 'lost' && dentro(l.l)) {
+      if (k.some(x => MEETING_TYPES.has(x[1]) && x[0] <= l.l)) posReu++;   // perdido depois de ter reunião
+      else if (!at.some(t2 => t2 <= l.l)) { semAg++; tent.push(k.filter(x => x[0] <= l.l).length); }   // perdido sem nunca agendar
+    }
+    if (l.s === 'won' && dentro(l.w)) {
+      const m1 = k.filter(x => MEETING_TYPES.has(x[1]) && x[0] <= l.w).map(x => x[0]).sort()[0];
+      if (m1) dRG.push(Math.max(0, (tms(l.w) - tms(m1)) / DAY));         // 1ª reunião → ganho
+    }
     if (agendaTempos(l).some(dentro)) ag++;   // reunião marcada no período (lead conta 1 vez)
     for (const x of k) if (MEETING_TYPES.has(x[1]) && dentro(x[0])) reu++;   // cada reunião concluída no período conta (pedido 10/11/2026)
     if (l.s === 'won' && dentro(l.w)) won++;
@@ -1288,7 +1306,9 @@ function computeEventos(leads, f) {
     cont += n; if (n) contL++;
     for (const x of l.ns || []) if (dentro(x)) faltas++;
   }
-  return {agendamentos: ag, reunioes: reu, ganhos: won, perdidos: lost, contatos: cont, leads_contatados: contL, faltas, motivos_perda: motivos};
+  return {agendamentos: ag, reunioes: reu, ganhos: won, perdidos: lost, contatos: cont, leads_contatados: contL, faltas, motivos_perda: motivos,
+    agendados_em_7d: ag7, dias_agenda_reuniao: median(dAR), dias_reuniao_ganho: median(dRG), negociacao: neg,
+    perdidos_sem_agendar: semAg, tentativas_ate_perda: mean(tent), perdidos_pos_reuniao: posReu};
 }
 function computePerf(leads, f, agora) {
   f = f || {};
@@ -2761,6 +2781,100 @@ function insMCalc(de, ate) {
   if (!INSM_CACHE.has(key)) { if (INSM_CACHE.size > 600) INSM_CACHE.clear(); INSM_CACHE.set(key, Object.assign(insCalc(de, ate), {mql: contaMetaMql(f)})); }
   return INSM_CACHE.get(key);
 }
+/* Indicadores que movem as metas (pedido 10/11/2026): para cada meta do painel de Metas, os indicadores que mexem
+   nela, comparados com o período anterior e com a média, para acompanhar semana a semana / mês a mês. */
+const DRV = [
+  {g: 'Volume de leads', metas: [{k: 'mql', t: 'MQL (leads qualificados)', tipo: 'fluxo', vol: 'mql'}],
+   it: [{k: 'inv', t: 'Investimento na Meta', good: 0, f: 'rs', como: 'mais verba traz mais leads, se o custo por lead se mantiver'},
+        {k: 'cpl', t: 'Custo por lead', good: -1, f: 'rs', como: 'quanto menor, mais MQL com a mesma verba'},
+        {k: 'leads', t: 'Leads novos (todas as origens)', good: 1, f: 'n', como: 'MQL é a parte com etiqueta Digital e prefixo TRD/DIAG/RCON; o resto não conta na meta'}]},
+  {g: 'Velocidade do 1º contato', metas: [{k: 'rap', t: 'Contato em menos de 1 dia', tipo: 'taxa', meta: 80}],
+   it: [{k: 't1', t: '1º contato médio', good: -1, f: 'd', como: 'quanto mais rápido, mais leads contatados no 1º dia'},
+        {k: 'semCont', t: 'Leads sem nenhum contato', good: -1, f: 'n', como: 'lead sem contato nunca entra nos 80% e não chega a agendar'}]},
+  {g: 'Agendamento', metas: [{k: 'ag', t: 'Reuniões agendadas', tipo: 'fluxo', vol: 'ag'}, {k: 'tAg', t: 'MQL → reunião agendada', tipo: 'taxa', meta: REF_PRU.ag}],
+   it: [{k: 'contatos', t: 'Contatos realizados', good: 1, f: 'n', como: 'mais tentativas concluídas, mais chance de conversa e agenda'},
+        {k: 'pAg7', t: 'Leads novos com reunião marcada em até 7 dias', good: 1, f: 'p', como: 'lead agendado rápido esfria menos; conta os que entraram no período'},
+        {k: 'pSemAg', t: 'Perdidos sem chegar a agendar', good: -1, f: 'n', como: 'cada um é um MQL que saiu do funil antes da reunião'},
+        {k: 'tPerda', t: 'Tentativas antes de desistir', good: 1, f: 'n1', como: 'cadência completa antes de dar o lead como perdido'}]},
+  {g: 'Comparecimento', metas: [{k: 'reu', t: 'Reuniões realizadas', tipo: 'fluxo', vol: 're'}, {k: 'tRe', t: 'Agendada → realizada', tipo: 'taxa', meta: REF_PRU.re / REF_PRU.ag * 100}],
+   it: [{k: 'faltas', t: 'Faltas (no-show)', good: -1, f: 'n', como: 'cada falta é uma reunião agendada que não acontece'},
+        {k: 'comp', t: 'Comparecimento', good: 1, f: 'p', como: 'realizadas ÷ (realizadas + faltas)'},
+        {k: 'dAR', t: 'Dias entre agendar e a reunião (mediana)', good: -1, f: 'd', como: 'reunião marcada para muito longe tem mais falta'}]},
+  {g: 'Fechamento', metas: [{k: 'won', t: 'Fechamentos', tipo: 'fluxo', vol: 'ga'}, {k: 'tGa', t: 'Realizada → fechamento', tipo: 'taxa', meta: REF_PRU.ga / REF_PRU.re * 100},
+     {k: 'tTot', t: 'MQL → fechamento', tipo: 'taxa', meta: REF_PRU.ga}],
+   it: [{k: 'neg', t: 'Leads que avançaram para Negociação', good: 1, f: 'n', como: 'o passo entre a reunião e o fechamento'},
+        {k: 'pPos', t: 'Perdidos depois da reunião', good: -1, f: 'n', como: 'oportunidade que chegou à reunião e não fechou'},
+        {k: 'dRG', t: 'Dias da 1ª reunião ao fechamento (mediana)', good: -1, f: 'd', como: 'ciclo de venda: quanto menor, mais fechamentos no período'}]}];
+function drvVal(k, x) {
+  if (!x) return null;
+  const pc = (a, b) => b ? a / b * 100 : null;
+  if (k === 'tAg') return pc(x.ag, x.leads); if (k === 'tRe') return pc(x.reu, x.ag);
+  if (k === 'tGa') return pc(x.won, x.reu); if (k === 'tTot') return pc(x.won, x.leads); if (k === 'pAg7') return pc(x.ag7, x.leads);
+  return x[k] ?? null;
+}
+const drvTaxa = (k, f) => f === 'p' || f === 'd' || f === 'rs' || f === 'n1' || ['tAg', 'tRe', 'tGa', 'tTot', 'rap'].includes(k);
+function drvSpark(vals, alvo, parcial) {
+  const W = 92, H = 26, v = vals.map(p => p == null ? null : p), ok = v.filter(p => p != null);
+  if (ok.length < 2) return '<span class="mut">–</span>';
+  let lo = Math.min(...ok, alvo ?? Infinity), hi = Math.max(...ok, alvo ?? -Infinity); if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+  const X = i => 3 + i * (W - 6) / Math.max(1, v.length - 1), Y = p => H - 3 - (p - lo) / (hi - lo) * (H - 6);
+  let d = '', pen = false; v.forEach((p, i) => { if (p == null) { pen = false; return; } d += `${pen ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p).toFixed(1)}`; pen = true; });
+  const li = v.length - 1, lv = v[li];
+  return `<svg class="spk" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${alvo != null ? `<line x1="2" x2="${W - 2}" y1="${Y(alvo).toFixed(1)}" y2="${Y(alvo).toFixed(1)}" stroke="var(--v300)" stroke-dasharray="3 3"/>` : ''}<path d="${d}" fill="none" stroke="var(--verde)" stroke-width="1.6"/>${lv != null ? `<circle cx="${X(li).toFixed(1)}" cy="${Y(lv).toFixed(1)}" r="2.6" fill="${parcial ? '#fff' : 'var(--verde)'}" stroke="var(--verde)" stroke-width="1.4"/>` : ''}</svg>`;
+}
+function insDrvHtml(o) {
+  const {x, ant, B, per, i, P, modo, frac, rotAnt, rotMed, CP, nm} = o;
+  const FM = {n: insN1, n1: v => v == null ? '–' : nf1.format(v), d: fD, p: fP, rs: v => v == null ? '–' : fR(v)};
+  const capP = v => v != null && v > 100 ? 100 : v;
+  const serieP = per.slice(Math.max(0, i - 7), i + 1).map((p, j, a) => insMCalc(p.de, j === a.length - 1 ? P.ate : p.fim));
+  const vari = (c, p, good, f, taxa) => {
+    if (c == null || p == null) return '<span class="dl na">sem comparação</span>';
+    const d = c - p; if (Math.abs(d) < 1e-9) return '<span class="dl neu">= igual</span>';
+    const tone = good === 0 ? 'neu' : ((d > 0) === (good > 0) ? 'pos' : 'neg');
+    if (f === 'p') return `<span class="dl ${tone}">${d > 0 ? '▲ +' : '▼ −'}${nf1.format(Math.abs(d))} p.p.</span>`;
+    return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${p ? nf1.format(Math.abs(d / p * 100)) + '%' : 'novo'} (${d > 0 ? '+' : '−'}${FM[f](Math.abs(d))})</span>`;
+  };
+  const sit = (c, p, good, taxa, meta) => {
+    if (good === 0) return c == null || p == null || Math.abs(c - p) < 1e-9 ? ['neu', '= igual'] : ['neu', c > p ? '↑ subiu' : '↓ caiu'];
+    if (c == null || p == null) return ['na', 'sem comparação'];
+    const tom = insTom(c, p, good, taxa || meta ? 0 : 3);
+    if (tom === 'pos') return ['pos', '✔ Melhorou']; if (tom === 'neg') return ['neg', '✖ Piorou'];
+    return ['neu', !taxa && Math.max(Math.abs(c), Math.abs(p)) < 3 && Math.abs(c - p) > 1e-9 ? '= Estável (volume pequeno)' : '= Estável'];
+  };
+  const cont = {pos: [], neg: [], neu: 0};
+  let rows = '';
+  for (const G of DRV) {
+    rows += `<tr class="dg"><td colspan="7">${ESC(G.g)}</td></tr>`;
+    for (const m of G.metas) {
+      const taxa = m.tipo === 'taxa', f = taxa ? 'p' : 'n';
+      const c = drvVal(m.k, x), pv = drvVal(m.k, ant), bm = B ? drvVal(m.k, B) : null;
+      const alvoP = taxa ? m.meta : (CP && m.k === 'mql' ? null : REF_VOL[modo][m.vol]);
+      const esp = alvoP == null ? null : taxa ? alvoP : alvoP * frac;
+      const okM = esp == null || c == null ? null : c >= esp - 1e-9;
+      const vtxt = taxa && c != null && c > 100 ? '100% ⚠' : FM[f](c);
+      const st = sit(c, pv, 1, taxa, true);
+      rows += `<tr class="dm"><td><span class="tagm">META</span> <b>${ESC(m.t)}</b><span class="hw">${alvoP == null ? 'meta do B2C inteiro (sem divisão por campanha)' : `meta ${taxa ? fP(alvoP) : insN1(alvoP) + ' por ' + nm[0]}${!taxa && frac < 1 ? ` · esperado até hoje ${insN1(esp)}` : ''}`}</span></td>
+        <td class="num"><b>${vtxt}</b>${okM == null ? '' : okM ? ' <span class="mtp ok">✔ na meta</span>' : ' <span class="mtp no">abaixo</span>'}</td>
+        <td class="num">${taxa ? fP(capP(pv)) : FM[f](pv)}</td><td class="num">${taxa ? fP(capP(bm)) : FM[f](bm)}</td>
+        <td class="num">${vari(taxa ? capP(c) : c, taxa ? capP(pv) : pv, 1, f, taxa)}</td>
+        <td>${drvSpark(serieP.map(z => taxa ? capP(drvVal(m.k, z)) : drvVal(m.k, z)), taxa ? alvoP : null, P.parcial)}</td>
+        <td><span class="dl ${st[0]}">${st[1]}</span></td></tr>`;
+    }
+    for (const d of G.it) {
+      const off = (d.k === 'inv' || d.k === 'cpl') && S.camp && !PAGAS[S.camp];
+      const taxa = drvTaxa(d.k, d.f), c = off ? null : drvVal(d.k, x), pv = off ? null : drvVal(d.k, ant), bm = off || !B ? null : drvVal(d.k, B);
+      const st = off ? ['na', 'sem mídia paga'] : sit(c, pv, d.good, taxa);
+      if (!off && d.good !== 0) { if (st[0] === 'pos') cont.pos.push(d.t); else if (st[0] === 'neg') cont.neg.push(d.t); else if (st[0] === 'neu') cont.neu++; }
+      rows += `<tr class="di"><td>${ESC(d.t)}<span class="hw">${ESC(d.como)}</span></td><td class="num"><b>${FM[d.f](c)}</b></td>
+        <td class="num">${FM[d.f](pv)}</td><td class="num">${FM[d.f](bm)}</td><td class="num">${off ? '–' : vari(c, pv, d.good, d.f, taxa)}</td>
+        <td>${off ? '<span class="mut">–</span>' : drvSpark(serieP.map(z => drvVal(d.k, z)), null, P.parcial)}</td><td><span class="dl ${st[0]}">${st[1]}</span></td></tr>`;
+    }
+  }
+  const resumo = `<div class="drvres"><span class="dl pos">✔ ${fN(cont.pos.length)} melhoraram</span><span class="dl neg">✖ ${fN(cont.neg.length)} pioraram</span><span class="dl neu">= ${fN(cont.neu)} estáveis</span>${cont.neg.length ? `<span class="drvw">Pioraram: <b>${cont.neg.map(ESC).join(', ')}</b></span>` : ''}</div>`;
+  return `<div class="card mt np insdrv"><div class="ch" style="padding:16px 18px 0"><div><h3>🎯 Indicadores que movem as metas</h3><p>Cada meta do painel de Metas e os indicadores que mexem nela · comparação com ${ESC(rotAnt)}${P.parcial ? ' (ajustada ao mesmo número de dias)' : ''} · situação: melhorou ou piorou mais de 15%; nos indicadores, volumes abaixo de 3 ficam como estáveis</p></div></div>
+    ${resumo}<div class="tw"><table class="t drv"><thead><tr><th>Indicador</th><th class="num">${modo === 'semanal' ? 'Esta semana' : 'Este mês'}</th><th class="num">${ESC(rotAnt)}</th><th class="num">${ESC(rotMed)}</th><th class="num">Variação vs ${ESC(rotAnt)}</th><th>Últimas ${fN(serieP.length)} ${nm[1]}</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="note" style="margin:0 18px 16px">Agendamentos, reuniões, ganhos e perdidos contam pela data em que aconteceram (lead de qualquer data de entrada), como nos cards. "Dias" são a mediana dos eventos do período (metade levou menos, metade mais), para um caso antigo não distorcer. A linha tracejada no gráfico é a meta.${P.parcial ? ' O ponto vazado é o período em andamento.' : ''}</div></div>`;
+}
 function insMetaVal(k, x) {
   const pc = (a, b) => b ? a / b * 100 : null;
   return {mql: x.mql, ag: x.ag, reu: x.reu, won: x.won, rap: x.rap, tAg: pc(x.ag, x.leads), tRe: pc(x.reu, x.ag), tGa: pc(x.won, x.reu), tTot: pc(x.won, x.leads)}[k] ?? null;
@@ -2841,12 +2955,15 @@ function insCalc(de, ate, camp) {
   return {de, ate, leads: k.leads, cont: k.contatados, pctCont: k.pct_contatados, semCont: k.sem_contato, t1: k.media_dias_1o_contato,
     rap: pctOf(rap, k.leads), rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos, lost: e.perdidos, contatos: e.contatos,
     faltas: e.faltas, comp: e.reunioes + e.faltas ? e.reunioes / (e.reunioes + e.faltas) * 100 : null,
+    ag7: e.agendados_em_7d, dAR: e.dias_agenda_reuniao, dRG: e.dias_reuniao_ganho, neg: e.negociacao,
+    pSemAg: e.perdidos_sem_agendar, tPerda: e.tentativas_ate_perda, pPos: e.perdidos_pos_reuniao,
     kAg: k.agendados, kReu: k.reunioes, kWon: k.ganhos, lostDet,
     motivos: e.motivos_perda, inv: pf.investimento, cpl: pf.custo_lead, pagos: pf.leads, cpg: pf.custo_ganho, wonPagos: pf.ganhos, grupos: R.res.performance.grupos,
     consultores: R.res.consultores};
 }
-const INS_KEYS = ['leads', 'rap', 'ag', 'reu', 'won', 'lost', 'inv', 'cpl', 'cpg', 'pctCont', 't1', 'contatos', 'faltas', 'comp'];
-const INS_TAXA = new Set(['rap', 'cpl', 'cpg', 'pctCont', 't1', 'comp']);   // taxas/médias não se ajustam pelo ritmo do período parcial
+const INS_KEYS = ['leads', 'rap', 'ag', 'reu', 'won', 'lost', 'inv', 'cpl', 'cpg', 'pctCont', 't1', 'contatos', 'faltas', 'comp',
+  'mql', 'semCont', 'ag7', 'dAR', 'dRG', 'neg', 'pSemAg', 'tPerda', 'pPos'];
+const INS_TAXA = new Set(['rap', 'cpl', 'cpg', 'pctCont', 't1', 'comp', 'pAg7', 'dAR', 'dRG', 'tPerda']);   // taxas/médias não se ajustam pelo ritmo do período parcial
 function insBase(list, frac) {
   const b = {}; for (const key of INS_KEYS) { const v = list.map(x => x[key]).filter(v => v != null);
     b[key] = v.length ? v.reduce((a, x) => a + x, 0) / v.length * (INS_TAXA.has(key) ? 1 : frac) : null; }
@@ -3229,6 +3346,12 @@ function viewInsights() {
   ].join('') + '</div>';
   if (modo !== 'semanal') h += insMetasHtml(x, CP, P.parcial, modo, frac);   // semanal: metas ficam na aba Metas (pedido 10/11/2026)
   // Funil Consultores saiu dos Insights (pedido 10/11/2026): fica só na página Consultores
+  {
+    const xm = Object.assign({}, x, {mql: insMCalc(P.de, P.ate).mql});
+    const pm = xPrev ? insAjusta(Object.assign({}, xPrev, {mql: insMCalc(per[i - 1].de, per[i - 1].fim).mql}), frac) : null;
+    const Bm = ants.length ? insBase(per.slice(Math.max(0, i - nb), i).map(p => insMCalc(p.de, p.fim)), frac) : null;
+    h += insDrvHtml({x: xm, ant: pm, B: Bm, per, i, P, modo, frac, rotAnt, rotMed, CP, nm});
+  }
   // avaliação
   const pos = [], neg = [], neu = [];
   const put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);

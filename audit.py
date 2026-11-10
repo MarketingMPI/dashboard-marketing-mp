@@ -25,6 +25,7 @@ DATA = os.path.join(BASE, "data", "dashboard.json")
 OUT = os.path.join(BASE, "data", "audit_expected.json")
 
 AGENDADO_STAGES = {348, 349, 350}
+NEGOCIACAO = 349   # etapa Negociação (espelho: NEGOC_ID)
 REUNIAO_TIPOS = {"meeting", "qualificacao"}
 TOL = 1e-6
 
@@ -184,8 +185,25 @@ def eventos(leads, f):
     dentro = lambda s: bool(s) and de <= str(s)[:10] <= ate
     ag = reu = won = lost = cont = contL = faltas = 0
     motivos = Counter()
+    neg = sem_ag = pos_reu = ag7 = 0; d_ar, d_rg, tent = [], [], []   # indicadores que movem as metas
     for l in P:
         k, h = l["k"] or [], l["h"] or []
+        at = agenda_tempos(l)
+        if dentro(l.get("e")) and any(t >= l["e"] and dias(dt(t), dt(l["e"])) <= 7 for t in at): ag7 += 1
+        for x in k:
+            if x[1] in REUNIAO_TIPOS and dentro(x[0]):
+                u = None
+                for t in at:
+                    if t <= x[0]: u = t
+                if u: d_ar.append(max(0.0, dias(dt(x[0]), dt(u))))
+        if any(s[0] == NEGOCIACAO and dentro(s[1]) for s in h): neg += 1
+        if l["s"] == "lost" and dentro(l["l"]):
+            if any(x[1] in REUNIAO_TIPOS and x[0] <= l["l"] for x in k): pos_reu += 1
+            elif not any(t <= l["l"] for t in at):
+                sem_ag += 1; tent.append(sum(1 for x in k if x[0] <= l["l"]))
+        if l["s"] == "won" and dentro(l["w"]):
+            m1 = sorted(x[0] for x in k if x[1] in REUNIAO_TIPOS and x[0] <= l["w"])
+            if m1: d_rg.append(max(0.0, dias(dt(l["w"]), dt(m1[0]))))
         if any(dentro(t) for t in agenda_tempos(l)): ag += 1
         reu += sum(1 for x in k if x[1] in REUNIAO_TIPOS and dentro(x[0]))   # cada reunião concluída no período
         if l["s"] == "won" and dentro(l["w"]): won += 1
@@ -195,7 +213,9 @@ def eventos(leads, f):
         cont += n; contL += 1 if n else 0
         faltas += sum(1 for x in (l.get("ns") or []) if dentro(x))
     return {"agendamentos": ag, "reunioes": reu, "ganhos": won, "perdidos": lost, "contatos": cont,
-            "leads_contatados": contL, "faltas": faltas, "motivos_perda": dict(motivos)}
+            "leads_contatados": contL, "faltas": faltas, "motivos_perda": dict(motivos),
+            "agendados_em_7d": ag7, "dias_agenda_reuniao": mediana(d_ar), "dias_reuniao_ganho": mediana(d_rg),
+            "negociacao": neg, "perdidos_sem_agendar": sem_ag, "tentativas_ate_perda": media(tent), "perdidos_pos_reuniao": pos_reu}
 
 
 # ----------------------------------------------------------------------------- performance (mídia × Pipedrive)
