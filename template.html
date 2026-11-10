@@ -3228,7 +3228,7 @@ function viewInsights() {
       tip: 'Investimento no Meta Ads (campanhas B2C) no período ÷ ganhos no período (todas as origens, mesmo número do card Ganhos, da Visão Macro e da Performance)'})
   ].join('') + '</div>';
   if (modo !== 'semanal') h += insMetasHtml(x, CP, P.parcial, modo, frac);   // semanal: metas ficam na aba Metas (pedido 10/11/2026)
-  h += insMetasConsHtml(P, modo, x, CP);
+  // Funil Consultores saiu dos Insights (pedido 10/11/2026): fica só na página Consultores
   // avaliação
   const pos = [], neg = [], neu = [];
   const put = (tom, t, txt) => (tom === 'pos' ? pos : tom === 'neg' ? neg : neu).push([t, txt]);
