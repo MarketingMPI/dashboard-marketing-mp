@@ -2716,7 +2716,7 @@ function mpMetaChart(meta, S0, sel, W) {
       S0.tipo !== 'estoque' ? `Acumulado até o fim do período: ${fmtA(x.acc)}` : null,
       meta.k === 'churn' && x.extra ? `${fN(x.extra.sairam)} de ${fN(x.extra.base)} não renovaram` : null,
       `Meta${S0.tipo === 'fluxo' ? ' do ' + nomeG : ''}: ${meta.bom === 'baixo' ? 'até ' : ''}${fmtA(S0.alvo)} · ${x.pct == null ? '–' : fP(x.pct)} atingido`,
-      S0.movel && x.mov != null ? `Meta móvel: ${f1(x.mov)} (${fN(x.mql)} MQL × ${fP(S0.movel)}) · ${x.pctMov == null ? '–' : fP(x.pctMov)} atingido` : null, 'Clique para ver no card'].filter(Boolean).join('\n');
+      S0.movel && x.mov != null ? `Meta proporcional: ${f1(x.mov)} (${fN(x.mql)} MQL × ${fP(S0.movel)}) · ${x.pctMov == null ? '–' : fP(x.pctMov)} atingido` : null, 'Clique para ver no card'].filter(Boolean).join('\n');
     g += `<rect class="hit" x="${pl + i * bw}" y="${pt - 14}" width="${bw}" height="${ph + 14}" data-tip="${ESC(tip)}" data-mpmb="${i}" style="cursor:pointer"/>`;
   });
   if (linha.length > 1) g += `<polyline points="${linha.map(p => p.join(',')).join(' ')}" fill="none" stroke="#1c1c1c" stroke-width="1.6" opacity=".7"/>`;
@@ -2735,8 +2735,12 @@ function mpMetaCard(meta, S0, x) {
   const fmtA = v => v == null ? '–' : S0.tipo === 'fluxo' && !Number.isInteger(v) ? f1(v) : meta.fmt(v);
   const linhas = S0.tipo === 'estoque'
     ? [`No período: <b>${x.delta == null ? '–' : (x.delta > 0 ? '+' : x.delta < 0 ? '−' : '') + meta.fmt(Math.abs(x.delta))}</b>`, `Total acumulado: <b>${meta.fmt(x.v)}</b>`]
-    : [`No período: <b>${fmtA(x.v)}</b>`, `Acumulado desde ${fMesAno(S0.desde || mpMeses()[0])}: <b>${fmtA(x.acc)}</b>`].concat(S0.movel && x.mov != null
-      ? [!x.mql ? '<span class="mvl">Meta móvel: sem MQL no período</span>' : `<span class="mvl">Meta móvel: <b>${f1(x.mov)}</b> (${fN(x.mql)} MQL × ${fP(S0.movel)}) · <b class="${x.pctMov >= 100 ? 'mt-ok' : x.pctMov >= 80 ? '' : 'mvl-no'}">${fP(x.pctMov)}</b> atingido${x.pctMov >= 100 ? ' ✔' : ''}</span>`] : []);
+    : S0.ins && S0.tipo === 'fluxo'
+      ? [`Meta fixa: <b>${fmtA(S0.alvo)}</b> · <b class="${p >= 100 ? 'mt-ok' : p >= 80 ? '' : 'mvl-no'}">${p == null ? '–' : fP(p)}</b> atingido${p >= 100 ? ' ✔' : ''}`,
+         !S0.movel ? '<span class="mut">Meta proporcional: não se aplica (o MQL é a base do cálculo)</span>'
+         : !x.mql ? '<span class="mvl">Meta proporcional: sem MQL no período</span>'
+         : `<span class="mvl">Meta proporcional: <b>${f1(x.mov)}</b> (${fN(x.mql)} MQL × ${fP(S0.movel)}) · <b class="${x.pctMov >= 100 ? 'mt-ok' : x.pctMov >= 80 ? '' : 'mvl-no'}">${fP(x.pctMov)}</b> atingido${x.pctMov >= 100 ? ' ✔' : ''}</span>`]
+      : [`No período: <b>${fmtA(x.v)}</b>`, `Acumulado desde ${fMesAno(S0.desde || mpMeses()[0])}: <b>${fmtA(x.acc)}</b>`];
   return `<div class="mt-i mpmc ${mpCls(p)}"><div class="mt-h"><span>${meta.t}<br><small>${ESC(x.nome)}${x.parcial ? ' · em andamento' : ''}</small></span><b>${fmtA(x.v)}</b></div>
     <div class="mt-bar"><i style="width:${Math.min(100, p || 0)}%"></i></div>
     <div class="mt-f"><span><b>${p == null ? '–' : fP(p)}</b> da meta</span><span>Meta ${meta.bom === 'baixo' ? 'até ' : ''}<b>${fmtA(S0.alvo)}</b>${S0.tipo === 'fluxo' ? ' por ' + nomeG : ''}</span></div>
@@ -2951,11 +2955,11 @@ function insMetaSerie(meta, g, ini) {
     const ate = b.ate > TODAY ? TODAY : b.ate, cap = v => v != null && meta.tipo === 'taxa' && v > 100 ? 100.0001 : v;
     const X = insMCalc(b.de < ini ? ini : b.de, ate);
     const v = cap(insMetaVal(meta.k, X)), acc = cap(insMetaVal(meta.k, insMCalc(ini, ate)));
-    // meta móvel: MQL realizado no período × taxa do funil (agendadas 30%, realizadas 15%, fechamentos 5%)
+    // meta proporcional (antes "móvel"): MQL realizado no período × taxa do funil (agendadas 30%, realizadas 15%, fechamentos 5%)
     const mov = meta.movel && X.mql != null ? X.mql * meta.movel / 100 : null;
     return {...b, v, acc, delta: null, extra: null, pct: mpMetaPct({bom: 'alto', meta: alvo}, v), mql: X.mql, mov, pctMov: mov ? Math.min(100, v / mov * 100) : null};
   });
-  return {g, tipo: meta.tipo, alvo, pts, mensalForcado: false, desde: ini.slice(0, 7), movel: meta.movel || null};
+  return {g, tipo: meta.tipo, alvo, pts, mensalForcado: false, desde: ini.slice(0, 7), movel: meta.movel || null, ins: true};
 }
 function viewInsMetas() {
   const CN = S.camp && CAMPANHAS[S.camp] ? CAMPANHAS[S.camp].nome : '', CP = CN ? CN.split(' · ')[0] : '';
@@ -2963,7 +2967,7 @@ function viewInsMetas() {
   h += subAbas(INS_MODOS, 'metas', 'insmodo');
   const g = MPG.some(x => x[0] === S.mpG) ? S.mpG : 'mensal', ini = INS_METAS_DESDE < MIN_DAY ? MIN_DAY : INS_METAS_DESDE;
   h += `<div class="aplpx"><span>Evolução</span><div class="seg">${MPG.map(([k, l]) => `<button type="button" data-mpg="${k}" class="${g === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
-  h += `<div class="mph"><span>METAS B2C</span>dados desde ${fDay(ini)} · só a operação (sem base importada e lançamentos retroativos) · barras = valor de cada período · tracejado dourado = meta fixa · linha azul = meta móvel (MQL realizado × taxa do funil: agendadas 30%, realizadas 15%, fechamentos 5%) · clique numa barra para ver o período no card</div>`;
+  h += `<div class="mph"><span>METAS B2C</span>dados desde ${fDay(ini)} · só a operação (sem base importada e lançamentos retroativos) · barras = valor de cada período · tracejado dourado = meta fixa · linha azul = meta proporcional (MQL realizado × taxa do funil: agendadas 30%, realizadas 15%, fechamentos 5%) · clique numa barra para ver o período no card</div>`;
   if (CP) h += `<div class="note">Com ${ESC(CP)} selecionado, os gráficos mostram só os negócios ${ESC(CP)}, mas as metas de volume (40 MQL, 12 agendadas, 6 realizadas e 2 fechamentos por mês) são do B2C inteiro. As metas de conversão valem para cada campanha.</div>`;
   const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
   const linha = meta0 => {
@@ -2973,7 +2977,7 @@ function viewInsMetas() {
     const sel = Number.isInteger(S.mpMB) && S.mpMB >= 0 && S.mpMB < n ? S.mpMB : ult;
     const leg = `<span><i style="background:#00a611"></i>bateu</span><span><i style="background:#d9a441"></i>80–99%</span><span><i style="background:#c0392b"></i>&lt;80%</span>${S0.tipo === 'taxa' ? '<span><i style="background:#1c1c1c;height:2px;vertical-align:middle"></i>acumulado</span>' : ''}`;
     const sub = S0.tipo === 'fluxo' ? `por ${(MPG.find(z => z[0] === S0.g) || [])[2]} · acum. desde o início` : 'por período · linha = acumulado';
-    return `<div class="g g32 mprow"><div class="card"><div class="ch"><div><h3>${meta.t} <small>${sub}</small></h3></div><div class="lg">${leg}<span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Meta</span>${S0.movel ? `<span data-tip="${ESC(`Meta ajustada ao volume real: MQL do período × ${fP(S0.movel)}`)}"><i style="background:#2f6db5;height:2px;vertical-align:middle"></i>Meta móvel (MQL × ${fP(S0.movel)})</span>` : ''}</div></div>${mpMetaChart(meta, S0, sel, W)}</div>
+    return `<div class="g g32 mprow"><div class="card"><div class="ch"><div><h3>${meta.t} <small>${sub}</small></h3></div><div class="lg">${leg}<span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Meta</span>${S0.movel ? `<span data-tip="${ESC(`Meta ajustada ao volume real: MQL do período × ${fP(S0.movel)}`)}"><i style="background:#2f6db5;height:2px;vertical-align:middle"></i>Meta proporcional (MQL × ${fP(S0.movel)})</span>` : ''}</div></div>${mpMetaChart(meta, S0, sel, W)}</div>
       ${mpMetaCard(meta, S0, S0.pts[sel])}</div>`;
   };
   h += `<h4 class="insmh">Volume${CP ? ` · ${ESC(CP)} (meta do B2C inteiro)` : ''}</h4>` + INS_METAS.filter(m => m.tipo === 'fluxo').map(linha).join('');
