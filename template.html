@@ -498,7 +498,7 @@ table.hm td.tt{background:#f2f7f4;color:var(--prof)}
 .cad.atr{background:#fbe9e6;color:#a3362a}.cad.hoj{background:#fbf1dc;color:#8a5d10}.cad.dia{background:#e3f3ea;color:#0b6b3a}.cad.sem{background:#eef1f0;color:#69727d}
 .cadmini{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:4px 0 16px}
 .cadmini > div{border:1px solid var(--linha);border-radius:12px;padding:12px 14px;background:#fff}
-.mapa .ch{flex-wrap:wrap}.insdrv .drv td{vertical-align:middle}.insdrv tr.dg td{background:var(--suave);color:var(--verde);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:9px;padding-bottom:9px}.insdrv tr.dm td{background:var(--v50)}.insdrv tr.di td:first-child{padding-left:30px}.insdrv .hw{display:block;font-size:11.5px;color:var(--cinza);font-weight:400;margin-top:2px;white-space:normal;max-width:380px}.insdrv .tagm{font-size:10px;font-weight:700;color:#fff;background:var(--verde);border-radius:4px;padding:1px 5px;margin-right:2px}.insdrv .mtp{font-size:11px;padding:1px 7px;border-radius:9px;font-weight:600;white-space:nowrap}.insdrv .mtp.ok{background:var(--v100);color:var(--verde)}.insdrv .mtp.no{background:var(--verm-bg);color:var(--verm)}.insdrv .spk{display:block}.drvres{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 18px 12px}.drvres .drvw{font-size:12.5px;color:var(--cinza)}.mapa .cadmini{grid-template-columns:repeat(3,minmax(0,1fr))}@media (max-width:760px){.mapa .cadmini{grid-template-columns:1fr}}.mapa-acoes{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mapa .ch{flex-wrap:wrap}.insdrv .ch{flex-wrap:wrap;gap:10px}.dvr{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.dvg{margin-top:6px}.dvk{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;padding:16px 4px;border-top:1px solid var(--linha)}.dvk:first-child{border-top:0}.dvk h4{margin:0 0 6px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--cinza);font-weight:700}.dvs{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin:0 0 6px}.dvm,.dvi{display:flex;align-items:center;gap:12px;cursor:default;padding:5px 0}.dvm .nm{flex:1;font-weight:600;font-size:14px;color:var(--txt)}.dvm b{font-size:20px;font-weight:700;color:var(--txt);min-width:84px;text-align:right}.dvm.ok b{color:var(--verde)}.dvm.no b{color:var(--verm)}.dvm .alv{font-size:11.5px;color:var(--cinza);min-width:74px}.dvi{font-size:13.5px}.dvi .nm{flex:1;color:#4a525a}.dvi b{font-weight:600;color:var(--txt);min-width:84px;text-align:right}.dvm .dvc,.dvi .dvc{min-width:78px}@media (max-width:900px){.dvk{grid-template-columns:1fr;gap:10px}}@media (max-width:600px){.dvm,.dvi{gap:8px}.dvm b,.dvi b{min-width:0}.dvm .alv{min-width:0}.dvm .dvc,.dvi .dvc{min-width:62px}}.dvc{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;min-width:52px;text-align:center}.dvc.pos{background:var(--v100);color:var(--verde)}.dvc.neg{background:var(--verm-bg);color:var(--verm)}.dvc.neu,.dvc.na{background:var(--suave);color:var(--cinza)}.dvr .dvc{min-width:0}.dvleg{margin-top:12px;font-size:11.5px;color:var(--cinza);display:flex;gap:6px;align-items:center;flex-wrap:wrap}.dvleg .dvc{min-width:0;padding:0 6px}.mapa .cadmini{grid-template-columns:repeat(3,minmax(0,1fr))}@media (max-width:760px){.mapa .cadmini{grid-template-columns:1fr}}.mapa-acoes{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .cm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:14px}
 .cm-card{border:1px solid var(--linha);border-radius:12px;padding:14px 16px;background:#fff;min-width:0}.cm-card.cm-atr{border-color:#f0cfc9}
 .cm-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}.cm-h h4{margin:0;font-size:15px;cursor:pointer}.cm-h h4:hover{color:var(--verde)}
@@ -2784,27 +2784,23 @@ function insMCalc(de, ate) {
 /* Indicadores que movem as metas (pedido 10/11/2026): para cada meta do painel de Metas, os indicadores que mexem
    nela, comparados com o período anterior e com a média, para acompanhar semana a semana / mês a mês. */
 const DRV = [
-  {g: 'Volume de leads', metas: [{k: 'mql', t: 'MQL (leads qualificados)', tipo: 'fluxo', vol: 'mql'}],
-   it: [{k: 'inv', t: 'Investimento na Meta', good: 0, f: 'rs', como: 'mais verba traz mais leads, se o custo por lead se mantiver'},
-        {k: 'cpl', t: 'Custo por lead', good: -1, f: 'rs', como: 'quanto menor, mais MQL com a mesma verba'},
-        {k: 'leads', t: 'Leads novos (todas as origens)', good: 1, f: 'n', como: 'MQL é a parte com etiqueta Digital e prefixo TRD/DIAG/RCON; o resto não conta na meta'}]},
-  {g: 'Velocidade do 1º contato', metas: [{k: 'rap', t: 'Contato em menos de 1 dia', tipo: 'taxa', meta: 80}],
-   it: [{k: 't1', t: '1º contato médio', good: -1, f: 'd', como: 'quanto mais rápido, mais leads contatados no 1º dia'},
-        {k: 'semCont', t: 'Leads sem nenhum contato', good: -1, f: 'n', como: 'lead sem contato nunca entra nos 80% e não chega a agendar'}]},
-  {g: 'Agendamento', metas: [{k: 'ag', t: 'Reuniões agendadas', tipo: 'fluxo', vol: 'ag'}, {k: 'tAg', t: 'MQL → reunião agendada', tipo: 'taxa', meta: REF_PRU.ag}],
-   it: [{k: 'contatos', t: 'Contatos realizados', good: 1, f: 'n', como: 'mais tentativas concluídas, mais chance de conversa e agenda'},
-        {k: 'pAg7', t: 'Leads novos com reunião marcada em até 7 dias', good: 1, f: 'p', como: 'lead agendado rápido esfria menos; conta os que entraram no período'},
-        {k: 'pSemAg', t: 'Perdidos sem chegar a agendar', good: -1, f: 'n', como: 'cada um é um MQL que saiu do funil antes da reunião'},
-        {k: 'tPerda', t: 'Tentativas antes de desistir', good: 1, f: 'n1', como: 'cadência completa antes de dar o lead como perdido'}]},
-  {g: 'Comparecimento', metas: [{k: 'reu', t: 'Reuniões realizadas', tipo: 'fluxo', vol: 're'}, {k: 'tRe', t: 'Agendada → realizada', tipo: 'taxa', meta: REF_PRU.re / REF_PRU.ag * 100}],
-   it: [{k: 'faltas', t: 'Faltas (no-show)', good: -1, f: 'n', como: 'cada falta é uma reunião agendada que não acontece'},
-        {k: 'comp', t: 'Comparecimento', good: 1, f: 'p', como: 'realizadas ÷ (realizadas + faltas)'},
-        {k: 'dAR', t: 'Dias entre agendar e a reunião (mediana)', good: -1, f: 'd', como: 'reunião marcada para muito longe tem mais falta'}]},
-  {g: 'Fechamento', metas: [{k: 'won', t: 'Fechamentos', tipo: 'fluxo', vol: 'ga'}, {k: 'tGa', t: 'Realizada → fechamento', tipo: 'taxa', meta: REF_PRU.ga / REF_PRU.re * 100},
+  {g: 'Volume de leads', metas: [{k: 'mql', t: 'MQL', tipo: 'fluxo', vol: 'mql'}],
+   it: [{k: 'cpl', t: 'Custo por lead', good: -1, f: 'rs', como: 'Quanto menor, mais MQL com a mesma verba'}]},
+  {g: '1º contato', metas: [{k: 'rap', t: 'Contato em menos de 1 dia', tipo: 'taxa', meta: 80}],
+   it: [{k: 't1', t: '1º contato médio', good: -1, f: 'd', como: 'Quanto mais rápido, mais leads contatados no 1º dia'},
+        {k: 'semCont', t: 'Leads sem contato', good: -1, f: 'n', como: 'Lead sem contato não entra nos 80% e não chega a agendar'}]},
+  {g: 'Agendamento', metas: [{k: 'tAg', t: 'MQL → agendada', tipo: 'taxa', meta: REF_PRU.ag}, {k: 'ag', t: 'Reuniões agendadas', tipo: 'fluxo', vol: 'ag'}],
+   it: [{k: 'pAg7', t: 'Agendados em até 7 dias', good: 1, f: 'p', como: 'Leads que entraram no período e já têm reunião marcada em até 7 dias da entrada'},
+        {k: 'pSemAg', t: 'Perdidos sem agendar', good: -1, f: 'n', como: 'MQL que saiu do funil antes de marcar reunião'},
+        {k: 'tPerda', t: 'Tentativas antes de desistir', good: 1, f: 'n1', como: 'Média de contatos feitos antes de dar o lead como perdido (sem agendar)'}]},
+  {g: 'Comparecimento', metas: [{k: 'tRe', t: 'Agendada → realizada', tipo: 'taxa', meta: REF_PRU.re / REF_PRU.ag * 100}, {k: 'reu', t: 'Reuniões realizadas', tipo: 'fluxo', vol: 're'}],
+   it: [{k: 'faltas', t: 'Faltas (no-show)', good: -1, f: 'n', como: 'Cada falta é uma reunião agendada que não aconteceu'},
+        {k: 'dAR', t: 'Dias até a reunião', good: -1, f: 'd', como: 'Mediana de dias entre marcar e realizar a reunião: longe demais aumenta a falta'}]},
+  {g: 'Fechamento', metas: [{k: 'tGa', t: 'Realizada → fechamento', tipo: 'taxa', meta: REF_PRU.ga / REF_PRU.re * 100}, {k: 'won', t: 'Fechamentos', tipo: 'fluxo', vol: 'ga'},
      {k: 'tTot', t: 'MQL → fechamento', tipo: 'taxa', meta: REF_PRU.ga}],
-   it: [{k: 'neg', t: 'Leads que avançaram para Negociação', good: 1, f: 'n', como: 'o passo entre a reunião e o fechamento'},
-        {k: 'pPos', t: 'Perdidos depois da reunião', good: -1, f: 'n', como: 'oportunidade que chegou à reunião e não fechou'},
-        {k: 'dRG', t: 'Dias da 1ª reunião ao fechamento (mediana)', good: -1, f: 'd', como: 'ciclo de venda: quanto menor, mais fechamentos no período'}]}];
+   it: [{k: 'neg', t: 'Avançaram para Negociação', good: 1, f: 'n', como: 'Leads que entraram na etapa Negociação no período'},
+        {k: 'pPos', t: 'Perdidos depois da reunião', good: -1, f: 'n', como: 'Oportunidades que chegaram à reunião e não fecharam'},
+        {k: 'dRG', t: 'Dias da reunião ao fechamento', good: -1, f: 'd', como: 'Mediana do ciclo de venda: da 1ª reunião ao ganho'}]}];
 function drvVal(k, x) {
   if (!x) return null;
   const pc = (a, b) => b ? a / b * 100 : null;
@@ -2812,68 +2808,45 @@ function drvVal(k, x) {
   if (k === 'tGa') return pc(x.won, x.reu); if (k === 'tTot') return pc(x.won, x.leads); if (k === 'pAg7') return pc(x.ag7, x.leads);
   return x[k] ?? null;
 }
-const drvTaxa = (k, f) => f === 'p' || f === 'd' || f === 'rs' || f === 'n1' || ['tAg', 'tRe', 'tGa', 'tTot', 'rap'].includes(k);
-function drvSpark(vals, alvo, parcial) {
-  const W = 92, H = 26, v = vals.map(p => p == null ? null : p), ok = v.filter(p => p != null);
-  if (ok.length < 2) return '<span class="mut">–</span>';
-  let lo = Math.min(...ok, alvo ?? Infinity), hi = Math.max(...ok, alvo ?? -Infinity); if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
-  const X = i => 3 + i * (W - 6) / Math.max(1, v.length - 1), Y = p => H - 3 - (p - lo) / (hi - lo) * (H - 6);
-  let d = '', pen = false; v.forEach((p, i) => { if (p == null) { pen = false; return; } d += `${pen ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p).toFixed(1)}`; pen = true; });
-  const li = v.length - 1, lv = v[li];
-  return `<svg class="spk" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${alvo != null ? `<line x1="2" x2="${W - 2}" y1="${Y(alvo).toFixed(1)}" y2="${Y(alvo).toFixed(1)}" stroke="var(--v300)" stroke-dasharray="3 3"/>` : ''}<path d="${d}" fill="none" stroke="var(--verde)" stroke-width="1.6"/>${lv != null ? `<circle cx="${X(li).toFixed(1)}" cy="${Y(lv).toFixed(1)}" r="2.6" fill="${parcial ? '#fff' : 'var(--verde)'}" stroke="var(--verde)" stroke-width="1.4"/>` : ''}</svg>`;
-}
 function insDrvHtml(o) {
-  const {x, ant, B, per, i, P, modo, frac, rotAnt, rotMed, CP, nm} = o;
+  const {x, ant, B, P, modo, frac, rotAnt, rotMed, CP} = o;
   const FM = {n: insN1, n1: v => v == null ? '–' : nf1.format(v), d: fD, p: fP, rs: v => v == null ? '–' : fR(v)};
-  const capP = v => v != null && v > 100 ? 100 : v;
-  const serieP = per.slice(Math.max(0, i - 7), i + 1).map((p, j, a) => insMCalc(p.de, j === a.length - 1 ? P.ate : p.fim));
-  const vari = (c, p, good, f, taxa) => {
-    if (c == null || p == null) return '<span class="dl na">sem comparação</span>';
-    const d = c - p; if (Math.abs(d) < 1e-9) return '<span class="dl neu">= igual</span>';
-    const tone = good === 0 ? 'neu' : ((d > 0) === (good > 0) ? 'pos' : 'neg');
-    if (f === 'p') return `<span class="dl ${tone}">${d > 0 ? '▲ +' : '▼ −'}${nf1.format(Math.abs(d))} p.p.</span>`;
-    return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${p ? nf1.format(Math.abs(d / p * 100)) + '%' : 'novo'} (${d > 0 ? '+' : '−'}${FM[f](Math.abs(d))})</span>`;
+  const cap = v => v != null && v > 100 ? 100 : v;
+  // chip de variação contra o período anterior: cor = melhorou/piorou (±15%), seta = direção
+  const chip = (c, pv, good, f, minVol) => {
+    if (c == null || pv == null) return '<span class="dvc na">–</span>';
+    const d = c - pv; if (Math.abs(d) < 1e-9) return '<span class="dvc neu">=</span>';
+    const tom = insTom(c, pv, good, minVol);
+    const txt = f === 'p' ? `${d > 0 ? '+' : '−'}${nf1.format(Math.abs(d))} p.p.` : `${pv ? nf0.format(Math.round(Math.abs(d / pv * 100))) + '%' : 'novo'}`;
+    return `<span class="dvc ${tom}">${d > 0 ? '▲' : '▼'} ${txt}</span>`;
   };
-  const sit = (c, p, good, taxa, meta) => {
-    if (good === 0) return c == null || p == null || Math.abs(c - p) < 1e-9 ? ['neu', '= igual'] : ['neu', c > p ? '↑ subiu' : '↓ caiu'];
-    if (c == null || p == null) return ['na', 'sem comparação'];
-    const tom = insTom(c, p, good, taxa || meta ? 0 : 3);
-    if (tom === 'pos') return ['pos', '✔ Melhorou']; if (tom === 'neg') return ['neg', '✖ Piorou'];
-    return ['neu', !taxa && Math.max(Math.abs(c), Math.abs(p)) < 3 && Math.abs(c - p) > 1e-9 ? '= Estável (volume pequeno)' : '= Estável'];
-  };
-  const cont = {pos: [], neg: [], neu: 0};
-  let rows = '';
-  for (const G of DRV) {
-    rows += `<tr class="dg"><td colspan="7">${ESC(G.g)}</td></tr>`;
-    for (const m of G.metas) {
+  const cont = {pos: 0, neg: 0, neu: 0};
+  const cards = DRV.map(G => {
+    const metas = G.metas.map(m => {
       const taxa = m.tipo === 'taxa', f = taxa ? 'p' : 'n';
       const c = drvVal(m.k, x), pv = drvVal(m.k, ant), bm = B ? drvVal(m.k, B) : null;
-      const alvoP = taxa ? m.meta : (CP && m.k === 'mql' ? null : REF_VOL[modo][m.vol]);
-      const esp = alvoP == null ? null : taxa ? alvoP : alvoP * frac;
-      const okM = esp == null || c == null ? null : c >= esp - 1e-9;
-      const vtxt = taxa && c != null && c > 100 ? '100% ⚠' : FM[f](c);
-      const st = sit(c, pv, 1, taxa, true);
-      rows += `<tr class="dm"><td><span class="tagm">META</span> <b>${ESC(m.t)}</b><span class="hw">${alvoP == null ? 'meta do B2C inteiro (sem divisão por campanha)' : `meta ${taxa ? fP(alvoP) : insN1(alvoP) + ' por ' + nm[0]}${!taxa && frac < 1 ? ` · esperado até hoje ${insN1(esp)}` : ''}`}</span></td>
-        <td class="num"><b>${vtxt}</b>${okM == null ? '' : okM ? ' <span class="mtp ok">✔ na meta</span>' : ' <span class="mtp no">abaixo</span>'}</td>
-        <td class="num">${taxa ? fP(capP(pv)) : FM[f](pv)}</td><td class="num">${taxa ? fP(capP(bm)) : FM[f](bm)}</td>
-        <td class="num">${vari(taxa ? capP(c) : c, taxa ? capP(pv) : pv, 1, f, taxa)}</td>
-        <td>${drvSpark(serieP.map(z => taxa ? capP(drvVal(m.k, z)) : drvVal(m.k, z)), taxa ? alvoP : null, P.parcial)}</td>
-        <td><span class="dl ${st[0]}">${st[1]}</span></td></tr>`;
-    }
-    for (const d of G.it) {
-      const off = (d.k === 'inv' || d.k === 'cpl') && S.camp && !PAGAS[S.camp];
-      const taxa = drvTaxa(d.k, d.f), c = off ? null : drvVal(d.k, x), pv = off ? null : drvVal(d.k, ant), bm = off || !B ? null : drvVal(d.k, B);
-      const st = off ? ['na', 'sem mídia paga'] : sit(c, pv, d.good, taxa);
-      if (!off && d.good !== 0) { if (st[0] === 'pos') cont.pos.push(d.t); else if (st[0] === 'neg') cont.neg.push(d.t); else if (st[0] === 'neu') cont.neu++; }
-      rows += `<tr class="di"><td>${ESC(d.t)}<span class="hw">${ESC(d.como)}</span></td><td class="num"><b>${FM[d.f](c)}</b></td>
-        <td class="num">${FM[d.f](pv)}</td><td class="num">${FM[d.f](bm)}</td><td class="num">${off ? '–' : vari(c, pv, d.good, d.f, taxa)}</td>
-        <td>${off ? '<span class="mut">–</span>' : drvSpark(serieP.map(z => drvVal(d.k, z)), null, P.parcial)}</td><td><span class="dl ${st[0]}">${st[1]}</span></td></tr>`;
-    }
-  }
-  const resumo = `<div class="drvres"><span class="dl pos">✔ ${fN(cont.pos.length)} melhoraram</span><span class="dl neg">✖ ${fN(cont.neg.length)} pioraram</span><span class="dl neu">= ${fN(cont.neu)} estáveis</span>${cont.neg.length ? `<span class="drvw">Pioraram: <b>${cont.neg.map(ESC).join(', ')}</b></span>` : ''}</div>`;
-  return `<div class="card mt np insdrv"><div class="ch" style="padding:16px 18px 0"><div><h3>🎯 Indicadores que movem as metas</h3><p>Cada meta do painel de Metas e os indicadores que mexem nela · comparação com ${ESC(rotAnt)}${P.parcial ? ' (ajustada ao mesmo número de dias)' : ''} · situação: melhorou ou piorou mais de 15%; nos indicadores, volumes abaixo de 3 ficam como estáveis</p></div></div>
-    ${resumo}<div class="tw"><table class="t drv"><thead><tr><th>Indicador</th><th class="num">${modo === 'semanal' ? 'Esta semana' : 'Este mês'}</th><th class="num">${ESC(rotAnt)}</th><th class="num">${ESC(rotMed)}</th><th class="num">Variação vs ${ESC(rotAnt)}</th><th>Últimas ${fN(serieP.length)} ${nm[1]}</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="note" style="margin:0 18px 16px">Agendamentos, reuniões, ganhos e perdidos contam pela data em que aconteceram (lead de qualquer data de entrada), como nos cards. "Dias" são a mediana dos eventos do período (metade levou menos, metade mais), para um caso antigo não distorcer. A linha tracejada no gráfico é a meta.${P.parcial ? ' O ponto vazado é o período em andamento.' : ''}</div></div>`;
+      const alvo = taxa ? m.meta : (CP && m.k === 'mql' ? null : REF_VOL[modo][m.vol]);
+      const esp = alvo == null ? null : taxa ? alvo : alvo * frac;
+      const ok = esp == null || c == null ? '' : c >= esp - 1e-9 ? 'ok' : 'no';
+      const tip = `${m.t}\n${rotAnt}: ${taxa ? fP(cap(pv)) : FM[f](pv)} · ${rotMed}: ${taxa ? fP(cap(bm)) : FM[f](bm)}${alvo != null && !taxa && frac < 1 ? `\nEsperado até hoje: ${insN1(esp)}` : ''}`;
+      return `<div class="dvm ${ok}" data-tip="${ESC(tip)}"><span class="nm">${ESC(m.t)}</span><b>${taxa && c != null && c > 100 ? '100% ⚠' : FM[f](c)}</b>
+        <span class="alv">${alvo == null ? '' : `meta ${taxa ? fP(alvo) : insN1(alvo)}`}</span>${chip(taxa ? cap(c) : c, taxa ? cap(pv) : pv, 1, f, 0)}</div>`;
+    }).join('');
+    const its = G.it.map(d => {
+      const off = d.k === 'cpl' && S.camp && !PAGAS[S.camp];
+      const c = off ? null : drvVal(d.k, x), pv = off ? null : drvVal(d.k, ant), bm = off || !B ? null : drvVal(d.k, B);
+      const taxa = ['p', 'd', 'rs', 'n1'].includes(d.f);
+      const ch = off ? '<span class="dvc na">sem mídia</span>' : chip(c, pv, d.good, d.f, taxa ? 0 : 3);
+      if (!off && c != null && pv != null) { const tm = Math.abs(c - pv) < 1e-9 ? 'neu' : insTom(c, pv, d.good, taxa ? 0 : 3); cont[tm]++; }
+      const tip = `${d.como}\n${rotAnt}: ${FM[d.f](pv)} · ${rotMed}: ${FM[d.f](bm)}`;
+      return `<div class="dvi" data-tip="${ESC(tip)}"><span class="nm">${ESC(d.t)}</span><b>${FM[d.f](c)}</b>${ch}</div>`;
+    }).join('');
+    return `<div class="dvk"><div class="dvl"><h4>${ESC(G.g)}</h4>${metas}</div><div class="dvd"><div class="dvs">O que mexe nesta meta</div>${its}</div></div>`;
+  }).join('');
+  return `<div class="card mt insdrv"><div class="ch"><div><h3>🎯 Indicadores que movem as metas</h3><p>Comparado com ${ESC(rotAnt)}${P.parcial ? ' (no mesmo ritmo de dias)' : ''} · passe o mouse para ver a média e o porquê</p></div>
+    <div class="dvr"><span class="dvc pos">${fN(cont.pos)} ${cont.pos === 1 ? 'melhorou' : 'melhoraram'}</span><span class="dvc neg">${fN(cont.neg)} ${cont.neg === 1 ? 'piorou' : 'pioraram'}</span><span class="dvc neu">${fN(cont.neu)} ${cont.neu === 1 ? 'estável' : 'estáveis'}</span></div></div>
+    <div class="dvg">${cards}</div>
+    <div class="dvleg"><span class="dvc pos">▲</span> melhorou <span class="dvc neg">▼</span> piorou <span class="dvc neu">▲</span> variação menor que 15% ou volume pequeno · valor da meta em verde = atingida, em vermelho = abaixo</div></div>`;
 }
 function insMetaVal(k, x) {
   const pc = (a, b) => b ? a / b * 100 : null;
