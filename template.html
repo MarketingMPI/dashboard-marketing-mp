@@ -1321,8 +1321,19 @@ function computePerf(leads, f, agora) {
       custo_reuniao: by(g.reunioes), custo_ganho: by(g.ganhos), ctr: g.impressoes ? g.cliques / g.impressoes * 100 : null,
       cpc: by(g.cliques), cpm: g.impressoes ? inv / g.impressoes * 1000 : null, taxa_reuniao: g.leads ? g.reunioes / g.leads * 100 : null});
   };
-  const tot = z('total');
-  for (const id of sel) for (const k of Object.keys(tot)) if (k !== 'id') tot[k] += G[id][k];
+  // TOTAL = B2C inteiro (ou só a campanha do topo), igual à Visão Macro e aos Insights: leads/contatados do período e
+  // agendados/reuniões/ganhos que aconteceram no período, de QUALQUER origem; custo = investimento ÷ esses totais
+  // (decisão do usuário 10/11/2026). Os grupos continuam só com o que veio de cada campanha paga.
+  const tot = z('total'), crx = camp && CAMPANHAS[camp] ? CAMPANHAS[camp].rx : null;
+  for (const id of sel) for (const k of ['investimento_centavos', 'impressoes', 'cliques']) tot[k] += G[id][k];
+  for (const l of leads || []) {
+    if (f.operacao === true && (l.b || isRetro(l))) continue;
+    if (crx && !crx.test(l.n || '')) continue;
+    if (dentro(l.e)) { tot.leads++; if (derive(l, agora).cont) tot.contatados++; }
+    if (agendaTempos(l).some(dentro)) tot.agendados++;
+    for (const x of l.k || []) if (MEETING_TYPES.has(x[1]) && dentro(x[0])) tot.reunioes++;
+    if (l.s === 'won' && dentro(l.w)) tot.ganhos++;
+  }
   return {selecionados: sel, total: fin(tot), grupos: Object.keys(PAGAS).map(id => fin(G[id]))};
 }
 
@@ -3205,12 +3216,12 @@ function viewInsights() {
       tip: 'Reuniões CONCLUÍDAS dentro do período: cada reunião conta, inclusive a 2ª ou 3ª reunião do mesmo lead (reunião só marcada conta em Agendamentos). Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
     kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: pa('won', insN1), d: insVarN(x.won, B && B.won, 1, rotMed, ['ganho', 'ganhos']),
       tip: 'Negócios marcados como ganhos dentro do período (sem lançamentos retroativos)'}),
-    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads de campanha`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
-      tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads dessas campanhas que caíram no Pipedrive no período. Inclui a verba de campanhas que não trouxeram lead'})
+    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads no período`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
+      tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads que entraram no período (todas as origens, mesmo número de Leads novos e da Performance)'})
     ,kpiCard({label: 'Custo por ganho (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : x.wonPagos ? fRs(x.cpg) : '–',
-      sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.wonPagos ? `${fRs(x.inv)} investidos · ${fN(x.wonPagos)} ${x.wonPagos === 1 ? 'ganho' : 'ganhos'} de campanha` : (x.won ? `${fRs(x.inv)} investidos · ${x.won === 1 ? 'o único ganho não veio' : `nenhum dos ${fN(x.won)} ganhos veio`} de campanha paga` : `${fRs(x.inv)} investidos · nenhum ganho no período`),
+      sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.wonPagos ? `${fRs(x.inv)} investidos · ${fN(x.wonPagos)} ${x.wonPagos === 1 ? 'ganho' : 'ganhos'} no período` : `${fRs(x.inv)} investidos · nenhum ganho no período`,
       extra: pa('cpg', fRs), d: insVar(x.cpg, B && B.cpg, -1, fRs, rotMed),
-      tip: 'Investimento no Meta Ads (campanhas B2C) no período ÷ ganhos dessas campanhas no período (TRD, DIAG e ISCA; lead de qualquer data de entrada). Ganhos de campanha sem mídia paga (ex.: RCON) não entram na conta'})
+      tip: 'Investimento no Meta Ads (campanhas B2C) no período ÷ ganhos no período (todas as origens, mesmo número do card Ganhos, da Visão Macro e da Performance)'})
   ].join('') + '</div>';
   if (modo !== 'semanal') h += insMetasHtml(x, CP, P.parcial, modo, frac);   // semanal: metas ficam na aba Metas (pedido 10/11/2026)
   h += insMetasConsHtml(P, modo, x, CP);
@@ -3516,11 +3527,11 @@ function viewPerformance() {
     kpiCard({label: 'Investimento no período', cls: 'hero', v: fR0(t.investimento), sub: `${fR(t.investimento / dias)} por dia · ${fN(ativos.size)} ${ativos.size === 1 ? 'campanha' : 'campanhas'} com gasto`,
       d: delta(t.investimento, tp.investimento, 0, fR0), tip: `Valor gasto na Meta Ads em ${nomeSel}, no período selecionado`}),
     kpiCard({label: 'Leads no Pipedrive', v: fN(t.leads), sub: `${fN(t.contatados)} com contato · ${fN(t.agendados)} agendados`, d: delta(t.leads, tp.leads),
-      tip: 'Leads das campanhas pagas que ENTRARAM no Pipedrive no período (TRD |, DIAG |, [ISCA).\nOs leads contados pela Meta são ignorados.'}),
-    custo(t.custo_lead, tp.custo_lead, 'Custo por lead', `${fN(t.leads)} leads`, 'Investimento ÷ leads que entraram no Pipedrive'),
+      tip: 'Leads que ENTRARAM no Pipedrive no período (todo o B2C, ou só a campanha escolhida no topo) — o mesmo número da Visão Macro e dos Insights.\nOs leads contados pela Meta são ignorados.'}),
+    custo(t.custo_lead, tp.custo_lead, 'Custo por lead', `${fN(t.leads)} leads`, 'Investimento ÷ leads que entraram no Pipedrive no período (todas as origens, como na Visão Macro)'),
     custo(t.custo_agendamento, tp.custo_agendamento, 'Custo por agendamento', `${fN(t.agendados)} ${t.agendados === 1 ? 'agendado' : 'agendados'}`, 'Investimento ÷ leads do período com reunião marcada (etapa Reunião ou além, atividade de reunião ou ganho)'),
-    custo(t.custo_reuniao, tp.custo_reuniao, 'Custo por reunião', `${fN(t.reunioes)} ${t.reunioes === 1 ? 'reunião' : 'reuniões'}`, 'Investimento ÷ leads do período com reunião realizada'),
-    custo(t.custo_ganho, tp.custo_ganho, 'Custo por fechamento', `${fN(t.ganhos)} ${t.ganhos === 1 ? 'ganho' : 'ganhos'}`, 'Investimento ÷ leads do período ganhos (CAC de mídia)'),
+    custo(t.custo_reuniao, tp.custo_reuniao, 'Custo por reunião', `${fN(t.reunioes)} ${t.reunioes === 1 ? 'reunião' : 'reuniões'}`, 'Investimento ÷ reuniões realizadas no período (todas as origens, como na Visão Macro e nos Insights)'),
+    custo(t.custo_ganho, tp.custo_ganho, 'Custo por fechamento', `${fN(t.ganhos)} ${t.ganhos === 1 ? 'ganho' : 'ganhos'}`, 'Investimento ÷ ganhos no período (todas as origens, como na Visão Macro e nos Insights)'),
     custo(t.custo_contatado, tp.custo_contatado, 'Custo por lead contatado', `${fN(t.contatados)} contatados`, 'Investimento ÷ leads do período com ao menos um contato concluído'),
     kpiCard({label: 'Lead → reunião', v: fP(t.taxa_reuniao), sub: `${fN(t.reunioes)} de ${fN(t.leads)} leads`, d: delta(t.taxa_reuniao, tp.taxa_reuniao, 1, fP), tip: '% dos leads do período que tiveram reunião'}),
     kpiCard({label: 'Cliques no anúncio', v: fN(t.cliques), sub: `CTR ${fP(t.ctr)} · CPC ${fR(t.cpc)}`, d: delta(t.cliques, tp.cliques), tip: 'Cliques no link dos anúncios (Meta).\nCTR = cliques ÷ impressões · CPC = investimento ÷ cliques'}),
@@ -3537,9 +3548,12 @@ function viewPerformance() {
     <div class="card"><div class="ch"><div><h3>Divisão do investimento</h3><p>Por campanha no período</p></div></div>${shareHtml}</div></div>`;
   // tabela por grupo
   const td = v => `<td class="num">${v}</td>`;
-  h += `<div class="card np mt"><div class="ch"><div><h3>Custo por etapa do funil, por campanha</h3><p>Leads, agendamentos, reuniões e fechamentos dos leads que entraram no período</p></div></div><div class="tw"><table class="t stk"><thead><tr>
+  h += `<div class="card np mt"><div class="ch"><div><h3>Custo por etapa do funil, por campanha</h3><p>Leads que entraram no período; agendamentos, reuniões e fechamentos que aconteceram no período · "Sem mídia paga" = o que veio de outras origens · Total = mesmos números da Visão Macro</p></div></div><div class="tw"><table class="t stk"><thead><tr>
     <th>Campanha</th><th class="num">Investimento</th><th class="num">Leads</th><th class="num">Custo/lead</th><th class="num">Agendados</th><th class="num">Custo/agend.</th><th class="num">Reuniões</th><th class="num">Custo/reunião</th><th class="num">Ganhos</th><th class="num">Custo/ganho</th></tr></thead><tbody>` +
-    gs.concat(gs.length > 1 ? [Object.assign({}, t, {id: 'total'})] : []).map(g => `<tr${g.id === 'total' ? ' class="tot"' : ''}><td><b>${g.id === 'total' ? 'Total' : ESC(PAGAS[g.id].nome)}</b></td>${td(fR(g.investimento))}${td(fN(g.leads))}${td(fR(g.custo_lead))}${td(fN(g.agendados))}${td(fR(g.custo_agendamento))}${td(fN(g.reunioes))}${td(fR(g.custo_reuniao))}${td(fN(g.ganhos))}${td(fR(g.custo_ganho))}</tr>`).join('') +
+    (() => { const sem = S.camp ? null : {id: 'sem', investimento: 0, leads: t.leads - gs.reduce((a, g) => a + g.leads, 0), agendados: t.agendados - gs.reduce((a, g) => a + g.agendados, 0),
+        reunioes: t.reunioes - gs.reduce((a, g) => a + g.reunioes, 0), ganhos: t.ganhos - gs.reduce((a, g) => a + g.ganhos, 0)};
+      const linhas = gs.concat(sem && (sem.leads || sem.agendados || sem.reunioes || sem.ganhos) ? [sem] : []);
+      return linhas.concat(linhas.length > 1 ? [Object.assign({}, t, {id: 'total'})] : []); })().map(g => `<tr${g.id === 'total' ? ' class="tot"' : ''}><td><b>${g.id === 'total' ? 'Total' : g.id === 'sem' ? 'Sem mídia paga <span class="muted" style="font-weight:400">(indicação, RCON, eventos…)</span>' : ESC(PAGAS[g.id].nome)}</b></td>${td(fR(g.investimento))}${td(fN(g.leads))}${td(fR(g.custo_lead))}${td(fN(g.agendados))}${td(fR(g.custo_agendamento))}${td(fN(g.reunioes))}${td(fR(g.custo_reuniao))}${td(fN(g.ganhos))}${td(fR(g.custo_ganho))}</tr>`).join('') +
     `</tbody></table></div></div>`;
   // tabela por campanha da Meta
   const byC = new Map();
@@ -3554,7 +3568,7 @@ function viewPerformance() {
     (cl.length ? cl.map(o => { const st = ST[o.c.status] || ['–', '#8a958f'];
       return `<tr><td class="wrap" style="max-width:340px"><b>${ESC(o.c.nome)}</b></td><td>${ESC(PAGAS[o.c.grupo].nome)}</td><td><span style="color:${st[1]};font-weight:600">${st[0]}</span></td>${td(fR(o.inv))}${td(fP(pctOf(o.inv, t.investimento)))}${td(fN(o.imp))}${td(fN(o.cl))}${td(fP(pctOf(o.cl, o.imp)))}${td(fR(o.cl ? o.inv / o.cl : null))}${td(fR(o.imp ? o.inv / o.imp * 1000 : null))}<td>${fDM(o.d0)} a ${fDM(o.d1)}</td></tr>`; }).join('')
       : `<tr><td colspan="11">${emptyBox('Nenhuma campanha com gasto no período')}</td></tr>`) + `</tbody></table></div></div>`;
-  h += `<div class="note mt">Leads, agendamentos, reuniões e fechamentos são dos leads que <b>entraram no Pipedrive</b> no período (os números de leads da Meta são ignorados). Leads recentes ainda podem avançar, então os custos de reunião e fechamento dos últimos dias tendem a cair com o tempo.</div>`;
+  h += `<div class="note mt">Os cards somam <b>todo o B2C</b> (todas as origens), com os mesmos números da Visão Macro e dos Insights; os custos dividem o investimento da Meta por esses totais. A tabela por campanha mostra quanto veio de cada campanha paga. Leads são os que <b>entraram no Pipedrive</b> no período (os números de leads da Meta são ignorados). Leads recentes ainda podem avançar, então os custos de reunião e fechamento dos últimos dias tendem a cair com o tempo.</div>`;
   return h;
 }
 

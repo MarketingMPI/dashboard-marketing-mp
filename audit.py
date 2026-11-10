@@ -239,10 +239,19 @@ def performance(leads, f, agora, midia):
                  cpm=inv / g["impressoes"] * 1000 if g["impressoes"] else None,
                  taxa_reuniao=g["reunioes"] / g["leads"] * 100 if g["leads"] else None)
         return g
+    # TOTAL = B2C inteiro (ou só a campanha do topo), igual à Macro/Insights; custo = investimento ÷ esses totais
     tot = z("total")
     for i in sel:
-        for k in tot:
-            if k != "id": tot[k] += G[i][k]
+        for k in ("investimento_centavos", "impressoes", "cliques"): tot[k] += G[i][k]
+    crx = CAMPANHAS.get(camp) if camp else None
+    for l in leads:
+        if f.get("operacao") is True and (l.get("b") or retroativo(l)): continue
+        if crx and not re.match(crx, l.get("n") or "", re.I): continue
+        if dentro(l.get("e")):
+            tot["leads"] += 1; tot["contatados"] += lead_metrics(l, agora)["contatado"]
+        tot["agendados"] += 1 if any(dentro(x) for x in agenda_tempos(l)) else 0
+        tot["reunioes"] += sum(1 for x in (l["k"] or []) if x[1] in REUNIAO_TIPOS and dentro(x[0]))
+        tot["ganhos"] += 1 if l["s"] == "won" and dentro(l.get("w")) else 0
     return {"selecionados": sel, "total": fin(tot), "grupos": [fin(G[i]) for i in PAGAS]}
 
 
