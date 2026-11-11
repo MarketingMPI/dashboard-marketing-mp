@@ -1280,10 +1280,16 @@ function computeEventos(leads, f) {
   const motivos = {};
   // indicadores que movem as metas (espelho: audit.eventos)
   let neg = 0, semAg = 0, posReu = 0, ag7 = 0; const dAR = [], dRG = [], tent = [];
+  const ltAg = [], ltReu = [], ltLost = [], ltWon = [];   // lead-time: dias da ENTRADA até cada evento do período (11/11/2026)
   for (const l of leads || []) {
     if (!pred(l)) continue;
     const k = l.k || [], h = l.h || [];
     const at = agendaTempos(l);
+    if (l.e) { const e0 = tms(l.e), dd = s => Math.max(0, (tms(s) - e0) / DAY);
+      const a1 = at.find(dentro); if (a1) ltAg.push(dd(a1));
+      for (const x of k) if (MEETING_TYPES.has(x[1]) && dentro(x[0])) ltReu.push(dd(x[0]));
+      if (l.s === 'lost' && dentro(l.l)) ltLost.push(dd(l.l));
+      if (l.s === 'won' && dentro(l.w)) ltWon.push(dd(l.w)); }
     if (dentro(l.e) && at.some(t2 => t2 >= l.e && (tms(t2) - tms(l.e)) / DAY <= 7)) ag7++;   // lead novo com reunião marcada em até 7 dias
     for (const x of k) if (MEETING_TYPES.has(x[1]) && dentro(x[0])) {     // agendamento → cada reunião realizada no período
       let u = null; for (const t of at) if (t <= x[0]) u = t;
@@ -1308,7 +1314,8 @@ function computeEventos(leads, f) {
   }
   return {agendamentos: ag, reunioes: reu, ganhos: won, perdidos: lost, contatos: cont, leads_contatados: contL, faltas, motivos_perda: motivos,
     agendados_em_7d: ag7, dias_agenda_reuniao: median(dAR), dias_reuniao_ganho: median(dRG), negociacao: neg,
-    perdidos_sem_agendar: semAg, tentativas_ate_perda: mean(tent), perdidos_pos_reuniao: posReu};
+    perdidos_sem_agendar: semAg, tentativas_ate_perda: mean(tent), perdidos_pos_reuniao: posReu,
+    lt_agendamento: mean(ltAg), lt_reuniao: mean(ltReu), lt_perda: mean(ltLost), lt_ganho: mean(ltWon)};
 }
 function computePerf(leads, f, agora) {
   f = f || {};
@@ -2336,16 +2343,16 @@ const evCons = nome => run(filtros({consultores: [nome]})).res.eventos;   // mov
    só a operação) — % de cada lead dele que chegou a cada etapa. Só do período: mesma conta dos Insights/Funil Consultores. */
 function consPerf(nome, cart) {
   if (cart === undefined) cart = S.mapaM !== 'periodo';
-  // COORTE (pedido 11/11/2026): só os leads que entraram no período do topo (ou todos, na carteira inteira) — de cada
-  // um, se já agendou, se teve reunião realizada e se fechou. Assim um agendamento de lead antigo não infla a taxa.
-  const X = run(filtros(cart ? {consultores: [nome], de: MIN_DAY, ate: TODAY} : {consultores: [nome]})), kk = X.res.kpis;
-  const k = {leads: kk.leads, agendados: kk.agendados, reunioes: kk.reunioes, ganhos: kk.ganhos}, L = k.leads;
+  // REGRA ÚNICA (11/11/2026, "para todos"): leads = entraram no período; agendados, reuniões e ganhos = o que ACONTECEU
+  // no período (ganho conta no mês do fechamento), igual a Macro, Insights, Metas e Funil. Carteira inteira = tudo.
+  const X = run(filtros(cart ? {consultores: [nome], de: MIN_DAY, ate: TODAY} : {consultores: [nome]})), kk = X.res.kpis, e = X.res.eventos;
+  const k = {leads: kk.leads, agendados: e.agendamentos, reunioes: e.reunioes, ganhos: e.ganhos}, L = k.leads;
   const rap = X.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length, pc = (a, b) => b ? a / b * 100 : null;
   return {L, cart, abertos: kk.abertos, won: kk.ganhos, lost: kk.perdidos, itens: [
     ['Contato em menos de 1 dia', pc(rap, L), 80, `${fN(rap)} de ${fN(L)} leads`],
-    ['MQL → reunião agendada', pc(k.agendados, L), REF_PRU.ag, `${fN(k.agendados)} agendados de ${fN(L)}`],
-    ['Agendada → realizada', pc(k.reunioes, k.agendados), REF_PRU.re / REF_PRU.ag * 100, `${fN(k.reunioes)} com reunião realizada de ${fN(k.agendados)} agendados`],
-    ['Realizada → fechamento', pc(k.ganhos, k.reunioes), REF_PRU.ga / REF_PRU.re * 100, `${fN(k.ganhos)} ganhos de ${fN(k.reunioes)} leads com reunião`],
+    ['MQL → reunião agendada', pc(k.agendados, L), REF_PRU.ag, `${fN(k.agendados)} agendamentos no período ÷ ${fN(L)} leads que entraram`],
+    ['Agendada → realizada', pc(k.reunioes, k.agendados), REF_PRU.re / REF_PRU.ag * 100, `${fN(k.reunioes)} reuniões realizadas ÷ ${fN(k.agendados)} agendamentos no período`],
+    ['Realizada → fechamento', pc(k.ganhos, k.reunioes), REF_PRU.ga / REF_PRU.re * 100, `${fN(k.ganhos)} ganhos ÷ ${fN(k.reunioes)} reuniões no período`],
     ['MQL → fechamento', pc(k.ganhos, L), REF_PRU.ga, `${fN(k.ganhos)} ganhos de ${fN(L)} leads`]]};
 }
 function consPerfHtml(nome) {
@@ -2372,27 +2379,13 @@ function consBins(de, ate) {   // dia até 14 dias, semana até 6 meses, mês ac
   for (let ym = de.slice(0, 7); ym <= ate.slice(0, 7); ym = ymAdd(ym, 1)) { const a = ym + '-01' < de ? de : ym + '-01', b = ymLast(ym) > ate ? ate : ymLast(ym); out.push({de: a, ate: b, rot: mesCurto(ym), nome: `${fDay(a)} a ${fDay(b)}`, parcial: b >= TODAY}); }
   return {bins: out, g: 'mês'};
 }
-/* Gráfico da linha do consultor = mesma COORTE dos quadros (11/11/2026, "as informações precisam se conversar"):
-   só os leads que entraram no período (ou todos, na carteira inteira); cada lead aparece no dia em que entrou, no dia
-   do 1º agendamento, da 1ª reunião realizada e do ganho. Somando as barras dá exatamente a base dos quadros. Evento
-   fora da janela do topo vai para as colunas "antes"/"depois". */
-function consEvoChart(nome, W, cart) {
+/* Gráfico da linha do consultor (regra única 11/11/2026): por dia/semana/mês do período do topo, leads que entraram e o
+   que aconteceu (agendamentos, reuniões, ganhos), igual Macro/Insights. */
+function consEvoChart(nome, W) {
   const bs = consBins(S.de, S.ate).bins;
-  const X = run(filtros(cart ? {consultores: [nome], de: MIN_DAY, ate: TODAY} : {consultores: [nome]}));
-  const antes = {de: '0000-00-00', ate: addDays(S.de, -1), rot: 'antes', nome: `Antes de ${fDay(S.de)}`, leads: 0, ag: 0, reu: 0, won: 0, extra: true};
-  const depois = {de: addDays(S.ate, 1), ate: '9999-99-99', rot: 'depois', nome: `Depois de ${fDay(S.ate)} (até hoje)`, leads: 0, ag: 0, reu: 0, won: 0, extra: true};
-  bs.forEach(b => Object.assign(b, {leads: 0, ag: 0, reu: 0, won: 0}));
-  const put = (dia, kk) => { if (!dia) return; const d = String(dia).slice(0, 10);
-    const b = d < S.de ? antes : d > S.ate ? depois : bs.find(x => d >= x.de && d <= x.ate); if (b) b[kk]++; };
-  for (const {l, d} of X.rows) {
-    put(l.e, 'leads');
-    if (d.agendado) { const ag = agendaTempos(l); put(ag.length ? ag[0] : l.w, 'ag'); }
-    const r1 = (l.k || []).find(x => MEETING_TYPES.has(x[1])); if (r1) put(r1[0], 'reu');
-    if (l.s === 'won') put(l.w, 'won');
-  }
-  const tem = b => b.leads || b.ag || b.reu || b.won;
   const SER = [['leads', 'Leads novos', '#3b82c4'], ['ag', 'Agendadas', '#e2559a'], ['reu', 'Realizadas', '#f2b705'], ['won', 'Ganhos', '#00a611']];
-  const pts = (tem(antes) ? [antes] : []).concat(bs, tem(depois) ? [depois] : []);
+  const pts = bs.map(b => { const X = run(filtros({consultores: [nome], de: b.de, ate: b.ate})), e = X.res.eventos;
+    return {...b, leads: X.res.kpis.leads, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; });
   const Hh = 176, pl = 34, pr = 8, pt = 18, pb = 24, pw = W - pl - pr, ph = Hh - pt - pb;
   const mx = niceMax(Math.max(1, ...pts.flatMap(p => SER.map(s => p[s[0]])))), y = v => pt + ph - ph * v / mx;
   const bw = pw / Math.max(1, pts.length), w = Math.max(3, Math.min(14, bw * 0.78 / SER.length));
@@ -2408,7 +2401,7 @@ function consEvoChart(nome, W, cart) {
       if (v && w >= 9) s += `<text class="ax" x="${(x + w / 2 - .5).toFixed(1)}" y="${(y(v) - 3).toFixed(1)}" text-anchor="middle" style="font-size:9.5px;fill:#1c1c1c">${fN(v)}</text>`; });
     if (i % step === 0 || p.extra) s += `<text class="ax" x="${pl + i * bw + bw / 2}" y="${Hh - pb + 14}" text-anchor="middle"${p.extra ? ' style="font-style:italic"' : ''}>${p.rot}</text>`;
     const tip = [`${nome} · ${p.nome}${p.parcial ? ' (em andamento)' : ''}`, ...SER.map(([kk, nm]) => `${nm}: ${fN(p[kk])}`),
-      p.extra ? 'Leads da base dos quadros cujo evento caiu fora do período escolhido' : 'Só os leads que entraram no período (mesma base dos quadros)'].join('\n');
+      'Leads = entraram no dia/semana · agendadas, realizadas e ganhos = aconteceram nele (lead de qualquer data)'].join('\n');
     s += `<rect class="hit" x="${pl + i * bw}" y="${pt - 10}" width="${bw}" height="${ph + 10}" data-tip="${ESC(tip)}"/>`;
   });
   const leg = SER.map(([, nm, cor]) => `<span><i style="background:${cor}"></i>${nm}</span>`).join('');
@@ -2422,9 +2415,9 @@ function consLinhaHtml(nome, cardHtml, W, cart) {
     const cls = q == null ? 'na' : q >= 100 ? 'ok' : q >= 85 ? 'quase' : 'longe';
     return `<div class="cvc ${cls}" data-tip="${ESC(`${t}\n${sub}\nMeta: ${fP(ref)}${q == null ? '' : `\nAtingido: ${fP(q)} da meta`}`)}"><span>${curto[t] || t}</span><b>${v == null ? '–' : fP(v)}${acima ? ' ⚠' : ''}</b><small>meta ${fP(ref)}</small></div>`;
   }).join('');
-  const C = consEvoChart(nome, W, cart);
+  const C = consEvoChart(nome, W);
   const nomeG = consBins(S.de, S.ate).g;
-  return `<div class="g g32 mprow cons-row"><div class="card"><div class="ch"><div><h3 data-xf="consultores" data-v="${ESC(nome)}" data-tip="Clique para filtrar este consultor" style="cursor:pointer">${ESC(nome)} <small>${P.cart ? `conversão da carteira inteira (${fN(P.L)} leads)` : `conversão dos ${fN(P.L)} ${P.L === 1 ? 'lead que entrou' : 'leads que entraram'} de ${fDM(S.de)} a ${fDM(S.ate)}`} · gráfico por ${nomeG}: dia do agendamento, da reunião e do ganho desses leads</small></h3></div><div class="lg">${C.leg}</div></div>
+  return `<div class="g g32 mprow cons-row"><div class="card"><div class="ch"><div><h3 data-xf="consultores" data-v="${ESC(nome)}" data-tip="Clique para filtrar este consultor" style="cursor:pointer">${ESC(nome)} <small>${P.cart ? `conversão da carteira inteira (${fN(P.L)} leads)` : `conversão de ${fDM(S.de)} a ${fDM(S.ate)}: ${fN(P.L)} ${P.L === 1 ? 'lead entrou' : 'leads entraram'}, eventos contam na data em que aconteceram`} · gráfico por ${nomeG}</small></h3></div><div class="lg">${C.leg}</div></div>
     <div class="cvs">${P.L ? chips : '<div class="mut">Nenhum lead para este consultor com o seletor atual.</div>'}</div>${C.svg}</div>
     <div class="cons-side">${cardHtml}</div></div>`;
 }
@@ -4486,14 +4479,18 @@ const agingIdx = v => AGING.findIndex(a => a[1](v));
 function viewTempo() { S.tab = 'lista'; return viewLista(); }   // link antigo
 /* Lead-time: antes era aba própria; desde 11/11/2026 é a seção final do Lead a Lead (leads que entraram no período) */
 function tempoHtml() {
-  const C = cur(), P = prev(), lt = C.res.lead_time, plt = P.res.lead_time, k = C.res.kpis;
-  let h = `<div class="mph mt" id="leadtime"><span>LEAD-TIME</span>${ESC(periodCaption())} · tempos médios em dias desde a entrada do lead · vale para os leads que entraram no período (não depende do filtro rápido da lista)</div>`;
+  // Regra única (11/11/2026): agendamento, reunião, perda e ganho = eventos que ACONTECERAM no período (lead de qualquer
+  // data de entrada), média de dias desde a entrada do lead até o evento; 1º contato = leads que entraram no período.
+  const C = cur(), P = prev(), k = C.res.kpis, e = C.res.eventos, pe = P.res.eventos, lt0 = C.res.lead_time, plt0 = P.res.lead_time;
+  const lt = {media_dias_1o_contato: lt0.media_dias_1o_contato, media_dias_ate_agendamento: e.lt_agendamento, media_dias_ate_reuniao: e.lt_reuniao, media_dias_ate_perda: e.lt_perda, media_dias_ate_ganho: e.lt_ganho};
+  const plt = {media_dias_1o_contato: plt0.media_dias_1o_contato, media_dias_ate_agendamento: pe.lt_agendamento, media_dias_ate_reuniao: pe.lt_reuniao, media_dias_ate_perda: pe.lt_perda, media_dias_ate_ganho: pe.lt_ganho};
+  let h = `<div class="mph mt" id="leadtime"><span>LEAD-TIME</span>${ESC(periodCaption())} · média de dias desde a entrada do lead até cada evento que aconteceu no período (ganho de novembro de um lead de outubro conta aqui, com o tempo total) · 1º contato = leads que entraram no período</div>`;
   const cards = [
     ['Até o 1º contato', lt.media_dias_1o_contato, plt.media_dias_1o_contato, k.contatados, 'leads contatados', `mediana ${fD(k.mediana_dias_1o_contato)}`],
-    ['Até o agendamento', lt.media_dias_ate_agendamento, plt.media_dias_ate_agendamento, k.agendados, 'agendados', ''],
-    ['Até a reunião', lt.media_dias_ate_reuniao, plt.media_dias_ate_reuniao, k.reunioes, 'com reunião', ''],
-    ['Até a perda', lt.media_dias_ate_perda, plt.media_dias_ate_perda, k.perdidos, 'perdidos', ''],
-    ['Até o ganho', lt.media_dias_ate_ganho, plt.media_dias_ate_ganho, k.ganhos, 'ganhos', '']];
+    ['Até o agendamento', lt.media_dias_ate_agendamento, plt.media_dias_ate_agendamento, e.agendamentos, 'agendados no período', ''],
+    ['Até a reunião', lt.media_dias_ate_reuniao, plt.media_dias_ate_reuniao, e.reunioes, 'reuniões no período', ''],
+    ['Até a perda', lt.media_dias_ate_perda, plt.media_dias_ate_perda, e.perdidos, 'perdidos no período', ''],
+    ['Até o ganho', lt.media_dias_ate_ganho, plt.media_dias_ate_ganho, e.ganhos, 'ganhos no período', '']];
   h += '<div class="ltc">' + cards.map(([t, v, p, n, nl, x], i) => kpiCard({label: t, cls: i === 3 ? 'red' : i === 0 ? 'hero' : '', v: `${f1(v)}<small>dias</small>`,
     sub: `n = ${fN(n)} ${nl}${x ? ' · ' + x : ''}`, d: delta(v, p, -1, fD)})).join('') + '</div>';
   // régua
@@ -4509,7 +4506,7 @@ function tempoHtml() {
   if (perda != null) r += `<div class="mk red" style="left:${pos(perda)}%" data-tip="${ESC(`Perda: ${fD(perda)} em média após a entrada`)}"><span class="dot"></span><span class="stem" style="top:84px;height:18px;background:#e9c4be"></span><span class="lb" style="top:104px"><b>${fD(perda)}</b>Perda</span></div>`;
   const sorted = mk.slice().sort((a, b) => a[1] - b[1]);
   const gaps = sorted.map((m, i) => `<span>${i ? sorted[i - 1][0] : 'Entrada'} → ${m[0]}: <b>+${f1(m[1] - (i ? sorted[i - 1][1] : 0))} d</b></span>`).join('');
-  h += `<div class="card mt"><div class="ch"><div><h3>Régua do tempo médio entre marcos</h3><p>Posição de cada marco em dias médios após a entrada (cada média usa os leads que atingiram o marco)</p></div></div>
+  h += `<div class="card mt"><div class="ch"><div><h3>Régua do tempo médio entre marcos</h3><p>Posição de cada marco em dias médios após a entrada (cada média usa os eventos que aconteceram no período)</p></div></div>
     ${C.rows.length ? `<div class="ruler"><div class="ln"></div>${r}</div><div class="gaps">${gaps}</div>` : emptyBox()}</div>`;
   // envelhecimento
   const abertos = C.rows.filter(x => x.d.open), cnt = AGING.map(() => 0);

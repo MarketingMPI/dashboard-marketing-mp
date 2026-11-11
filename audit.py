@@ -186,9 +186,17 @@ def eventos(leads, f):
     ag = reu = won = lost = cont = contL = faltas = 0
     motivos = Counter()
     neg = sem_ag = pos_reu = ag7 = 0; d_ar, d_rg, tent = [], [], []   # indicadores que movem as metas
+    lt_ag, lt_reu, lt_lost, lt_won = [], [], [], []   # lead-time: entrada → evento do período (11/11/2026)
     for l in P:
         k, h = l["k"] or [], l["h"] or []
         at = agenda_tempos(l)
+        if l.get("e"):
+            e0 = dt(l["e"]); dd = lambda x: max(0.0, dias(dt(x), e0))
+            a1 = next((x for x in at if dentro(x)), None)
+            if a1: lt_ag.append(dd(a1))
+            lt_reu += [dd(x[0]) for x in k if x[1] in REUNIAO_TIPOS and dentro(x[0])]
+            if l["s"] == "lost" and dentro(l["l"]): lt_lost.append(dd(l["l"]))
+            if l["s"] == "won" and dentro(l["w"]): lt_won.append(dd(l["w"]))
         if dentro(l.get("e")) and any(t >= l["e"] and dias(dt(t), dt(l["e"])) <= 7 for t in at): ag7 += 1
         for x in k:
             if x[1] in REUNIAO_TIPOS and dentro(x[0]):
@@ -215,7 +223,8 @@ def eventos(leads, f):
     return {"agendamentos": ag, "reunioes": reu, "ganhos": won, "perdidos": lost, "contatos": cont,
             "leads_contatados": contL, "faltas": faltas, "motivos_perda": dict(motivos),
             "agendados_em_7d": ag7, "dias_agenda_reuniao": mediana(d_ar), "dias_reuniao_ganho": mediana(d_rg),
-            "negociacao": neg, "perdidos_sem_agendar": sem_ag, "tentativas_ate_perda": media(tent), "perdidos_pos_reuniao": pos_reu}
+            "negociacao": neg, "perdidos_sem_agendar": sem_ag, "tentativas_ate_perda": media(tent), "perdidos_pos_reuniao": pos_reu,
+            "lt_agendamento": media(lt_ag), "lt_reuniao": media(lt_reu), "lt_perda": media(lt_lost), "lt_ganho": media(lt_won)}
 
 
 # ----------------------------------------------------------------------------- performance (mídia × Pipedrive)
