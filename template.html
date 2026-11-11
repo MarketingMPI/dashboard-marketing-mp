@@ -4619,8 +4619,7 @@ function viewFunil() {
       <span class="sft"><span class="p" style="width:${100 * e.passaram / k.leads}%"></span><span class="v" style="width:${100 * e.avancaram / k.leads}%"></span><span class="a" style="left:${100 * e.avancaram / k.leads}%;width:${100 * e.atuais / k.leads}%"></span></span>
       <span class="sfv" style="white-space:nowrap"><b>${fN(e.passaram)}</b> entraram · <b>${fN(e.avancaram)}</b> avançaram · <b>${fN(e.atuais)}</b> ainda estão · <b>${fD(e.media_dias_ate_avancar)}</b> até avançar</span></div>`;
   }).join('') + '</div>';
-  h += `<div class="card mt"><div class="ch"><div><h3>Mapa do CRM: etapas do Pipedrive</h3><p>Barra clara = entraram na etapa · média = avançaram para a próxima · escura = ainda estão nela (abertos) · base = ${fN(k.leads)} leads</p></div>
-    <div class="lg"><span><i style="background:var(--v200)"></i>Entraram</span><span><i style="background:#5f9c83"></i>Avançaram</span><span><i style="background:var(--verde)"></i>Ainda estão</span></div></div>${sf}</div>`;
+  // "Mapa do CRM: etapas do Pipedrive" saiu da página (pedido 11/11/2026); a tabela Mapa de etapas segue abaixo
   const cols = [{k: 'et', t: 'Etapa'}, {k: 'en', t: 'Entraram', num: 1, tip: 'Leads do período que estiveram na etapa em algum momento'},
     {k: 'av', t: 'Avançaram', num: 1, tip: 'Foram para uma etapa seguinte do funil (em Fechamento: ganhos)'}, {k: 'pa', t: '% avanço', num: 1, tip: 'Avançaram ÷ entraram'},
     {k: 'at', t: 'Ainda estão', num: 1, tip: 'Abertos que estão na etapa agora'}, {k: 'sa', t: 'Saíram sem avançar', num: 1, tip: 'Perdidos na etapa, enviados ao Cultivo ou que voltaram de etapa'},
