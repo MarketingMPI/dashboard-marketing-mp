@@ -4167,7 +4167,7 @@ function igChart(serie, width, cor) {
   const mx = niceMax(Math.max(1, ...serie.map(x => x[1]))), mr = niceMax(Math.max(1, ...serie.map(x => x[3] || 0)))   /* linha = interações (11/11/2026) */, bw = pw / serie.length, w = Math.max(1.5, Math.min(bw * .62, 30));
   const y = v => pt + ph - ph * v / mx, yr = v => pt + ph - ph * v / mr;
   let g = '';
-  for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mx * i / 4)}</text><text class="ax" x="${W - pr + 6}" y="${yy + 3.5}" style="fill:#a8701c">${fN(mr * i / 4)}</text>`; }
+  for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mx * i / 4)}</text><text class="ax" x="${W - pr + 6}" y="${yy + 3.5}" style="fill:#a020f0">${fN(mr * i / 4)}</text>`; }
   const step = Math.max(1, Math.ceil(serie.length / Math.max(1, Math.floor(pw / 48)))), pts = [];
   serie.forEach(([d, v, r, it], i) => {
     const cx = pl + i * bw + bw / 2;
@@ -4176,7 +4176,7 @@ function igChart(serie, width, cor) {
     if (i % step === 0) g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${fDM(d)}</text>`;
     g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${WD[weekday(d)]}, ${fDay(d)}\nVisualizações: ${fN(v)}\nInterações: ${fN(it)}\nEngajamento: ${v ? fP((it || 0) / v * 100) : '–'} (interações ÷ visualizações)\nAlcance do dia: ${fN(r)}`)}" data-range="${d}|${d}"/>`;
   });
-  g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#c98a1b" stroke-width="2" stroke-linejoin="round"/>`;
+  g += `<polyline points="${pts.join(' ')}" fill="none" stroke="#a020f0" stroke-width="2.4" stroke-linejoin="round" style="filter:drop-shadow(0 0 3px rgba(176,38,255,.55))"/>` + pts.map(q => `<circle cx="${q.split(',')[0]}" cy="${q.split(',')[1]}" r="2.6" fill="#a020f0"/>`).join('');   // roxo neon (11/11/2026)
   return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Visualizações e interações por dia">${g}</svg></div>`;
 }
 function igInsights(c, p) {
@@ -4355,7 +4355,7 @@ function viewInstagram() {
     ].join('') + '</div>';
     const ins = igInsights(c, p);
     h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Visualizações × interações por dia · ${MN}</h3><p>${org ? `Sem anúncios pagos${c.views_anuncios ? ` (${fN(c.views_anuncios)} visualizações de anúncios ficaram de fora)` : ''}` : modo === 'ads' ? 'Só o que veio de anúncios pagos' : 'Totais do perfil'} · barras = visualizações · linha = interações · engajamento do período: <b>${c.views ? fP(c.interacoes / c.views * 100) : '–'}</b> (interações ÷ visualizações)</p></div>
-        <div class="lg"><span><i style="background:${cor}"></i>Visualizações</span><span><i style="background:#c98a1b"></i>Interações</span></div></div>${igChart(c.serie, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44, cor)}</div>
+        <div class="lg"><span><i style="background:${cor}"></i>Visualizações</span><span><i style="background:#a020f0"></i>Interações</span></div></div>${igChart(c.serie, window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44, cor)}</div>
       <div class="card"><div class="ch"><div><h3>Principais insights</h3><p>Em relação ao período anterior</p></div></div>${ins.length ? '<ul class="igi">' + ins.map(([t, x]) => `<li class="${t}">${x}</li>`).join('') + '</ul>' : emptyBox('Sem variações relevantes')}</div></div>`;
     const fm = c.formatos.length ? '<div class="igf">' + c.formatos.map(x => `<div><div class="igfh"><b>${x.formato}</b><span class="mut">${x.posts} ${x.posts === 1 ? 'post' : 'posts'}</span></div>
       <div class="igfg"><span><b>${fN(Math.round(x.views / x.posts))}</b>visualizações/post</span><span><b>${fN(Math.round(x.alcance / x.posts))}</b>alcance/post</span><span><b>${f1(x.interacoes / x.posts)}</b>interações/post</span><span><b>${fP(pctOf(x.interacoes, x.alcance))}</b>engajamento</span></div></div>`).join('') + '</div>' : emptyBox('Nenhum post no período');
