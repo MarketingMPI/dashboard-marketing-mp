@@ -2040,6 +2040,46 @@ function niceMax(v) {  // máximo do eixo = 4 × passo "redondo"
 }
 
 /* Leads por dia de entrada (barras empilhadas contatado/sem contato, FDS destacado). */
+/* Custo por lead DIÁRIO (Visão Macro, pedido 11/11/2026): barras = investimento do dia na Meta (B2C), linha = custo por
+   lead do dia (investimento ÷ leads que entraram no dia), tracejado = custo por lead do período. Mesma conta da Performance
+   e dos Insights: leads da operação (todas as origens, ou só a campanha do topo) e investimento das campanhas pagas. */
+function chartCPLDiario(de, ate, width) {
+  const M = (D && D.midia) || {camps: [], dias: []}, camp = S.camp || '';
+  const sel = camp ? (PAGAS[camp] ? [camp] : []) : Object.keys(PAGAS), crx = camp && CAMPANHAS[camp] ? CAMPANHAS[camp].rx : null;
+  const bins = [], idx = new Map();
+  for (let d = de; d <= ate; d = addDays(d, 1)) { idx.set(d, bins.length); bins.push({d, inv: 0, leads: 0, fds: [0, 6].includes(weekday(d))}); }
+  for (const r of M.dias || []) { const b = bins[idx.get(r[0])], c = M.camps[r[1]]; if (b && c && sel.includes(c.grupo)) b.inv += r[2] / 100; }
+  for (const l of LEADS) {
+    if (l.b || isRetro(l) || !l.e) continue;
+    if (crx && !crx.test(l.n || '')) continue;
+    const b = bins[idx.get(l.e.slice(0, 10))]; if (b) b.leads++;
+  }
+  bins.forEach(b => { b.cpl = b.leads && b.inv ? b.inv / b.leads : null; });
+  const totInv = bins.reduce((a, b) => a + b.inv, 0), totL = bins.reduce((a, b) => a + b.leads, 0), med = totL && totInv ? totInv / totL : null;
+  const W = Math.max(300, width), H = 300, pl = 58, pr = 8, pt = 18, pb = 30, pw = W - pl - pr, ph = H - pt - pb;
+  const mx = niceMax(Math.max(1, ...bins.map(b => Math.max(b.inv, b.cpl || 0)))), y = v => pt + ph - ph * Math.max(0, v) / mx;
+  const bw = pw / bins.length, w = Math.max(1.5, Math.min(bw * 0.62, 40));
+  let g = '';
+  for (let i = 0; i <= 4; i++) { const v = mx * i / 4, yy = y(v); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fR0(v)}</text>`; }
+  const step = Math.max(1, Math.ceil(bins.length / Math.max(1, Math.floor(pw / 48)))), lin = [];
+  bins.forEach((b, i) => {
+    const x0 = pl + i * bw, cx = x0 + bw / 2;
+    if (b.fds) g += `<rect x="${x0}" y="${pt}" width="${bw}" height="${ph}" fill="#fbf4e6"/>`;
+    if (b.inv) g += `<rect class="bar" style="animation-delay:${Math.min(i * 12, 400)}ms" x="${cx - w / 2}" y="${y(b.inv)}" width="${w}" height="${y(0) - y(b.inv)}" fill="#cfe0f2" rx="${Math.min(3, w / 4)}"/>`;
+    if (bins.length <= 31 && bw > 16 && (b.leads || b.inv)) g += `<text class="ax" x="${cx}" y="${y(0) - 4}" text-anchor="middle" style="fill:#2f5d8a;font-weight:600;font-size:10px">${fN(b.leads)}</text>`;
+    if (b.cpl != null) lin.push([cx, y(b.cpl)]); else if (b.inv) { lin.push(null); g += `<text x="${cx}" y="${y(b.inv) - 4}" text-anchor="middle" style="fill:#c0392b;font-size:11px;font-weight:700">×</text>`; } else lin.push(null);
+    if (i % step === 0) g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle"${b.fds ? ' style="fill:#a8701c"' : ''}>${bins.length <= 14 ? `${WD[weekday(b.d)].toLowerCase()} ${fDM(b.d)}` : fDM(b.d)}</text>`;
+    const tip = `${WD[weekday(b.d)]}, ${fDay(b.d)}${b.fds ? ' · fim de semana' : ''}\nInvestimento: ${fR(b.inv)}\nLeads que entraram: ${fN(b.leads)}\nCusto por lead: ${b.cpl != null ? fR(b.cpl) : b.inv ? 'sem lead no dia' : '–'}${med != null ? `\nMédia do período: ${fR(med)}` : ''}\nClique para filtrar este dia`;
+    g += `<rect class="hit" x="${x0}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(tip)}" data-range="${b.d}|${b.d}"/>`;
+  });
+  if (med != null) { const ym = y(med); g += `<line x1="${pl}" x2="${W - pr}" y1="${ym}" y2="${ym}" stroke="#a8701c" stroke-width="1.5" stroke-dasharray="6 5"/><text class="ax" x="${W - pr - 4}" y="${ym - 5}" text-anchor="end" style="fill:#a8701c;font-weight:600;stroke:#fff;stroke-width:3px;paint-order:stroke">média ${fR(med)}</text>`; }
+  let path = '', on = false;
+  for (const pnt of lin) { if (!pnt) { on = false; continue; } path += `${on ? 'L' : 'M'}${pnt[0].toFixed(1)},${pnt[1].toFixed(1)}`; on = true; }
+  if (path) g += `<path d="${path}" fill="none" stroke="#2f6db5" stroke-width="2" stroke-linejoin="round"/>`;
+  g += lin.filter(Boolean).map(([a, b]) => `<circle cx="${a.toFixed(1)}" cy="${b.toFixed(1)}" r="3" fill="#2f6db5" stroke="#fff" stroke-width="1.2"/>`).join('');
+  return {svg: `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Custo por lead por dia">${g}</svg></div>`, inv: totInv, leads: totL, med, semMidia: camp && !PAGAS[camp]};
+}
+
 function chartDaily(rows, de, ate, width) {
   const n = diffDays(de, ate) + 1;
   const mode = n <= 62 ? 'dia' : n <= 420 ? 'semana' : 'mes';
@@ -2256,10 +2296,10 @@ function viewMacro() {
   ].join('') + '</div>';
   const vw = document.getElementById('view').clientWidth || 900;
   const dailyW = window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44;
-  const ch = chartDaily(C.rows, S.de, S.ate, dailyW);
-  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Leads por data de entrada</h3><p>Agrupado ${ch.lbl} · clique numa barra para filtrar</p></div>
-      <div class="lg"><span><i style="background:#00503c"></i>Contatados</span><span><i style="background:#c2d3cb"></i>Sem contato</span><span><i style="background:#f6e7c8"></i>Fim de semana</span></div></div>
-      ${C.rows.length ? ch.svg : emptyBox()}</div>
+  const ch = chartCPLDiario(S.de, S.ate, dailyW);
+  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Custo por lead por dia</h3><p>${ch.semMidia ? 'Esta campanha não tem mídia paga na Meta' : `${fR(ch.inv)} investidos · ${fN(ch.leads)} leads · média ${ch.med != null ? fR(ch.med) : '–'} por lead`} · número embaixo da barra = leads do dia · clique para filtrar o dia</p></div>
+      <div class="lg"><span><i style="background:#cfe0f2"></i>Investimento do dia</span><span><i style="background:#2f6db5;height:2px;vertical-align:middle"></i>Custo por lead</span><span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Média do período</span><span><b style="color:#c0392b">×</b> investiu e não entrou lead</span></div></div>
+      ${ch.svg}</div>
     <div class="card"><div class="ch"><div><h3>Funil do período</h3><p>Leads → Contatados → Agendados → Reuniões → Ganhos</p></div>
       <div class="lg"><span data-tip="Referência sobre os leads qualificados (MQL): agendados 30%, reuniões 15%, ganhos 5%"><i class="rfk"></i>Referência do funil</span></div></div>${miniFunnel(k)}</div></div>`;
   // distribuição 1º contato
