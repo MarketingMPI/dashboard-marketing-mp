@@ -4693,9 +4693,7 @@ function viewConsultores() {
   let h = viewHead('Consultores', periodCaption() + ' · mapa da carteira e fluxo de eficiência por consultor (dono do negócio)');
   h += mapaConsHtml({onde: 'consultores', linhas: true});
   if (!cs.length) return h + `<div class="card mt">${emptyBox()}</div>`;
-  h += insMetasConsHtml({de: S.de, ate: S.ate}, 'mensal', null, '', {cons: true, mk: o => filtros(o),
-    titulo: 'Conversão do funil por consultor × referência',
-    sub: 'Contato em menos de 1 dia e conversão etapa a etapa de cada consultor no período, com quanto da referência foi atingido · clique para abrir ou fechar'});
+  // tabela "Conversão do funil por consultor × referência" saiu (pedido 11/11/2026): a conversão de cada um já está nas linhas acima
   const st = S.cons, col = CONS_COLS.find(x => x.k === st.sort) || CONS_COLS[1];
   const rows = cs.slice().sort((a, b) => { const x = a[col.k], y = b[col.k]; if (x == null) return 1; if (y == null) return -1; return (x < y ? -1 : x > y ? 1 : 0) * st.dir; });
   const maxPct = 100;
