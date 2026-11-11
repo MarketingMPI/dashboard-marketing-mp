@@ -192,6 +192,16 @@ table.t.mprc th,table.t.mprc td{padding-left:7px;padding-right:7px}table.t.mprc 
 .mpd ul{margin:10px 0 0;padding-left:18px;line-height:1.55}.mpd.mt{margin-top:22px}
 @media(min-width:961px){.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .igh{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-top:6px;border-top:1px solid var(--linha)}.igh.mt{margin-top:30px;padding-top:22px}
+.igmenu{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 16px}
+.igmenu button{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border:1px solid var(--linha);border-radius:999px;background:#fff;cursor:pointer;font:inherit;color:inherit;text-align:left;transition:border-color .15s,box-shadow .15s}
+.igmenu button:hover{border-color:#9fbfb1}
+.igmenu button.on{border-color:var(--verde);box-shadow:0 0 0 2px rgba(0,80,60,.15);background:#f3f8f6}
+.igav{position:relative;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:16px;flex:none}
+.igav i{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 0 0 1px var(--linha)}
+.igav i svg{width:12px;height:12px;fill:none;stroke:#c13584;stroke-width:2.2}
+.igav.cmp{background:#eef3f1;color:var(--prof)}.igav.cmp svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
+.igmt{display:flex;flex-direction:column;line-height:1.2}.igmt b{font-size:13.5px}.igmt small{font-size:11.5px;color:var(--cinza)}
+@media(max-width:760px){.igmenu button{padding:6px 10px 6px 6px}.igmt small{display:none}}
 .igsp{height:10px;margin:48px -4px 6px;background:#e8eeeb;border-radius:6px}.igsp+.igh.mt{margin-top:18px;border-top:0}
 .igh h3{margin:0;font-size:18px;color:var(--prof)}.igh p{margin:2px 0 0;color:var(--cinza);font-size:13px}.igl{margin-left:auto;font-size:12.5px;font-weight:600;text-decoration:none}
 .igdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}.igdot.lg{width:14px;height:14px;margin:0}
@@ -4303,7 +4313,15 @@ function viewInstagram() {
     ads: 'Somente o que veio de <b>anúncios pagos</b> (impulsionamentos e anúncios exibidos com o perfil). Seguidores, cliques na bio e os números dos posts não mudam.',
     tot: '<b>Orgânico + anúncios</b>: totais do perfil, como aparecem no Instagram. Seguidores, cliques na bio e os números dos posts não mudam.'};
   h += `<div class="note">${AVISO.org}</div>`;
-  h += `<div class="card np"><div class="ch"><div><h3>Comparativo dos perfis</h3><p>${MN} · valores no período e variação em relação ao período anterior</p></div></div><div class="tw"><table class="t igc"><thead><tr><th></th>` +
+  /* Menu de perfis (11/11/2026): a aba abre só no Comparativo; cada ícone mostra todos os dados de um perfil. */
+  const selP = S.igP && ig.contas.some(c => c.id === S.igP) ? S.igP : null;
+  const ini = u => ESC(({'meupatrimonio.nacional': 'MP', 'rede.meupatrimonio': 'RD', 'gabriel.meupatrimonio': 'GB', 'renanlimacfp': 'RL'})[u] || u.slice(0, 2).toUpperCase());
+  const ICO_IG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg>';
+  const ICO_CMP = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10M15 10v10"/></svg>';
+  h += `<nav class="igmenu" aria-label="Perfis do Instagram">
+    <button type="button" data-igp="" class="${selP ? '' : 'on'}"><span class="igav cmp">${ICO_CMP}</span><span class="igmt"><b>Comparativo</b><small>todos os perfis</small></span></button>` +
+    ig.contas.map(c => `<button type="button" data-igp="${ESC(c.id)}" class="${selP === c.id ? 'on' : ''}" data-tip="${ESC(`${c.nome} · ver todos os dados do perfil`)}"><span class="igav" style="background:${IG_COR[c.user] || '#00503c'}">${ini(c.user)}<i>${ICO_IG}</i></span><span class="igmt"><b>@${ESC(c.user)}</b><small>${fN(c.seguidores_hoje)} seguidores</small></span></button>`).join('') + `</nav>`;
+  if (!selP) h += `<div class="card np"><div class="ch"><div><h3>Comparativo dos perfis</h3><p>${MN} · valores no período e variação em relação ao período anterior</p></div></div><div class="tw"><table class="t igc"><thead><tr><th></th>` +
     ig.contas.map(c => `<th class="num"><span class="igdot" style="background:${IG_COR[c.user] || '#00503c'}"></span>@${ESC(c.user)}</th>`).join('') + `</tr></thead><tbody>` +
     row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no último dia do período, comparados com o último dia do período anterior. Reconstruído dia a dia pelo saldo informado pela Meta (começaram a seguir − deixaram de seguir).', c => c.seguidores_fim, true) +
     row('Visualizações', c => c.views) + row('Alcance médio por dia', c => c.alcance_medio_dia == null ? null : Math.round(c.alcance_medio_dia), fN, 'Média diária de contas alcançadas. A variação usa o valor sem arredondar.', c => c.alcance_medio_dia) +
@@ -4312,11 +4330,11 @@ function viewInstagram() {
     row('Visualizações por post', c => c.views_por_post == null ? null : Math.round(c.views_por_post)) +
     row('Taxa de engajamento dos posts', c => c.engajamento_posts, fP) + row('Novos seguidores', c => c.novos_seguidores, fN, 'Contas que começaram a seguir o perfil no período', c => c.novos_cobertura >= 99.5 ? c.novos_seguidores : null, true) +
     row('Deixaram de seguir', c => c.deixaram_de_seguir, fN, 'Contas que deixaram de seguir (ou saíram do Instagram) no período', c => c.deixaram_de_seguir, true) +
-    row('Cliques no link da bio', c => c.cliques_site, fN, 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)') + `</tbody></table></div></div>`;
-  // ---- um bloco por perfil
+    row('Cliques no link da bio', c => c.cliques_site, fN, 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)') + `</tbody></table></div><p class="mut" style="font-size:12px;margin:8px 16px 14px">Clique no ícone de um perfil, acima, para ver todos os dados dele.</p></div>`;
+  // ---- bloco do perfil escolhido no menu
   const vw = document.getElementById('view').clientWidth || 900;
   const contasInfo = ig.contas.map(c => ({id: c.id, user: c.user}));
-  ig.contas.forEach((c, ic) => {
+  ig.contas.filter(c => c.id === selP).forEach((c, ic) => {
     const p = pmap.get(c.id) || {}, cor = IG_COR[c.user] || '#00503c';
     if (ic) h += '<div class="igsp" aria-hidden="true"></div>';   // espaçador entre perfis
     h += `<div class="igh mt" id="ig-${ESC(c.user)}"><span class="igdot lg" style="background:${cor}"></span><div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
@@ -5569,7 +5587,8 @@ function bindEvents() {
       try { localStorage.setItem('mp-painel-navmin', m ? '1' : '0'); } catch (e) { /* sem storage */ }
       renderNav(); return; }
     const tab = t.closest('[data-tab]');
-    if (tab) { S.tab = tab.dataset.tab; update({anim: true}); window.scrollTo({top: Math.min(window.scrollY, document.querySelector('.shell').offsetTop), behavior: 'smooth'}); return; }
+    if (tab) { if (tab.dataset.tab === 'instagram') S.igP = null;   // aba Instagram abre sempre no Comparativo
+      S.tab = tab.dataset.tab; update({anim: true}); window.scrollTo({top: Math.min(window.scrollY, document.querySelector('.shell').offsetTop), behavior: 'smooth'}); return; }
     const rm = t.closest('[data-rm]');
     if (rm) { if (rm.dataset.rm === 'busca') S.busca = ''; else toggleVal(rm.dataset.rm, rm.dataset.v); resetPages(); update(); return; }
     const act = t.closest('[data-act]');
@@ -5618,6 +5637,8 @@ function bindEvents() {
     if (row) { openDrawer(row.dataset.lead); return; }
     const mpg = t.closest('[data-mpg]'), mpmb = t.closest('[data-mpmb]');
     if (mpg || mpmb) { if (mpg) { S.mpG = mpg.dataset.mpg; S.mpMB = null; } else { const k = Number(mpmb.dataset.mpmb); S.mpMB = S.mpMB === k ? null : k; } const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
+    const igp = t.closest('[data-igp]');
+    if (igp) { S.igP = igp.dataset.igp || null; S.mpMB = null; renderView(); const m = document.querySelector('#view .igmenu'); if (m) window.scrollTo(0, Math.max(0, m.getBoundingClientRect().top + scrollY - 90)); return; }
     const ighp = t.closest('[data-ighp]'), ighm = t.closest('[data-ighm]');
     if (ighp || ighm) { if (ighp) S.igHP = ighp.dataset.ighp; if (ighm) S.igHM = ighm.dataset.ighm; const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
     const hr = t.closest('[data-hubrede]');
