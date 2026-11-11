@@ -1915,7 +1915,7 @@ const S = {
   tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: true, camp: '', igModo: 'org',
   consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [],
   ll: {sort: 'e', dir: -1, page: 0, quick: 'todos'}, lost: {sort: 'l', dir: -1, page: 0},
-  cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false, mapaM: 'carteira', mapaOpen: {}
+  cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false, mapaM: 'carteira', consM: 'periodo', mapaOpen: {}
 };
 
 function presetRange(p) {
@@ -2330,11 +2330,12 @@ const MAPA_CORES = ['#003326', '#00503c', '#1f7a58', '#3d9a6f', '#00a611', '#9fb
 /* Performance do consultor no período do topo × metas do funil (REF_PRU sobre MQL; contato em < 1 dia: 80%).
    Mesmas contas da tabela "Conversão do funil por consultor × referência" (leads que entraram no período e,
    desses, agendados / reuniões / ganhos), para os números baterem entre os blocos. */
+const consOrdem = (a, b) => { const sa = /^Sem consultor/i.test(a), sb = /^Sem consultor/i.test(b); return sa !== sb ? (sa ? 1 : -1) : a.localeCompare(b, 'pt-BR'); };   // ordem fixa (11/11/2026)
 const evCons = nome => run(filtros({consultores: [nome]})).res.eventos;   // movimento do consultor no período do topo
 /* Carteira inteira (padrão do mapa): TODOS os leads do consultor (abertos, ganhos e perdidos, qualquer data de entrada,
    só a operação) — % de cada lead dele que chegou a cada etapa. Só do período: mesma conta dos Insights/Funil Consultores. */
-function consPerf(nome) {
-  const cart = S.mapaM !== 'periodo';
+function consPerf(nome, cart) {
+  if (cart === undefined) cart = S.mapaM !== 'periodo';
   const X = run(filtros(cart ? {consultores: [nome], de: MIN_DAY, ate: TODAY} : {consultores: [nome]})), kk = X.res.kpis, e = X.res.eventos;
   const k = cart ? {leads: kk.leads, agendados: kk.agendados, reunioes: kk.reunioes, ganhos: kk.ganhos}
     : {leads: kk.leads, agendados: e.agendamentos, reunioes: e.reunioes, ganhos: e.ganhos}, L = k.leads;
@@ -2363,9 +2364,15 @@ function consPerfHtml(nome) {
 /* Página Consultores (pedido 10/11/2026): uma linha por consultor, igual a Insights › Metas — à esquerda a conversão
    por etapa (× metas) e o gráfico de evolução (leads, agendadas, realizadas, ganhos por período); à direita o card da
    carteira. Conversão segue o seletor do mapa (carteira inteira ou só do período), mesma conta de consPerf. */
-function consEvoChart(nome, g, W) {
-  const ini = INS_METAS_DESDE < MIN_DAY ? MIN_DAY : INS_METAS_DESDE;
-  const bs = mpBuckets(g, ini).slice(g === 'semanal' ? -12 : g === 'mensal' ? -12 : -8);
+function consBins(de, ate) {   // dia até 14 dias, semana até 6 meses, mês acima disso
+  const n = diffDays(de, ate) + 1, out = [];
+  if (n <= 14) { for (let d = de; d <= ate; d = addDays(d, 1)) out.push({de: d, ate: d, rot: fDM(d), nome: `${WD[weekday(d)]}, ${fDay(d)}`, parcial: d === TODAY}); return {bins: out, g: 'dia'}; }
+  if (n <= 186) { for (let d = de; d <= ate; d = addDays(d, 7)) { const f = addDays(d, 6) > ate ? ate : addDays(d, 6); out.push({de: d, ate: f, rot: fDM(d), nome: `${fDay(d)} a ${fDay(f)}`, parcial: f >= TODAY}); } return {bins: out, g: 'semana'}; }
+  for (let ym = de.slice(0, 7); ym <= ate.slice(0, 7); ym = ymAdd(ym, 1)) { const a = ym + '-01' < de ? de : ym + '-01', b = ymLast(ym) > ate ? ate : ymLast(ym); out.push({de: a, ate: b, rot: mesCurto(ym), nome: `${fDay(a)} a ${fDay(b)}`, parcial: b >= TODAY}); }
+  return {bins: out, g: 'mês'};
+}
+function consEvoChart(nome, W) {
+  const bs = consBins(S.de, S.ate).bins;
   const SER = [['leads', 'Leads novos', '#3b82c4'], ['ag', 'Agendadas', '#e2559a'], ['reu', 'Realizadas', '#f2b705'], ['won', 'Ganhos', '#00a611']];
   const pts = bs.map(b => { const ate = b.ate > TODAY ? TODAY : b.ate, X = run(filtros({consultores: [nome], de: b.de, ate})), e = X.res.eventos;
     return {...b, leads: X.res.kpis.leads, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; });
@@ -2389,33 +2396,34 @@ function consEvoChart(nome, g, W) {
   const leg = SER.map(([, nm, cor]) => `<span><i style="background:${cor}"></i>${nm}</span>`).join('');
   return {leg, svg: `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Evolução de ${ESC(nome)}">${s}</svg></div>`};
 }
-function consLinhaHtml(nome, cardHtml, g, W) {
-  const P = consPerf(nome);
+function consLinhaHtml(nome, cardHtml, W, cart) {
+  const P = consPerf(nome, cart);
   const curto = {'Contato em menos de 1 dia': 'Contato < 1 dia', 'MQL → reunião agendada': 'MQL → agendada', 'Agendada → realizada': 'Agendada → realiz.', 'Realizada → fechamento': 'Realiz. → fechamento'};
   const chips = P.itens.map(([t, v0, ref, sub]) => {
     const acima = v0 != null && v0 > 100.05, v = acima ? 100 : v0, q = v == null ? null : Math.min(100, v / ref * 100);
     const cls = q == null ? 'na' : q >= 100 ? 'ok' : q >= 85 ? 'quase' : 'longe';
     return `<div class="cvc ${cls}" data-tip="${ESC(`${t}\n${sub}\nMeta: ${fP(ref)}${q == null ? '' : `\nAtingido: ${fP(q)} da meta`}`)}"><span>${curto[t] || t}</span><b>${v == null ? '–' : fP(v)}${acima ? ' ⚠' : ''}</b><small>meta ${fP(ref)}</small></div>`;
   }).join('');
-  const C = consEvoChart(nome, g, W);
-  const nomeG = (MPG.find(z => z[0] === g) || [])[2];
-  return `<div class="g g32 mprow cons-row"><div class="card"><div class="ch"><div><h3 data-xf="consultores" data-v="${ESC(nome)}" data-tip="Clique para filtrar este consultor" style="cursor:pointer">${ESC(nome)} <small>${P.cart ? `conversão da carteira inteira (${fN(P.L)} leads)` : `conversão no período (${fN(P.L)} leads)`} · gráfico por ${nomeG}</small></h3></div><div class="lg">${C.leg}</div></div>
+  const C = consEvoChart(nome, W);
+  const nomeG = consBins(S.de, S.ate).g;
+  return `<div class="g g32 mprow cons-row"><div class="card"><div class="ch"><div><h3 data-xf="consultores" data-v="${ESC(nome)}" data-tip="Clique para filtrar este consultor" style="cursor:pointer">${ESC(nome)} <small>${P.cart ? `conversão da carteira inteira (${fN(P.L)} leads)` : `conversão de ${fDM(S.de)} a ${fDM(S.ate)} (${fN(P.L)} ${P.L === 1 ? 'lead entrou' : 'leads entraram'})`} · gráfico por ${nomeG}</small></h3></div><div class="lg">${C.leg}</div></div>
     <div class="cvs">${P.L ? chips : '<div class="mut">Nenhum lead para este consultor com o seletor atual.</div>'}</div>${C.svg}</div>
     <div class="cons-side">${cardHtml}</div></div>`;
 }
 function mapaConsHtml(opt) {
   opt = opt || {};
-  const modo = S.mapaM === 'periodo' ? 'periodo' : 'carteira';
+  const modo = opt.linhas ? (S.consM === 'carteira' ? 'carteira' : 'periodo') : (S.mapaM === 'periodo' ? 'periodo' : 'carteira');
   const X = modo === 'carteira' ? run(filtros({de: MIN_DAY, ate: TODAY})) : cur();
   const k = X.res.kpis, ab = X.rows.filter(r => r.d.open);
-  const cs = X.res.consultores.filter(c => c.abertos).slice().sort((a, b) => b.abertos - a.abertos || (a.consultor < b.consultor ? -1 : 1));
-  const zerados = X.res.consultores.filter(c => !c.abertos).map(c => c.consultor);
+  const temMov = c => { if (c.leads || c.abertos) return true; const e = evCons(c.consultor); return !!(e.agendamentos || e.reunioes || e.ganhos || e.perdidos); };
+  const cs = X.res.consultores.filter(c => opt.linhas ? temMov(c) : c.abertos).slice().sort((a, b) => consOrdem(a.consultor, b.consultor));
+  const zerados = X.res.consultores.filter(c => !(opt.linhas ? temMov(c) : c.abertos)).map(c => c.consultor).sort(consOrdem);
   const hj = dkey(AGORA);
   const segBtn = `<div class="seg">${[['carteira', 'Carteira inteira', 'todos os leads em aberto, de qualquer data de entrada'], ['periodo', 'Só do período', 'só os leads em aberto que entraram no período do topo']]
-    .map(([v, tx, tip]) => `<button type="button" data-mapam="${v}" class="${modo === v ? 'on' : ''}" data-tip="${ESC(tip)}">${tx}</button>`).join('')}</div>`;
+    .map(([v, tx, tip]) => `<button type="button" ${opt.linhas ? 'data-consm' : 'data-mapam'}="${v}" class="${modo === v ? 'on' : ''}" data-tip="${ESC(opt.linhas && v === 'periodo' ? 'leads que entraram e o que aconteceu no período do topo (padrão desta página)' : opt.linhas ? 'todos os leads do consultor, de qualquer data de entrada (não muda com as datas)' : tip)}">${tx}</button>`).join('')}</div>`;
   const head = `<div class="ch"><div><h3>Mapa da carteira por consultor</h3><p>Onde está cada lead em aberto e como está a cadência · situação em ${fDay(hj)} · ${modo === 'carteira' ? 'carteira inteira (qualquer data de entrada)' : 'só leads que entraram no período'} · atraso = atividade pendente no Pipedrive com data anterior a hoje${opt.linhas ? ' · performance = conversão de cada etapa × metas do funil (Carteira inteira: sobre todos os leads do consultor; Só do período: período do topo)' : ''}</p></div>
     <div class="mapa-acoes">${segBtn}<button type="button" class="btn gh" data-atraso="1">Ver atrasados no Lead a Lead</button></div></div>`;
-  if (!ab.length) return `<div class="card mt mapa">${head}${emptyBox('Nenhum lead em aberto', 'Nenhum lead em aberto com os filtros atuais.')}</div>`;
+  if (!ab.length && !(opt.linhas && cs.length)) return `<div class="card mt mapa">${head}${emptyBox('Nenhum lead em aberto', 'Nenhum lead em aberto com os filtros atuais.')}</div>`;
   const atrT = ab.filter(r => r.d.cad === 'atraso');
   const mx = atrT.reduce((a, r) => Math.max(a, r.d.dAtr), 0);
   const resumo = [
@@ -2450,13 +2458,12 @@ function mapaConsHtml(opt) {
         </tbody></table></div></details></div>`;
   };
   if (opt.linhas) {
-    const g = ['semanal', 'mensal', 'trimestral'].includes(S.mpG) ? S.mpG : 'mensal';
     const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
-    const seg = `<div class="aplpx"><span>Evolução</span><div class="seg">${MPG.filter(x => ['semanal', 'mensal', 'trimestral'].includes(x[0])).map(([kk, l]) => `<button type="button" data-mpg="${kk}" class="${g === kk ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
+    const seg = '';
     return `<div class="card mapa">${head}
     <div class="cadmini">${resumo.map(([a, v, s, c]) => `<div class="${c}"><span>${a}</span><b>${v}</b><small>${s}</small></div>`).join('')}</div>
     ${zerados.length ? `<div class="mut" style="margin-top:10px">Sem leads em aberto${modo === 'periodo' ? ' no período' : ''}: ${zerados.map(ESC).join(', ')}.</div>` : ''}</div>
-    ${seg}${cs.map(c => consLinhaHtml(c.consultor, card(c, true), g, W)).join('')}`;
+    ${seg}${cs.map(c => consLinhaHtml(c.consultor, card(c, true), W, modo === 'carteira')).join('')}`;
   }
   return `<div class="card mt mapa">${head}
     <div class="cadmini">${resumo.map(([a, v, s, c]) => `<div class="${c}"><span>${a}</span><b>${v}</b><small>${s}</small></div>`).join('')}</div>
@@ -3356,6 +3363,7 @@ function insMetasConsHtml(P, modo, xT, CP, opt) {
     return {L, rap: L ? rap / L * 100 : null, rapN: rap, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}; };   // mesma conta em todo o painel
   for (const n of extra) if (!nomes.includes(n)) { const c = calc(n); if (c.L || c.ag || c.reu || c.won) nomes.push(n); }
   if (opt.cons && S.consultores.length) { const fc = new Set(S.consultores); for (let i = nomes.length - 1; i >= 0; i--) if (!fc.has(nomes[i])) nomes.splice(i, 1); }
+  if (opt.cons) nomes.sort(consOrdem);
   const pc = (a, b) => b ? a / b * 100 : null;
   const cols = [['Contato em menos de 1 dia', c => c.rap, 80, c => `${fN(c.rapN)} de ${fN(c.L)}`],
     ['MQL → reunião agendada', c => pc(c.ag, c.L), REF_PRU.ag, c => `${fN(c.ag)} ag. ÷ ${fN(c.L)}`]];
@@ -5513,6 +5521,8 @@ function bindEvents() {
     if (POP) closePop();
     const mapam = t.closest('[data-mapam]');
     if (mapam) { S.mapaM = mapam.dataset.mapam; renderView(); return; }
+    const consm = t.closest('[data-consm]');
+    if (consm) { S.consM = consm.dataset.consm; const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
     const indf = t.closest('[data-indf]');
     if (indf) { IND.filtro = indf.dataset.indf; renderView(); return; }
     const apx = t.closest('[data-aplpx]');
