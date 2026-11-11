@@ -2233,7 +2233,7 @@ function viewMacro() {
   const pctK = (v, n) => n ? fP(v / n * 100) + ' dos leads' : '';
   const nBase = C.rows.reduce((a, r) => a + (r.l.b ? 1 : 0), 0);
   let h = viewHead('Visão Macro', periodCaption() + ' · agendados, reuniões, ganhos e perdidos = o que aconteceu no período');
-  h += metaMqlHtml();
+  // meta do mês (MQL) saiu da Visão Macro (pedido 10/11/2026): fica em Insights › Metas e no Funil
   const EXm = insExcl(S.de, S.ate);
   if (EXm.base || EXm.retro) h += `<div class="note insexc">Fora do painel neste período: ${[EXm.base ? `<b>${fN(EXm.base)}</b> ${EXm.base === 1 ? 'contato importado da base/reativado' : 'contatos importados da base/reativados'}` : '', EXm.retro ? `<b>${fN(EXm.retro)}</b> ${EXm.retro === 1 ? 'lançamento retroativo' : 'lançamentos retroativos'} (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade)` : ''].filter(Boolean).join(' e ')}. Todas as abas do B2C contam só a operação.</div>`;
   h += '<div class="kpis k6 kmac">' + [
