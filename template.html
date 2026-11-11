@@ -2370,7 +2370,7 @@ function mapaConsHtml(opt) {
   const hj = dkey(AGORA);
   const segBtn = `<div class="seg">${[['carteira', 'Carteira inteira', 'todos os leads em aberto, de qualquer data de entrada'], ['periodo', 'Só do período', 'só os leads em aberto que entraram no período do topo']]
     .map(([v, tx, tip]) => `<button type="button" data-mapam="${v}" class="${modo === v ? 'on' : ''}" data-tip="${ESC(tip)}">${tx}</button>`).join('')}</div>`;
-  const head = `<div class="ch"><div><h3>Mapa da carteira por consultor</h3><p>Onde está cada lead em aberto e como está a cadência · situação em ${fDay(hj)} · ${modo === 'carteira' ? 'carteira inteira (qualquer data de entrada)' : 'só leads que entraram no período'} · atraso = atividade pendente no Pipedrive com data anterior a hoje · performance = conversão de cada etapa × metas do funil (Carteira inteira: sobre todos os leads do consultor; Só do período: período do topo)</p></div>
+  const head = `<div class="ch"><div><h3>Mapa da carteira por consultor</h3><p>Onde está cada lead em aberto e como está a cadência · situação em ${fDay(hj)} · ${modo === 'carteira' ? 'carteira inteira (qualquer data de entrada)' : 'só leads que entraram no período'} · atraso = atividade pendente no Pipedrive com data anterior a hoje${opt.linhas ? ' · performance = conversão de cada etapa × metas do funil (Carteira inteira: sobre todos os leads do consultor; Só do período: período do topo)' : ''}</p></div>
     <div class="mapa-acoes">${segBtn}<button type="button" class="btn gh" data-atraso="1">Ver atrasados no Lead a Lead</button></div></div>`;
   if (!ab.length) return `<div class="card mt mapa">${head}${emptyBox('Nenhum lead em aberto', 'Nenhum lead em aberto com os filtros atuais.')}</div>`;
   const atrT = ab.filter(r => r.d.cad === 'atraso');
@@ -2417,7 +2417,7 @@ function mapaConsHtml(opt) {
   }
   return `<div class="card mt mapa">${head}
     <div class="cadmini">${resumo.map(([a, v, s, c]) => `<div class="${c}"><span>${a}</span><b>${v}</b><small>${s}</small></div>`).join('')}</div>
-    <div class="cm-grid">${cs.map(card).join('')}</div>
+    <div class="cm-grid">${cs.map(c => card(c, true)).join('')}</div>
     ${zerados.length ? `<div class="mut" style="margin-top:10px">Sem leads em aberto${modo === 'periodo' ? ' no período' : ''}: ${zerados.map(ESC).join(', ')}.</div>` : ''}</div>`;
 }
 /* ---- Atividades em atraso (cadência) — situação na data de referência, leads abertos do filtro ---- */
