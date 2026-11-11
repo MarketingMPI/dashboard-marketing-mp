@@ -238,10 +238,18 @@ def calculo(S, B):
         P = r["perdidos"]
         ck(n, "perdidos (aba Perdidos) = perdidos (Macro)", P["total"], k["perdidos"])
         ck(n, "soma dos motivos = perdidos", sum(P["motivos"].values()), P["total"])
-        for g in (r.get("performance") or {}).get("grupos") or []:
+        PF = r.get("performance") or {}
+        lat = bool(PF.get("filtro_lateral"))
+        if PF.get("total"):   # Performance conversa com a Macro/Insights com os MESMOS filtros (11/11/2026)
+            T, EV = PF["total"], r.get("eventos") or {}
+            ck(n, "Performance: leads = Macro", T["leads"], k["leads"])
+            for a, b in (("agendados", "agendamentos"), ("reunioes", "reunioes"), ("ganhos", "ganhos")):
+                if b in EV: ck(n, f"Performance: {a} = eventos", T[a], EV[b])
+            if lat: ck(n, "Performance: sem custo com filtro lateral", T.get("custo_lead") is None, True)
+        for g in PF.get("grupos") or []:
             if g.get("cliques") and g.get("impressoes"): ck(n, f"CTR {g['id']}", round(g["ctr"], 4), round(g["cliques"] * 100 / g["impressoes"], 4))
             if g.get("cliques"): ck(n, f"CPC {g['id']}", round(g["cpc"], 4), round(g["investimento"] / g["cliques"], 4))
-            if g.get("leads") and g.get("investimento"): ck(n, f"CPL {g['id']}", round(g["custo_lead"], 4), round(g["investimento"] / g["leads"], 4))
+            if g.get("leads") and g.get("investimento") and not lat: ck(n, f"CPL {g['id']}", round(g["custo_lead"], 4), round(g["investimento"] / g["leads"], 4))
             ck(n, f"contatados ≤ leads ({g['id']})", g["contatados"] <= g["leads"], True)
 
 

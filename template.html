@@ -1324,8 +1324,12 @@ function computePerf(leads, f, agora) {
     g.investimento_centavos += r[2]; g.impressoes += r[3]; g.cliques += r[4];
   }
   const dentro = s => { if (!s) return false; const x = String(s).slice(0, 10); return (!de || x >= de) && (!ate || x <= ate); };
+  // filtros laterais (consultor, origem, status, etapa, etiqueta, motivo, busca) valem nas contagens, como em todas as abas
+  // (11/11/2026); o investimento da Meta não se divide por eles, então os custos ficam vazios quando algum está ativo
+  const lateral = ['consultores', 'origens', 'status', 'etapas', 'etiquetas', 'motivos'].some(k => Array.isArray(f[k]) && f[k].length) || !!String(f.busca || '').trim();
+  const pG = makePred(Object.assign({}, f, {campanha: null, so_trd: false}), 'periodo'), pT = makePred(f, 'periodo');
   for (const l of leads || []) {
-    if (f.operacao === true && (l.b || isRetro(l))) continue;
+    if (!pG(l)) continue;
     let id = null; for (const k of ['trd', 'diag', 'isca']) if (PAGAS[k].rx.test(l.n || '')) { id = k; break; }
     if (!id) continue;
     const g = G[id];
@@ -1336,10 +1340,10 @@ function computePerf(leads, f, agora) {
     if (l.s === 'won' && dentro(l.w)) g.ganhos++;
   }
   const fin = g => {
-    const inv = g.investimento_centavos / 100, by = n => n ? inv / n : null;
+    const inv = g.investimento_centavos / 100, by = n => n && !lateral ? inv / n : null;
     return Object.assign(g, {investimento: inv, custo_lead: by(g.leads), custo_contatado: by(g.contatados), custo_agendamento: by(g.agendados),
       custo_reuniao: by(g.reunioes), custo_ganho: by(g.ganhos), ctr: g.impressoes ? g.cliques / g.impressoes * 100 : null,
-      cpc: by(g.cliques), cpm: g.impressoes ? inv / g.impressoes * 1000 : null, taxa_reuniao: g.leads ? g.reunioes / g.leads * 100 : null});
+      cpc: g.cliques ? inv / g.cliques : null, cpm: g.impressoes ? inv / g.impressoes * 1000 : null, taxa_reuniao: g.leads ? g.reunioes / g.leads * 100 : null});
   };
   // TOTAL = B2C inteiro (ou só a campanha do topo), igual à Visão Macro e aos Insights: leads/contatados do período e
   // agendados/reuniões/ganhos que aconteceram no período, de QUALQUER origem; custo = investimento ÷ esses totais
@@ -1347,14 +1351,13 @@ function computePerf(leads, f, agora) {
   const tot = z('total'), crx = camp && CAMPANHAS[camp] ? CAMPANHAS[camp].rx : null;
   for (const id of sel) for (const k of ['investimento_centavos', 'impressoes', 'cliques']) tot[k] += G[id][k];
   for (const l of leads || []) {
-    if (f.operacao === true && (l.b || isRetro(l))) continue;
-    if (crx && !crx.test(l.n || '')) continue;
+    if (!pT(l)) continue;
     if (dentro(l.e)) { tot.leads++; if (derive(l, agora).cont) tot.contatados++; }
     if (agendaTempos(l).some(dentro)) tot.agendados++;
     for (const x of l.k || []) if (MEETING_TYPES.has(x[1]) && dentro(x[0])) tot.reunioes++;
     if (l.s === 'won' && dentro(l.w)) tot.ganhos++;
   }
-  return {selecionados: sel, total: fin(tot), grupos: Object.keys(PAGAS).map(id => fin(G[id]))};
+  return {selecionados: sel, total: fin(tot), grupos: Object.keys(PAGAS).map(id => fin(G[id])), filtro_lateral: lateral};
 }
 
 /* MP PRO (B2B): Kiwify (pedidos do produto MP PRO, assinatura reconstruída no painel.py) + Meta (campanhas
@@ -2050,13 +2053,15 @@ function chartCPLDiario(de, ate, width) {
   const bins = [], idx = new Map();
   for (let d = de; d <= ate; d = addDays(d, 1)) { idx.set(d, bins.length); bins.push({d, inv: 0, leads: 0, fds: [0, 6].includes(weekday(d))}); }
   for (const r of M.dias || []) { const b = bins[idx.get(r[0])], c = M.camps[r[1]]; if (b && c && sel.includes(c.grupo)) b.inv += r[2] / 100; }
+  const prF = makePred(filtros(), 'periodo');   // mesmos filtros das outras abas
   for (const l of LEADS) {
-    if (l.b || isRetro(l) || !l.e) continue;
-    if (crx && !crx.test(l.n || '')) continue;
+    if (!l.e || !prF(l)) continue;
     const b = bins[idx.get(l.e.slice(0, 10))]; if (b) b.leads++;
   }
-  bins.forEach(b => { b.cpl = b.leads && b.inv ? b.inv / b.leads : null; });
-  const totInv = bins.reduce((a, b) => a + b.inv, 0), totL = bins.reduce((a, b) => a + b.leads, 0), med = totL && totInv ? totInv / totL : null;
+  const lateral = ['consultores', 'origens', 'status', 'etapas', 'etiquetas', 'motivos'].some(k => S[k].length) || !!S.busca.trim();
+  bins.forEach(b => { b.cpl = b.leads && b.inv && !lateral ? b.inv / b.leads : null; });
+  const totInv = bins.reduce((a, b) => a + b.inv, 0), totL = bins.reduce((a, b) => a + b.leads, 0), med = totL && totInv && !lateral ? totInv / totL : null;
+  if (lateral) return {svg: emptyBox('Custo por lead não se divide por este filtro', 'O investimento da Meta não se divide por consultor, origem, status, etapa ou etiqueta. Limpe esses filtros para ver o custo por lead do dia.'), inv: totInv, leads: totL, med: null, semMidia: false, lateral: true};
   const W = Math.max(300, width), H = 300, pl = 58, pr = 8, pt = 18, pb = 30, pw = W - pl - pr, ph = H - pt - pb;
   const mx = niceMax(Math.max(1, ...bins.map(b => b.cpl || 0), med || 0)), y = v => pt + ph - ph * Math.max(0, v) / mx;
   const bw = pw / bins.length, w = Math.max(1.5, Math.min(bw * 0.62, 40));
@@ -2295,7 +2300,7 @@ function viewMacro() {
   const vw = document.getElementById('view').clientWidth || 900;
   const dailyW = window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44;
   const ch = chartCPLDiario(S.de, S.ate, dailyW);
-  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Custo por lead por dia</h3><p>${ch.semMidia ? 'Esta campanha não tem mídia paga na Meta' : `${fR(ch.inv)} investidos · ${fN(ch.leads)} leads · média ${ch.med != null ? fR(ch.med) : '–'} por lead`} · número embaixo da barra = leads do dia · clique para filtrar o dia</p></div>
+  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Custo por lead por dia</h3><p>${ch.semMidia ? 'Esta campanha não tem mídia paga na Meta' : ch.lateral ? `${fN(ch.leads)} leads no período com o filtro atual` : `${fR(ch.inv)} investidos · ${fN(ch.leads)} leads · média ${ch.med != null ? fR(ch.med) : '–'} por lead`} · número embaixo da barra = leads do dia · clique para filtrar o dia</p></div>
       <div class="lg"><span><i style="background:#2f6db5"></i>Custo por lead do dia</span><span><i style="background:#e8a09a"></i>mais de 15% acima da média</span><span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Média do período</span><span><b style="color:#c0392b">×</b> investiu e não entrou lead</span></div></div>
       ${ch.svg}</div>
     <div class="card"><div class="ch"><div><h3>Funil do período</h3><p>Leads → Contatados → Agendados → Reuniões → Ganhos</p></div>
@@ -3120,7 +3125,7 @@ function insCalc(de, ate, camp) {
     ag7: e.agendados_em_7d, dAR: e.dias_agenda_reuniao, dRG: e.dias_reuniao_ganho, neg: e.negociacao,
     pSemAg: e.perdidos_sem_agendar, tPerda: e.tentativas_ate_perda, pPos: e.perdidos_pos_reuniao,
     kAg: k.agendados, kReu: k.reunioes, kWon: k.ganhos, lostDet,
-    motivos: e.motivos_perda, inv: pf.investimento, cpl: pf.custo_lead, pagos: pf.leads, cpg: pf.custo_ganho, wonPagos: pf.ganhos, grupos: R.res.performance.grupos,
+    motivos: e.motivos_perda, inv: pf.investimento, cpl: pf.custo_lead, pagos: pf.leads, cpg: pf.custo_ganho, wonPagos: pf.ganhos, lat: R.res.performance.filtro_lateral, grupos: R.res.performance.grupos,
     fds: k.fim_de_semana, consultores: R.res.consultores};
 }
 const INS_KEYS = ['leads', 'rap', 'ag', 'reu', 'won', 'lost', 'inv', 'cpl', 'cpg', 'pctCont', 't1', 'contatos', 'faltas', 'comp',
@@ -3499,10 +3504,10 @@ function viewInsights() {
       tip: 'Reuniões CONCLUÍDAS dentro do período: cada reunião conta, inclusive a 2ª ou 3ª reunião do mesmo lead (reunião só marcada conta em Agendamentos). Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
     kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: pa('won', insN1), d: insVarN(x.won, B && B.won, 1, rotMed, ['ganho', 'ganhos']),
       tip: 'Negócios marcados como ganhos dentro do período (sem lançamentos retroativos)'}),
-    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads no período`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
+    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.lat ? 'o investimento não se divide pelo filtro de consultor/origem/status/etapa/etiqueta' : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads no período`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
       tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads que entraram no período (todas as origens, mesmo número de Leads novos e da Performance)'})
-    ,kpiCard({label: 'Custo por ganho (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : x.wonPagos ? fRs(x.cpg) : '–',
-      sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.wonPagos ? `${fRs(x.inv)} investidos · ${fN(x.wonPagos)} ${x.wonPagos === 1 ? 'ganho' : 'ganhos'} no período` : `${fRs(x.inv)} investidos · nenhum ganho no período`,
+    ,kpiCard({label: 'Custo por ganho (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : x.wonPagos && !x.lat ? fRs(x.cpg) : '–',
+      sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.lat ? 'o investimento não se divide pelo filtro de consultor/origem/status/etapa/etiqueta' : x.wonPagos ? `${fRs(x.inv)} investidos · ${fN(x.wonPagos)} ${x.wonPagos === 1 ? 'ganho' : 'ganhos'} no período` : `${fRs(x.inv)} investidos · nenhum ganho no período`,
       extra: pa('cpg', fRs), d: insVar(x.cpg, B && B.cpg, -1, fRs, rotMed),
       tip: 'Investimento no Meta Ads (campanhas B2C) no período ÷ ganhos no período (todas as origens, mesmo número do card Ganhos, da Visão Macro e da Performance)'})
   ].join('') + '</div>';
@@ -3742,7 +3747,7 @@ function viewPerformance() {
   if (!M.dias.length) return h + `<div class="card">${emptyBox('Dados de mídia indisponíveis', 'Não foi possível ler o investimento da Meta nesta atualização.')}</div>`;
   if (!pf.selecionados.length) return h + `<div class="card">${emptyBox('Esta campanha não tem investimento em mídia', 'Os leads RCON chegam pelo site (pedido de análise de carteira), sem campanha paga na Meta. Escolha "Todos os leads", TRD ou DIAG para ver custos.')}</div>`;
   const outros = ['consultores', 'origens', 'status', 'etapas', 'etiquetas', 'motivos'].some(k => S[k].length) || S.busca.trim();
-  if (outros) h += `<div class="note">Os filtros de consultor, origem, status, etapa, etiqueta e busca não se aplicam a esta aba: o investimento não se divide por eles. Aqui valem só o período e a campanha.</div>`;
+  if (outros) h += `<div class="note">Com filtro de consultor, origem, status, etapa, etiqueta ou busca, os leads, agendamentos, reuniões e ganhos seguem o filtro (os mesmos números das outras abas), mas os <b>custos ficam vazios</b>: o investimento da Meta não se divide por esses filtros.</div>`;
   const nomeSel = S.camp ? PAGAS[S.camp].nome : 'todas as campanhas B2C (Tríade, Diagnóstico Financeiro e Iscas)';
   const dias = diffDays(S.de, S.ate) + 1;
   const ativos = new Set(); for (const r of M.dias) if (r[0] >= S.de && r[0] <= S.ate && r[2] > 0 && pf.selecionados.includes(M.camps[r[1]].grupo)) ativos.add(r[1]);

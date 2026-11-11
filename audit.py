@@ -239,8 +239,11 @@ def performance(leads, f, agora, midia):
         if g is None: continue
         g["investimento_centavos"] += cent; g["impressoes"] += imp; g["cliques"] += cl
     dentro = lambda x: bool(x) and (not de or str(x)[:10] >= de) and (not ate or str(x)[:10] <= ate)
-    for l in leads:
-        if f.get("operacao") is True and (l.get("b") or retroativo(l)): continue
+    # filtros laterais valem nas contagens (11/11/2026); custos vazios quando algum está ativo (investimento não se divide)
+    lateral = any(f.get(k) for k in ("consultores", "origens", "status", "etapas", "etiquetas", "motivos")) or bool((f.get("busca") or "").strip())
+    PG = filtra(leads, dict(f, de=None, ate=None, campanha=None, so_trd=None))
+    PT = filtra(leads, dict(f, de=None, ate=None))
+    for l in PG:
         gid = next((k for k in ("trd", "diag", "isca") if re.match(PAGAS[k], l.get("n") or "", re.I)), None)
         if not gid: continue
         g = G[gid]
@@ -252,10 +255,10 @@ def performance(leads, f, agora, midia):
         g["ganhos"] += 1 if l["s"] == "won" and dentro(l.get("w")) else 0
     def fin(g):
         inv = g["investimento_centavos"] / 100
-        by = lambda n: inv / n if n else None
+        by = lambda n: inv / n if n and not lateral else None
         g.update(investimento=inv, custo_lead=by(g["leads"]), custo_contatado=by(g["contatados"]),
                  custo_agendamento=by(g["agendados"]), custo_reuniao=by(g["reunioes"]), custo_ganho=by(g["ganhos"]),
-                 ctr=g["cliques"] / g["impressoes"] * 100 if g["impressoes"] else None, cpc=by(g["cliques"]),
+                 ctr=g["cliques"] / g["impressoes"] * 100 if g["impressoes"] else None, cpc=inv / g["cliques"] if g["cliques"] else None,
                  cpm=inv / g["impressoes"] * 1000 if g["impressoes"] else None,
                  taxa_reuniao=g["reunioes"] / g["leads"] * 100 if g["leads"] else None)
         return g
@@ -263,16 +266,13 @@ def performance(leads, f, agora, midia):
     tot = z("total")
     for i in sel:
         for k in ("investimento_centavos", "impressoes", "cliques"): tot[k] += G[i][k]
-    crx = CAMPANHAS.get(camp) if camp else None
-    for l in leads:
-        if f.get("operacao") is True and (l.get("b") or retroativo(l)): continue
-        if crx and not re.match(crx, l.get("n") or "", re.I): continue
+    for l in PT:
         if dentro(l.get("e")):
             tot["leads"] += 1; tot["contatados"] += lead_metrics(l, agora)["contatado"]
         tot["agendados"] += 1 if any(dentro(x) for x in agenda_tempos(l)) else 0
         tot["reunioes"] += sum(1 for x in (l["k"] or []) if x[1] in REUNIAO_TIPOS and dentro(x[0]))
         tot["ganhos"] += 1 if l["s"] == "won" and dentro(l.get("w")) else 0
-    return {"selecionados": sel, "total": fin(tot), "grupos": [fin(G[i]) for i in PAGAS]}
+    return {"selecionados": sel, "total": fin(tot), "grupos": [fin(G[i]) for i in PAGAS], "filtro_lateral": lateral}
 
 
 # ----------------------------------------------------------------------------- MP PRO (Kiwify + Meta Perpétuo)
