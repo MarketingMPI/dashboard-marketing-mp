@@ -1893,7 +1893,7 @@ const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20
    4. ESTADO, FILTROS E URL
    ========================================================================= */
 const TABS = [
-  {id: 'macro', nome: 'Visão Macro'}, {id: 'insights', nome: 'Insights'}, {id: 'performance', nome: 'Performance'}, {id: 'lista', nome: 'Lead a Lead'}, {id: 'tempo', nome: 'Lead-time'},
+  {id: 'macro', nome: 'Visão Macro'}, {id: 'insights', nome: 'Insights'}, {id: 'performance', nome: 'Performance'}, {id: 'lista', nome: 'Lead a Lead'},
   {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'consultores', nome: 'Consultores'}];   // Perdidos agora fica dentro do Lead a Lead (10/11/2026)
 // B2B: seções em construção (sem dados do Funil Alpha; filtros B2C ficam ocultos)
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
@@ -1982,6 +1982,7 @@ function readHash() {
   S.tab = TABS.concat(TABS_B2B, TABS_RS, TABS_CT, TABS_PG).some(t => t.id === p.get('aba') && !t.off) ? p.get('aba') : 'macro';
   S.ll.quick = QUICK.some(q => q[0] === p.get('lq')) ? p.get('lq') : 'todos';
   if (p.get('aba') === 'perdidos') { S.tab = 'lista'; S.ll.quick = 'perdidos'; }
+  if (p.get('aba') === 'tempo') S.tab = 'lista';   // Lead-time agora fica dentro do Lead a Lead (11/11/2026)
   const pr = p.get('p');
   if (p.get('de') && ok.test(p.get('de')) && p.get('ate') && ok.test(p.get('ate'))) {
     S.preset = 'custom'; S.de = p.get('de'); S.ate = p.get('ate');
@@ -4442,18 +4443,20 @@ function viewLista() {
   let h = viewHead('Lead a Lead', (ev ? periodCaption(evNome) + ' · lead de qualquer data de entrada' : periodCaption()) + ' · clique numa linha para ver a jornada completa');
   const nQ = id => quickRows(id).length;
   const seg = '<div class="seg">' + QUICK.map(([id, nome]) => `<button data-quick="${id}" class="${S.ll.quick === id ? 'on' : ''}"${LL_EVENTO[id] ? ` data-tip="${ESC('Pela data em que aconteceu no período (lead de qualquer data de entrada) · mesma conta da Visão Macro e dos Insights')}"` : ''}>${nome}<small>${fN(nQ(id))}</small></button>`).join('') + '</div>';
-  if (perd) return h + `<div class="card np"><div class="tbar">${seg}</div></div>` + perdidosHtml();
+  if (perd) return h + `<div class="card np"><div class="tbar">${seg}</div></div>` + perdidosHtml() + tempoHtml();
   h += `<div class="card np"><div class="tbar">${seg}<button class="btn gh" data-act="csv-lista">${DL_ICON}Exportar CSV (${fN(list.length)})</button></div>`;
   h += list.length ? `<div class="tw tall"><table class="t stk">${thead(LL_COLS, S.ll, 'll')}${tableRows(LL_COLS, pageRows)}</table></div>${pager('ll', S.ll.page, list.length, per)}` : emptyBox();
-  return h + '</div>';
+  return h + '</div>' + tempoHtml();
 }
 
 /* ---- Lead-time ---- */
 const AGING = [['0–2 dias', d => d < 3], ['3–7 dias', d => d >= 3 && d <= 7], ['8–14 dias', d => d > 7 && d < 15], ['15–30 dias', d => d >= 15 && d < 31], ['Mais de 30 dias', d => d >= 31]];
 const agingIdx = v => AGING.findIndex(a => a[1](v));
-function viewTempo() {
+function viewTempo() { S.tab = 'lista'; return viewLista(); }   // link antigo
+/* Lead-time: antes era aba própria; desde 11/11/2026 é a seção final do Lead a Lead (leads que entraram no período) */
+function tempoHtml() {
   const C = cur(), P = prev(), lt = C.res.lead_time, plt = P.res.lead_time, k = C.res.kpis;
-  let h = viewHead('Lead-time', periodCaption() + ' · tempos médios em dias desde a entrada do lead');
+  let h = `<div class="mph mt" id="leadtime"><span>LEAD-TIME</span>${ESC(periodCaption())} · tempos médios em dias desde a entrada do lead · vale para os leads que entraram no período (não depende do filtro rápido da lista)</div>`;
   const cards = [
     ['Até o 1º contato', lt.media_dias_1o_contato, plt.media_dias_1o_contato, k.contatados, 'leads contatados', `mediana ${fD(k.mediana_dias_1o_contato)}`],
     ['Até o agendamento', lt.media_dias_ate_agendamento, plt.media_dias_ate_agendamento, k.agendados, 'agendados', ''],
