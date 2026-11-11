@@ -192,6 +192,7 @@ table.t.mprc th,table.t.mprc td{padding-left:7px;padding-right:7px}table.t.mprc 
 .mpd ul{margin:10px 0 0;padding-left:18px;line-height:1.55}.mpd.mt{margin-top:22px}
 @media(min-width:961px){.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .igh{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-top:6px;border-top:1px solid var(--linha)}.igh.mt{margin-top:30px;padding-top:22px}
+.igsp{height:10px;margin:48px -4px 6px;background:#e8eeeb;border-radius:6px}.igsp+.igh.mt{margin-top:18px;border-top:0}
 .igh h3{margin:0;font-size:18px;color:var(--prof)}.igh p{margin:2px 0 0;color:var(--cinza);font-size:13px}.igl{margin-left:auto;font-size:12.5px;font-weight:600;text-decoration:none}
 .igdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}.igdot.lg{width:14px;height:14px;margin:0}
 .igv{font-size:11px;font-weight:600;border-radius:99px;padding:1px 6px;margin-left:4px;white-space:nowrap}.igv.pos{background:#e3f3ea;color:#0b6b3a}.igv.neg{background:#fbe9e6;color:#a3362a}
@@ -4266,17 +4267,14 @@ function igEvoCard(E, perfil, k, nome, sel, contasInfo) {
     ${linhas.length ? `<div class="mpmc-l">${linhas.join('')}</div>` : ''}
     <div class="mt-n">${desc}${comp}${IGE_FU.has(k) && v == null ? ' · a Meta só informa a partir de 30/10/2025' : ''}${b.ini_dados ? ` · dados desde ${fDay(E.ini)}` : ''}</div></div>`;
 }
-function igEvoHtml(contasInfo, vw) {
+function igEvoHtml(contasInfo, vw, perfilId) {   // um bloco por perfil (11/11/2026: "separe de cada perfil")
   const g = MPG.some(x => x[0] === S.mpG) ? S.mpG : 'mensal', E = igEvoSerie(g);
   if (!E || !E.bs.length) return '';
-  const perfil = S.igHP && (S.igHP === 'todos' || contasInfo.some(c => c.id === S.igHP)) ? S.igHP : 'todos';
+  const perfil = perfilId || 'todos', conta = contasInfo.find(c => c.id === perfil);
   const n = E.bs.length, sel = Number.isInteger(S.mpMB) && S.mpMB >= 0 && S.mpMB < n ? S.mpMB : n - 1;
   const W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
-  let h = `<div class="mph mt"><span>EVOLUÇÃO DOS PERFIS</span>orgânico · não depende do filtro de datas do topo · dados desde ${fDay(E.ini)} · ${perfil === 'todos' ? 'perfis somados (cores = perfis)' : 'um perfil'} · clique numa barra para ver o período no card</div>`;
+  let h = `<div class="mph mt"><span>EVOLUÇÃO${conta ? ' · @' + ESC(conta.user) : ''}</span>orgânico · não depende do filtro de datas do topo · dados desde ${fDay(E.ini)} · clique numa barra para ver o período no card</div>`;
   h += `<div class="aplpx"><span>Período</span><div class="seg">${MPG.map(([kk, l]) => `<button type="button" data-mpg="${kk}" class="${g === kk ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
-  h += `<div class="aplpx"><span>Perfil</span><div class="seg">${[['todos', 'Todos os perfis'], ...contasInfo.map(c => [c.id, '@' + c.user])].map(([kk, l]) => `<button type="button" data-ighp="${ESC(kk)}" class="${perfil === kk ? 'on' : ''}">${ESC(l)}</button>`).join('')}</div></div>`;
-  const leg = (perfil === 'todos' ? contasInfo : contasInfo.filter(c => c.id === perfil)).map(c => `<span><i style="background:${IG_COR[c.user] || '#00503c'}"></i>@${ESC(c.user)}</span>`).join('');
-  h += `<div class="lg" style="margin:4px 0 2px">${leg}</div>`;
   const nomeG = (MPG.find(z => z[0] === g) || [])[2];
   for (const [k, nome] of IGE_MET) {
     h += `<div class="g g32 mprow"><div class="card"><div class="ch"><div><h3>${nome} <small>por ${nomeG}</small></h3></div></div>${igEvoChart(E, perfil, k, nome, sel, W, contasInfo)}</div>
@@ -4317,9 +4315,10 @@ function viewInstagram() {
     row('Cliques no link da bio', c => c.cliques_site, fN, 'Toques no link que aparece no perfil, abaixo da bio (não inclui links de stories nem de anúncios)') + `</tbody></table></div></div>`;
   // ---- um bloco por perfil
   const vw = document.getElementById('view').clientWidth || 900;
-  h += igEvoHtml(ig.contas.map(c => ({id: c.id, user: c.user})), vw);
-  for (const c of ig.contas) {
+  const contasInfo = ig.contas.map(c => ({id: c.id, user: c.user}));
+  ig.contas.forEach((c, ic) => {
     const p = pmap.get(c.id) || {}, cor = IG_COR[c.user] || '#00503c';
+    if (ic) h += '<div class="igsp" aria-hidden="true"></div>';   // espaçador entre perfis
     h += `<div class="igh mt" id="ig-${ESC(c.user)}"><span class="igdot lg" style="background:${cor}"></span><div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
       <a class="igl" href="https://www.instagram.com/${encodeURIComponent(c.user)}/" target="_blank" rel="noopener noreferrer">abrir perfil ↗</a></div>`;
     h += '<div class="kpis k6">' + [
@@ -4346,7 +4345,8 @@ function viewInstagram() {
       c.top.map(x => `<tr><td class="wrap" style="min-width:260px;max-width:420px"${x.img ? ` data-igprev="${ESC(x.img)}" data-igleg="${ESC(fmtNome(x.formato) + ' · ' + fDM(x.data.slice(0, 10)))}"` : ''}><a href="${ESC(x.link || '#')}" target="_blank" rel="noopener noreferrer"><b>${fDM(x.data.slice(0, 10))}</b></a> <span class="mut">${ESC((x.legenda || '').slice(0, 70))}${(x.legenda || '').length > 70 ? '…' : ''}</span></td><td>${fmtNome(x.formato)}</td><td class="num b">${fN(x.views)}</td><td class="num">${fN(x.alcance)}</td><td class="num">${fN(x.interacoes)}</td><td class="num">${fN(x.compart)}</td><td class="num">${fN(x.salvos)}</td><td class="num">${fP(x.engajamento)}</td></tr>`).join('') + '</tbody></table>' : emptyBox('Nenhum post no período');
     h += `<div class="g g32 mt"><div class="card np"><div class="ch"><div><h3>Melhores posts do período</h3><p>Top 5 por visualizações orgânicas · passe o mouse no post para ver a prévia · clique na data para abrir no Instagram</p></div></div><div class="tw">${tp}</div></div>
       <div class="card"><div class="ch"><div><h3>Desempenho por formato</h3><p>Posts publicados no período · números orgânicos</p></div></div>${fm}</div></div>`;
-  }
+    h += igEvoHtml(contasInfo, vw, c.id);
+  });
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Fonte:</b> API oficial da Meta (Instagram), contas ${ig.contas.map(c => '@' + ESC(c.user)).join(', ')}. Atualiza junto com o dashboard. ${(IGP.sem_permissao || []).length ? `@${IGP.sem_permissao.map(ESC).join(', @')} aparece no Business, mas a Meta não libera os insights para o app (precisa conceder acesso).` : ''}</li>
     <li><b>Variação:</b> sempre contra o período anterior de mesmo tamanho.</li>
