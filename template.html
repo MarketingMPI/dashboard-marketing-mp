@@ -4098,7 +4098,7 @@ function viewMPHub() {
     for (let i = 0; i < n; i += stepT) g += `<line x1="${x(i)}" x2="${x(i)}" y1="${ya(0)}" y2="${ya(0) + 4}" stroke="#cfd9d4"/><text class="ax" x="${x(i)}" y="${Hh - pb + 16}" text-anchor="middle">${fDM(serie[i][0])}</text>`;
     const ym = ya(HUB_META);
     g += `<line x1="${pl}" x2="${W - pr}" y1="${ym}" y2="${ym}" stroke="#a8701c" stroke-width="1.5" stroke-dasharray="6 5"/>
-      <text class="ax" x="${W - pr - 4}" y="${ym - 6}" text-anchor="end" style="fill:#a8701c;font-weight:600">Meta ${fN(HUB_META)} até ${fDay(HUB_META_ATE)}</text>`;
+      <text class="ax" x="${W - pr - 4}" y="${ym - 6}" text-anchor="end" style="fill:#a8701c;font-weight:600">Meta ${fN(HUB_META)}</text>`;
     const xe = x(n - 1), ye = ya(acc);
     g += `<circle cx="${xe}" cy="${ye}" r="4.5" fill="#00503c" stroke="#fff" stroke-width="2"/><text class="ax" x="${xe - 8}" y="${ye - 9}" text-anchor="end" style="fill:#00503c;font-weight:700;font-size:12px;stroke:#fff;stroke-width:3px;paint-order:stroke">${fN(acc)} · ${fP(pctOf(acc, HUB_META))} da meta</text>`;
     const hw = n > 1 ? pw / (n - 1) : pw;
