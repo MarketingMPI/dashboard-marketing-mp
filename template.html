@@ -192,6 +192,7 @@ table.t.mprc th,table.t.mprc td{padding-left:7px;padding-right:7px}table.t.mprc 
 .mpd ul{margin:10px 0 0;padding-left:18px;line-height:1.55}.mpd.mt{margin-top:22px}
 @media(min-width:961px){.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .igh{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-top:6px;border-top:1px solid var(--linha)}.igh.mt{margin-top:30px;padding-top:22px}
+.dvmel{margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef7f1;border:1px solid #cfe6d8}.dvmel .dvlt{color:#00503c;margin-top:0}.dvmel ol{margin:4px 0 0;padding-left:20px}.dvmel li{margin:3px 0;line-height:1.45}
 .igmenu{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 16px}
 .igmenu button{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border:1px solid var(--linha);border-radius:999px;background:#fff;cursor:pointer;font:inherit;color:inherit;text-align:left;transition:border-color .15s,box-shadow .15s}
 .igmenu button:hover{border-color:#9fbfb1}
@@ -3633,6 +3634,8 @@ function mpDrvHtml(o) {
   const ROT = {bom: 'Bom', medida: 'Na medida', ruim: 'Ruim'};
   const lista = (tit, cs) => cs.length ? `<div class="dvlt">${tit}</div><ul>${cs.slice(0, 4).map(c => `<li>${c.charAt(0).toUpperCase() + c.slice(1)}</li>`).join('')}</ul>` : '';
   const M = k => MP_METAS.find(m => m.k === k);
+  // "Como melhorar" (pedido 12/11/2026): ações concretas a partir dos fatores do mês, com a conta de quanto precisa mudar
+  const melhorar = (st, acs) => acs.length ? `<div class="dvmel"><div class="dvlt">${st === 'bom' ? 'Para manter' : 'Como melhorar'}</div><ol>${acs.slice(0, 4).map(a => `<li>${a}</li>`).join('')}</ol></div>` : '';
   const cards = [];
   const card = (tit, sub, v, alvoTxt, st, fatores, leitura) => cards.push(`<div class="dvk ${st || ''}">
     <div class="dvh"><div><h4>${tit}</h4><p>${sub}</p></div><div class="dvv"><b>${v}</b><span>${alvoTxt}</span></div>${st ? `<span class="dvst ${st}">${ROT[st]}</span>` : ''}</div>
@@ -3655,6 +3658,14 @@ function mpDrvHtml(o) {
     let L = st === 'bom' ? `<b>No ritmo:</b> saldo de ${saldo >= 0 ? '+' : '−'}${fN(Math.abs(saldo))} assinantes${parcial ? ' até agora' : ''}, para ${insN1(precisa)} necessários por mês.` + lista('Ajudou', bons) + lista('Atenção', cs)
       : `<b>${st === 'medida' ? 'Perto do ritmo' : 'Abaixo do ritmo'}:</b> saldo de ${saldo >= 0 ? '+' : '−'}${fN(Math.abs(saldo))} assinantes${parcial ? ' até agora' : ''}; para chegar a ${fN(m.meta)} até ${fDay(MP_METAS_ATE)} seriam ${insN1(precisa)}${parcial ? ' até hoje' : ' por mês'}.` + (cs.length ? lista('Fator provável', cs) : '') + lista('Ajudou', bons);
     const depois = parcial ? mesesRest : mesesRest - 1;   // meses que sobram até a meta (o mês fechado já passou)
+    {
+      const ac = [], base = x.ativos, ch = x.churn != null ? x.churn : (ant && ant.churn), saem = ch != null ? base * ch / 100 : 0, sald = depois > 0 ? falta / depois : 0;
+      if (falta && depois > 0) ac.push(`Com o churn atual (${ch == null ? '–' : fP(ch)}), saem cerca de ${insN1(saem)} assinantes por mês: para somar ${insN1(sald)} de saldo, são <b>${fN(Math.ceil(sald + saem))} novas assinaturas por mês</b> (hoje: ${fN(x.novas)}).`);
+      if (ch != null && ch > M('churn').meta) ac.push(`Baixar o churn para ${fP(M('churn').meta)} já evitaria ${insN1(Math.max(0, saem - base * M('churn').meta / 100))} saídas por mês (ver o card Churn).`);
+      if (x.novas < M('novas').meta * frac) ac.push('Aquisição é o maior gargalo de volume: as ações do card Novas assinaturas (página, checkout e verba) são as que mais aproximam da meta.');
+      if (x.inadN) ac.push(`Recuperar as ${fN(x.inadN)} renovações que ficaram sem pagar antes que a Kiwify cancele (ver o card Taxa de renovação).`);
+      L += melhorar(st, ac);
+    }
     if (falta) L += `<div class="dvlt">Até a meta</div>` + (depois > 0 ? `Faltam ${fN(falta)} assinantes em ${fN(depois)} ${depois === 1 ? 'mês' : 'meses'}${parcial ? ' (contando este)' : ''}: ${insN1(falta / depois)} de saldo por mês.` : `Faltaram ${fN(falta)} assinantes no prazo da meta.`);
     card('Assinantes ativos', `Meta geral: ${fN(m.meta)} assinantes até ${fDay(MP_METAS_ATE)} · status pelo ritmo do mês (saldo de entradas − saídas)`, fN(x.ativos),
       `${fP(Math.min(100, x.ativos / m.meta * 100))} da meta · MRR ${fRc(x.mrr)}`, st,
@@ -3678,6 +3689,16 @@ function mpDrvHtml(o) {
     else { const falta = Math.ceil(alvo - v - 1e-9);
       L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> faltaram ${fN(falta)} ${falta === 1 ? 'assinatura' : 'assinaturas'}${parcial ? ' para o esperado até hoje' : ''}.` + (cs.length ? lista('Fator provável', cs) : ` Verba, CPM e conversão da página ficaram estáveis em relação a ${rotAnt}: o volume atual de mídia não chega à meta.`) + lista('Ajudou', bons)
         + (x.cac ? `<div class="dvlt">Para fechar a diferença</div>${fN(falta)} × ${fRc(x.cac)} (CAC atual) ≈ ${fRc(falta * x.cac)} de verba.` : ''); }
+    {
+      const ac = [];
+      if (x.abandono != null && x.abandono >= 60 && x.checkouts >= 3) ac.push(`<b>Recuperar o checkout abandonado</b>: ${fN(Math.round(x.checkouts * x.abandono / 100))} pessoas começaram e não pagaram. Ativar a recuperação de carrinho da Kiwify e um contato (e-mail/WhatsApp) em até 1 hora; recuperar 10% delas daria ${insN1(x.checkouts * x.abandono / 1000)} assinaturas.`);
+      if (x.convVisita != null && (caiu(x.convVisita, ant && ant.convVisita) || x.convVisita < 2)) ac.push(`<b>Melhorar a página de vendas</b> (${fP(x.convVisita)} das visitas viram assinatura): deixar a oferta de ${fRc(x.ticket)}/mês e a garantia no topo, prova social (depoimentos de consultores), e testar uma versão mais curta. Dobrar a conversão com as mesmas ${fN(x.visitas)} visitas daria ${fN(Math.round(x.novas * 2))} novas.`);
+      if (subiu(x.cpm, ant && ant.cpm) || (x.cpm != null && x.cpm > M('cpm').meta)) ac.push(`<b>Renovar criativos e públicos</b>: CPM de ${fRc(x.cpm)} (limite ${fRc(M('cpm').meta)}). Subir 2 ou 3 criativos novos por semana e pausar os de custo mais alto.`);
+      if (caiu(x.visitas, ant && ant.visitas, 10)) ac.push('<b>Recuperar o tráfego</b>: menos visitas na página; conferir o CTR dos anúncios e o orçamento diário das campanhas Perpétuo.');
+      if (st !== 'bom' && x.cac && !ac.length) ac.push(`<b>Aumentar a verba</b> com o CAC atual: ${fN(Math.ceil(alvo - v))} assinaturas a mais ≈ ${fRc(Math.ceil(alvo - v) * x.cac)} de mídia.`);
+      else if (st !== 'bom' && x.cac && x.cac > M('cac').meta) ac.push(`Antes de aumentar a verba, atacar a conversão: com o CAC de ${fRc(x.cac)}, cada assinatura a mais custa ${fX(x.cac / M('cac').meta)}x o limite.`);
+      L += melhorar(st, ac);
+    }
     card('Novas assinaturas', `${fN(M('novas').meta)} por mês · assinaturas novas pagas na Kiwify`, fN(v), `meta ${insN1(alvo)}${parcial ? ' até hoje' : ''}`, st,
       fk('Investimento', 'investimento', 'rs', 0, 'Mídia nas campanhas MP PRO Perpétuo (Meta)') + fk('CPM', 'cpm', 'rs', -1, 'Custo por mil impressões')
       + fk('Visitas na página', 'visitas', 'n', 1, 'Visitas à página de vendas vindas dos anúncios') + fk('Visita → assinatura', 'convVisita', 'p', 1, 'Novas assinaturas ÷ visitas na página'), L);
@@ -3696,6 +3717,15 @@ function mpDrvHtml(o) {
     else if (st === 'bom') L = `<b>Dentro da meta:</b> ${fRc(v)} por assinatura.` + lista('Atenção', cs);
     else L = `<b>${st === 'medida' ? 'Perto do limite' : 'Acima do limite'}:</b> ${fRc(v)} por assinatura, ${fX(v / lim)}x o limite de ${fRc(lim)}.` + (cs.length ? lista('Fator provável', cs) : '');
     if (x.ltvCac != null) L += `<div class="dvlt">Retorno</div>Cada assinatura devolve ${fX1(x.ltvCac)} o que custou (LTV ÷ CAC; meta ${fX1(M('ltvCac').meta)}).`;
+    {
+      const ac = [];
+      if (v != null && v > lim && x.investimento) ac.push(`Com ${fRc(x.investimento)} de mídia, o CAC fica dentro do limite com <b>${fN(Math.ceil(x.investimento / lim))} novas assinaturas</b> no mês (hoje: ${fN(x.novas)}). O caminho mais barato é converter melhor quem já chega (página e checkout), não comprar mais tráfego.`);
+      if (v != null && v > lim && x.convVisita != null) ac.push(`Testar na página: oferta e garantia no topo, depoimentos e checkout em 1 passo. Cada ponto a mais de conversão sobre ${fN(x.visitas)} visitas são ${insN1(x.visitas / 100)} assinaturas.`);
+      if (subiu(x.cpm, ant && ant.cpm) || (x.cpm != null && x.cpm > M('cpm').meta)) ac.push(`Baixar o custo da mídia: CPM de ${fRc(x.cpm)}; renovar criativos e testar públicos abertos (Advantage+).`);
+      if (x.ltvCac != null && x.ltvCac < M('ltvCac').meta) ac.push(`Aumentar o LTV junto: cada mês a mais de permanência vale ${fRc(x.ticket)} por assinante (plano anual com desconto e retenção nos primeiros 30 dias).`);
+      if (v == null && x.investimento) ac.push('Revisar as campanhas ativas: houve mídia e nenhuma assinatura nova; pausar o que não gera checkout.');
+      L += melhorar(st, ac);
+    }
     card('CAC', `Custo de aquisição: mídia ÷ novas assinaturas · no máximo ${fRc(lim)}`, FM.rs(v), `limite ${fRc(lim)}`, st,
       fk('Investimento', 'investimento', 'rs', 0, 'Mídia nas campanhas MP PRO Perpétuo (Meta)') + fk('Novas assinaturas', 'novas', 'n', 1, 'Assinaturas novas pagas no mês')
       + fk('LTV ÷ CAC', 'ltvCac', 'x', 1, 'Quanto cada assinatura devolve do que custou'), L);
@@ -3711,6 +3741,15 @@ function mpDrvHtml(o) {
     else if (st === 'bom') L = `<b>Dentro da meta:</b> ${fN(x.churnSairam)} de ${fN(x.churnBase)} assinantes não renovaram.` + lista('Atenção', cs);
     else L = `<b>${st === 'medida' ? 'Perto do limite' : 'Acima do limite'}:</b> ${fN(x.churnSairam)} de ${fN(x.churnBase)} assinantes não renovaram (mercado: 4,99%).` + (cs.length ? lista('Fator provável', cs) : ' Nenhuma recusa ou cancelamento por falta de pagamento: a saída foi por decisão do assinante.');
     if (x.churnBase && x.churnBase < 30) L += `<div class="dvln">Base pequena: 1 assinante muda o churn em ${nf1.format(100 / x.churnBase)} pontos.</div>`;
+    {
+      const ac = [];
+      if (v != null && x.churnBase) { const max = Math.floor(x.churnBase * lim / 100); if (v > lim) ac.push(`Para ficar em ${fP(lim)} com ${fN(x.churnBase)} assinantes, no máximo <b>${fN(max)} ${max === 1 ? 'saída' : 'saídas'}</b> por mês (neste: ${fN(x.churnSairam)}).`); }
+      if (x.recusas || x.inadCanc) ac.push('<b>Churn involuntário</b> (cartão recusado): ativar a régua de cobrança — aviso 3 dias antes do vencimento, mensagem no dia da recusa com o link para atualizar o cartão e opção de Pix.');
+      if (engaj != null && engaj < 60) ac.push(`<b>Engajamento</b>: só ${fP(engaj)} dos ativos acessaram as aulas em 30 dias. Onboarding nas 2 primeiras semanas (trilha de início + mensagem de boas-vindas), lembrete semanal da próxima aula e contato com quem está há 15 dias sem acessar.`);
+      else if (engaj == null) ac.push('<b>Engajamento</b>: acompanhar quem está sem acessar as aulas (fotografia da área de membros) e falar com eles antes do vencimento.');
+      if (v != null && v > lim) ac.push('<b>Ouvir quem saiu</b>: perguntar o motivo do cancelamento (1 pergunta por WhatsApp) e oferecer o plano anual com desconto para quem está perto de renovar.');
+      L += melhorar(st, ac);
+    }
     card('Churn mensal', `Pagaram no mês anterior e não renovaram · no máximo ${fP(lim)}`, FM.p(v), `limite ${fP(lim)}`, st,
       fk('Não renovaram', 'churnSairam', 'n', -1, 'Pagaram no mês anterior e não pagaram neste') + fk('Inadimplentes', 'inadN', 'n', -1, 'Renovação sem pagar em algum dia do mês')
       + (engaj != null ? fator('Acessaram as aulas (30 dias)', engaj, null, 'p', 1, `Fotografia da área de membros de ${fDay(AL.extraido_em.slice(0, 10))}`) : ''), L);
@@ -3725,6 +3764,15 @@ function mpDrvHtml(o) {
     if (v == null) L = 'Nenhuma renovação prevista no mês.';
     else if (st === 'bom') L = `<b>Meta atingida:</b> ${fP(v)} das ${fN(x.previstas)} renovações previstas foram pagas.` + lista('Atenção', cs);
     else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fP(v)} das ${fN(x.previstas)} renovações previstas foram pagas.` + (cs.length ? lista('Fator provável', cs) : '');
+    {
+      const ac = [];
+      if (v != null && v < alvo) { const prec = Math.ceil(x.previstas * alvo / 100 - 1e-9), pagas = Math.round(x.previstas * v / 100); ac.push(`Para ${fP(alvo)} das ${fN(x.previstas)} previstas, são <b>${fN(prec)} renovações pagas</b> (neste mês: ${fN(pagas)}): ${fN(prec - pagas)} a mais.`); }
+      if (x.inadVPend) ac.push(`<b>Cobrar hoje os pendentes</b>: ${fRc(x.inadVPend)} ainda podem entrar. Mensagem com o link de pagamento e alternativa em Pix.`);
+      if (x.recusas) ac.push(`<b>${fN(x.recusas)} recusas no cartão</b>: aviso 3 dias antes do vencimento, mensagem no dia da recusa pedindo a atualização do cartão e retentativa no dia seguinte.`);
+      if (x.inadVPerd) ac.push(`${fRc(x.inadVPerd)} já foram perdidos (cancelados pela Kiwify): oferecer a volta com o mesmo preço a esses assinantes.`);
+      if (!ac.length && st === 'bom') ac.push('Manter a régua de cobrança e o aviso antes do vencimento.');
+      L += melhorar(st, ac);
+    }
     card('Taxa de renovação', `Renovações pagas ÷ previstas no mês · meta ${fP(alvo)}`, FM.p(v), `meta ${fP(alvo)}`, st,
       fk('Previstas', 'previstas', 'n', 0, 'Assinaturas com vencimento no mês') + fk('Recusas no cartão', 'recusas', 'n', -1, 'Cobranças recusadas no mês')
       + fk('Receita travada', 'inadValor', 'rs', -1, 'Mensalidades dos inadimplentes que não entraram'), L);
