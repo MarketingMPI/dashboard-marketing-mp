@@ -192,6 +192,10 @@ table.t.mprc th,table.t.mprc td{padding-left:7px;padding-right:7px}table.t.mprc 
 .mpd ul{margin:10px 0 0;padding-left:18px;line-height:1.55}.mpd.mt{margin-top:22px}
 @media(min-width:961px){.kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .igh{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-top:6px;border-top:1px solid var(--linha)}.igh.mt{margin-top:30px;padding-top:22px}
+summary.dvh{cursor:pointer;list-style:none}summary.dvh::-webkit-details-marker{display:none}
+.dvchev{width:20px;height:20px;flex:none;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .15s}details.dvk[open] .dvchev{transform:rotate(180deg)}
+details.dvk:not([open]){padding-top:12px;padding-bottom:12px}details.dvk:not([open]):hover{background:#fafcfb}
+.dvb{margin-top:10px}.dvsub{margin:0 0 8px;font-size:12px;color:var(--cinza)}
 .dvmel{margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef7f1;border:1px solid #cfe6d8}.dvmel .dvlt{color:#00503c;margin-top:0}.dvmel ol{margin:4px 0 0;padding-left:20px}.dvmel li{margin:3px 0;line-height:1.45}
 .igmenu{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 16px}
 .igmenu button{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border:1px solid var(--linha);border-radius:999px;background:#fff;cursor:pointer;font:inherit;color:inherit;text-align:left;transition:border-color .15s,box-shadow .15s}
@@ -2957,11 +2961,13 @@ function insDrvHtml(o) {
   const vol = (k, volK) => REF_VOL[modo][volK] * frac;
   const sec = (t, v, alvo, f = insN1) => `<span class="dvsec ${v >= alvo - 1e-9 ? 'ok' : 'no'}">${ESC(t)} <b>${f(v)}</b> de ${f(alvo)}</span>`;
   const cards = [];
-  const card = (tit, sub, v, alvoTxt, st, secs, fatores, leitura) => cards.push(`<div class="dvk ${st || ''}">
-    <div class="dvh"><div><h4>${tit}</h4><p>${sub}</p></div><div class="dvv"><b>${v}</b><span>${alvoTxt}</span></div>${st ? `<span class="dvst ${st}">${ROT[st]}</span>` : ''}</div>
+  // card recolhido (12/11/2026): fechado mostra só nome, número e status; clique abre o resto
+  const card = (tit, sub, v, alvoTxt, st, secs, fatores, leitura) => cards.push(`<details class="dvk ${st || ''}">
+    <summary class="dvh"><div><h4>${tit}</h4></div><div class="dvv"><b>${v}</b><span>${alvoTxt}</span></div>${st ? `<span class="dvst ${st}">${ROT[st]}</span>` : ''}<svg class="dvchev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+    <div class="dvb"><p class="dvsub">${sub}</p>
     ${secs ? `<div class="dvsecs">${secs}</div>` : ''}
     <div class="dvfs"><em>O que influencia</em>${fatores}</div>
-    <div class="dvl"><span class="dvli">💡</span><div>${leitura}</div></div></div>`);
+    <div class="dvl"><span class="dvli">💡</span><div>${leitura}</div></div></div></details>`);
   const parcial = frac < 1;
 
   // 1) MQL — meta geral
@@ -3637,10 +3643,11 @@ function mpDrvHtml(o) {
   // "Como melhorar" (pedido 12/11/2026): ações concretas a partir dos fatores do mês, com a conta de quanto precisa mudar
   const melhorar = (st, acs) => acs.length ? `<div class="dvmel"><div class="dvlt">${st === 'bom' ? 'Para manter' : 'Como melhorar'}</div><ol>${acs.slice(0, 4).map(a => `<li>${a}</li>`).join('')}</ol></div>` : '';
   const cards = [];
-  const card = (tit, sub, v, alvoTxt, st, fatores, leitura) => cards.push(`<div class="dvk ${st || ''}">
-    <div class="dvh"><div><h4>${tit}</h4><p>${sub}</p></div><div class="dvv"><b>${v}</b><span>${alvoTxt}</span></div>${st ? `<span class="dvst ${st}">${ROT[st]}</span>` : ''}</div>
+  const card = (tit, sub, v, alvoTxt, st, fatores, leitura) => cards.push(`<details class="dvk ${st || ''}">
+    <summary class="dvh"><div><h4>${tit}</h4></div><div class="dvv"><b>${v}</b><span>${alvoTxt}</span></div>${st ? `<span class="dvst ${st}">${ROT[st]}</span>` : ''}<svg class="dvchev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+    <div class="dvb"><p class="dvsub">${sub}</p>
     <div class="dvfs"><em>O que influencia</em>${fatores}</div>
-    <div class="dvl"><span class="dvli">💡</span><div>${leitura}</div></div></div>`);
+    <div class="dvl"><span class="dvli">💡</span><div>${leitura}</div></div></div></details>`);
   const AL = D.mppro_alunos, alOk = AL && AL.extraido_em && AL.extraido_em.slice(0, 7) === x.ym && AL.assinatura_ativa && AL.assinatura_ativa.na_area;
   const engaj = alOk ? AL.assinatura_ativa.acessaram_30d / AL.assinatura_ativa.na_area * 100 : null;
 
