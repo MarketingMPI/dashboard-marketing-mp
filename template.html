@@ -2740,6 +2740,7 @@ const MP_METAS = [
   {k: 'reembPct', t: 'Reembolso das novas', meta: 10, bom: 'baixo', fmt: v => fP(v), nota: 'no máximo'},
   {k: 'ltvCac', t: 'LTV ÷ CAC', meta: 1, bom: 'alto', fmt: v => fX(v) + 'x'}
 ];
+const MP_METAS_FORA = new Set(['renov']);   // saíram da seção Metas a pedido do usuário (12/11/2026): Taxa de renovação
 function mpMetaPct(m, v) {
   if (v == null) return null;
   if (m.bom === 'alto') return m.meta ? Math.min(100, v / m.meta * 100) : null;
@@ -2901,7 +2902,7 @@ function viewMPProMetas() {
   const faltam = Math.max(0, diffDays(TODAY, MP_METAS_ATE));
   h += `<div class="mph"><span>METAS ATÉ ${fDay(MP_METAS_ATE)}</span>dados desde ${fDay(ini)} · faltam ${fN(faltam)} dias · barras = valor de cada período · tracejado dourado = meta do período (ativos e MRR: onde a base deveria estar no fim de cada período para chegar à meta final em ${fDay(MP_METAS_ATE)}; novas: meta mensal × tamanho do período) · clique numa barra para ver o período no card</div>`;
   const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
-  for (const meta0 of MP_METAS) {
+  for (const meta0 of MP_METAS.filter(m => !MP_METAS_FORA.has(m.k))) {
     const meta = {...meta0, t: meta0.t.replace(/ no mês$/, ''), nota: meta0.nota === 'no fim do mês' ? 'no fim do período' : meta0.nota};
     const S0 = mpMetaSerie(meta, g, ini), n = S0.pts.length;
     let ult = n - 1; while (ult > 0 && S0.pts[ult].v == null) ult--;   // padrão: último período com valor
