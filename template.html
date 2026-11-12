@@ -4017,33 +4017,34 @@ function mpFunnel(m, novas) {
     `<div class="mpet"><div><b>${fef(tot)}</b>impressão → assinatura</div><div><b>${fef(tc)}</b>clique → assinatura</div><div><b>${fef(tv)}</b>visita → assinatura</div><div><b>${fef(ef[4])}</b>checkout → assinatura</div></div>` +
     `<p class="mut">Eficiência = volume da etapa ÷ volume da etapa anterior. Barras em escala logarítmica para as etapas finais ficarem visíveis. A última etapa é a venda registrada na Kiwify, não a atribuição do pixel (o pixel do Meta atribuiu ${fN(m.compras_pixel)}).</p></div>`;
 }
-/* Assinantes totais × ativos (12/11/2026, no lugar de "Pagamentos por mês"): por mês, barra = total de assinantes que já
-   compraram até o fim do mês (base acumulada); dentro dela, ativos (verde), pagamento pendente (dourado) e os que saíram
-   (cancelaram ou reembolsados, rosado). Mesma fotografia da base dos cards (computeMPPro no fim de cada mês). */
+/* Assinantes ativos por mês (12/11/2026, pedido do usuário): barra = assinantes ATIVOS no fim de cada mês (mesma base
+   dos cards); verde-escuro = entraram naquele mês e seguem ativos; verde-claro = vinham de meses anteriores.
+   Rótulo de cima = ativos; abaixo do mês = quantos entraram no mês (novas assinaturas, mesmo os que já saíram). */
 function mpBaseChart(width) {
   const meses = mpMeses().filter(ym => ym >= '2026-07');
   if (!meses.length) return emptyBox('Sem assinantes registrados');
-  const pts = meses.map(ym => { const ate = ymLast(ym) > TODAY ? TODAY : ymLast(ym), b = mpCalc(ym + '-01', ate).base;
-    return {ym, ate, parcial: ymLast(ym) > TODAY, tot: b.compradores, at: b.ativos, pe: b.pendentes || 0, sa: b.compradores - b.ativos - (b.pendentes || 0), canc: b.cancelaram, ree: b.reembolsados}; });
-  const W = Math.max(300, width), H = 250, pl = 30, pr = 8, pt = 22, pb = 34, pw = W - pl - pr, ph = H - pt - pb;
-  const mx = niceMax(Math.max(1, ...pts.map(x => x.tot))), bw = pw / pts.length, w = Math.min(64, bw * 0.55), y = v => pt + ph - ph * v / mx;
+  const pts = meses.map(ym => { const ate = ymLast(ym) > TODAY ? TODAY : ymLast(ym), X = mpCalc(ym + '-01', ate), b = X.base;
+    const novAt = X.compradores.filter(c => c.status === 'ativo' && String(c.entrada).slice(0, 7) === ym).length;
+    return {ym, ate, parcial: ymLast(ym) > TODAY, at: b.ativos, novAt, ant: b.ativos - novAt, entraram: X.vendas.novas_assinaturas}; });
+  const W = Math.max(300, width), H = 260, pl = 30, pr = 8, pt = 22, pb = 44, pw = W - pl - pr, ph = H - pt - pb;
+  const mx = niceMax(Math.max(1, ...pts.map(x => x.at))), bw = pw / pts.length, w = Math.min(64, bw * 0.55), y = v => pt + ph - ph * v / mx;
   let g = '';
   for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(mx * i / 4)}</text>`; }
+  let prev = null;
   pts.forEach((x, i) => {
     const cx = pl + i * bw + bw / 2, noPer = x.ym >= S.de.slice(0, 7) && x.ym <= S.ate.slice(0, 7);
     if (noPer) g += `<rect x="${pl + i * bw + 2}" y="${pt - 18}" width="${bw - 4}" height="${ph + 18}" fill="#f1f6f3" rx="6"/>`;
-    let base = 0;
-    for (const [v, cor] of [[x.at, '#00503c'], [x.pe, '#d9a441'], [x.sa, '#e7c3bc']]) {
-      if (v > 0) g += `<rect class="bar" x="${cx - w / 2}" y="${y(base + v)}" width="${w}" height="${y(base) - y(base + v) - (base ? 1 : 0)}" fill="${cor}" rx="3"/>`;
-      base += v;
-    }
-    g += `<text class="ax" x="${cx}" y="${y(x.tot) - 6}" text-anchor="middle" style="fill:#33413b;font-weight:600">${fN(x.tot)}</text>`;
-    if (x.at && x.at < x.tot && y(0) - y(x.at) >= 14) g += `<text class="ax" x="${cx}" y="${y(x.at) + 13}" text-anchor="middle" style="fill:#fff;font-weight:700">${fN(x.at)}</text>`;
-    g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle"${noPer ? ' style="font-weight:700;fill:#1c1c1c"' : ''}>${MESN(x.ym)}${x.parcial ? '*' : ''}</text>`;
-    const tip = `${MESN(x.ym)}${x.parcial ? ` (até ${fDM(x.ate)})` : ''} · posição no fim do mês\nAssinantes totais (já compraram): ${fN(x.tot)}\nAtivos: ${fN(x.at)} (${fP(pctOf(x.at, x.tot))})${x.pe ? `\nPagamento pendente: ${fN(x.pe)}` : ''}\nSaíram: ${fN(x.sa)} (${fN(x.canc)} cancelaram · ${fN(x.ree)} reembolsados)`;
+    if (x.ant > 0) g += `<rect class="bar" x="${cx - w / 2}" y="${y(x.ant)}" width="${w}" height="${y(0) - y(x.ant)}" fill="#b4d6c6" rx="3"/>`;
+    if (x.novAt > 0) g += `<rect class="bar" x="${cx - w / 2}" y="${y(x.at)}" width="${w}" height="${y(x.ant) - y(x.at) - (x.ant ? 1 : 0)}" fill="#00503c" rx="3"/>`;
+    const d = prev == null ? null : x.at - prev;
+    g += `<text class="ax" x="${cx}" y="${y(x.at) - 6}" text-anchor="middle" style="fill:#1c1c1c;font-weight:700">${fN(x.at)}${d ? `<tspan style="fill:${d > 0 ? '#00a611' : '#c0392b'};font-weight:600"> ${d > 0 ? '+' : '−'}${fN(Math.abs(d))}</tspan>` : ''}</text>`;
+    g += `<text class="ax" x="${cx}" y="${H - pb + 15}" text-anchor="middle"${noPer ? ' style="font-weight:700;fill:#1c1c1c"' : ''}>${MESN(x.ym)}${x.parcial ? '*' : ''}</text>`;
+    g += `<text class="ax" x="${cx}" y="${H - pb + 29}" text-anchor="middle" style="font-size:10.5px;fill:#00503c">${fN(x.entraram)} ${x.entraram === 1 ? 'entrou' : 'entraram'}</text>`;
+    const tip = `${MESN(x.ym)}${x.parcial ? ` (até ${fDM(x.ate)})` : ''} · ativos no fim do mês\nAssinantes ativos: ${fN(x.at)}${d != null ? ` (${d >= 0 ? '+' : '−'}${fN(Math.abs(d))} vs mês anterior)` : ''}\nEntraram no mês: ${fN(x.entraram)} (${fN(x.novAt)} ${x.novAt === 1 ? 'segue ativo' : 'seguem ativos'})\nVinham de meses anteriores: ${fN(x.ant)}`;
     g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(tip)}" data-range="${x.ym}-01|${x.ate}"/>`;
+    prev = x.at;
   });
-  return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Assinantes totais e ativos por mês">${g}</svg></div>`;
+  return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Assinantes ativos por mês">${g}</svg></div>`;
 }
 function mpEvolChart(ev, width) {
   if (!ev.length) return emptyBox('Sem vendas registradas');
@@ -4134,8 +4135,8 @@ function viewMPProPeriodo() {
     kpiCard({label: 'MRR', cls: 'hero', v: fRc(b.mrr), sub: `${pl(b.assinaturas_ativas, 'assinatura ativa', 'assinaturas ativas')}`, tip: 'Receita recorrente mensal bruta das assinaturas ativas'})
   ].join('') + '</div>';
   const coh = m.coortes.length ? '<div class="mpco">' + m.coortes.map(c => `<div data-tip="${ESC(`Entraram em ${MESN(c.mes)}: ${c.entraram}\nSeguem ativos em ${fDay(base)}: ${c.ativos}`)}"><span class="mut">${MESN(c.mes)}</span><span class="mpt"><i style="width:100%;background:#e6ece9"></i><i class="ov" style="width:${pctOf(c.ativos, c.entraram)}%"></i></span><b>${fP(pctOf(c.ativos, c.entraram)).replace(',0%', '%')}</b><small>${c.ativos} de ${c.entraram}</small></div>`).join('') + '</div>' : emptyBox('Sem compradores');
-  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Assinantes totais × ativos</h3><p>Posição no fim de cada mês · barra inteira = todos que já assinaram · faixa verde = mês do período escolhido · clique numa barra para ver o mês · * mês em andamento</p></div>
-      <div class="lg"><span><i style="background:#00503c"></i>Ativos</span><span><i style="background:#d9a441"></i>Pagamento pendente</span><span><i style="background:#e7c3bc"></i>Saíram</span></div></div>${mpBaseChart(window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44)}</div>
+  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Assinantes ativos por mês</h3><p>Ativos no fim de cada mês e quantos entraram no mês · faixa clara = período escolhido · * mês em andamento</p></div>
+      <div class="lg"><span><i style="background:#b4d6c6"></i>Já eram ativos</span><span><i style="background:#00503c"></i>Entraram no mês</span></div></div>${mpBaseChart(window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44)}</div>
     <div class="card"><div class="ch"><div><h3>Sobrevivência por coorte</h3><p>Mês de entrada → % que segue ativo em ${fDay(base)}</p></div></div>${coh}</div></div>`;
   // tabela 'Evolução mensal' saiu (pedido 12/11/2026)
   // ---------- churn
