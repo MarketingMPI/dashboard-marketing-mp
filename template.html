@@ -4113,16 +4113,7 @@ function viewMPProPeriodo() {
   // ---------- funil + receita
   const vw = document.getElementById('view').clientWidth || 900;
   h += `<div class="card mt"><div class="ch"><div><h3>Funil da campanha</h3><p>Da impressão à assinatura · custo por unidade = investimento ÷ volume da etapa</p></div></div>${md.impressoes || v.novas_assinaturas ? mpFunnel(md, v.novas_assinaturas) : emptyBox('Sem mídia nem vendas no período')}</div>`;   // Composição da receita e Reembolsos/recusas saíram (pedido 12/11/2026)
-  // ---------- renovações
-  h += `<div class="mph mt"><span>RENOVAÇÕES</span>Cobranças recorrentes com vencimento no período</div>`;
-  h += '<div class="kpis k3x">' + [
-    kpiCard({label: 'Previstas', v: fN(r.previstas), sub: 'vencimentos no período', tip: 'Assinaturas com vencimento (último pagamento + 1 mês) no período, já vencidas.\nQuem passou do prazo sem nenhuma tentativa de cobrança cancelou antes da renovação e não entra aqui.'}),
-    kpiCard({label: 'Pagas em dia', v: fN(r.em_dia), sub: r.previstas ? fP(pctOf(r.em_dia, r.previstas)) + ' das previstas' : '', tip: 'Pagamento entrou até o dia do vencimento'}),
-    kpiCard({label: 'Pagas com atraso', v: fN(r.atrasaram_pagas), sub: r.atrasaram_pagas ? `média ${f1(r.atraso_medio)} dias · pico ${fN(r.atraso_max)} dias` : 'nenhuma', tip: 'Entraram depois do vencimento (em geral após a Kiwify repetir uma cobrança recusada)'}),
-    kpiCard({label: 'Em aberto', v: fN(r.em_aberto), sub: 'até 25 dias do vencimento', tip: 'Ainda não pagas, dentro do limite de 25 dias'}),
-    kpiCard({label: 'Inadimplentes', cls: r.inadimplentes ? 'red' : '', v: fN(r.inadimplentes), sub: 'mais de 25 dias sem pagar', tip: 'Passaram de 25 dias do vencimento sem pagamento, com cobrança tentada e sem cancelamento na Kiwify'}),
-    kpiCard({label: 'Canceladas na cobrança', cls: r.canceladas ? 'red' : '', v: fN(r.canceladas), sub: 'recusadas e canceladas pela Kiwify', tip: 'A cobrança da renovação foi tentada, não entrou e a assinatura foi cancelada na Kiwify (por esgotar as tentativas ou por pedido do cliente). Saem de em aberto/inadimplentes e entram no churn.'})
-  ].join('') + '</div>';
+  // bloco RENOVAÇÕES (Previstas, Pagas em dia/atraso, Em aberto, Inadimplentes, Canceladas) saiu (pedido 12/11/2026)
   // tabelas 'Pagamentos do período, um a um' e 'Renovações que não entraram' saíram (pedido 12/11/2026)
   // ---------- base
   h += `<div class="mph mt"><span>BASE</span>Assinantes MP PRO em ${fDay(base)} · plano Janela Fundadora</div>`;
