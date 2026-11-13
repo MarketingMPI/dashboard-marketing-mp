@@ -1962,13 +1962,13 @@ const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20
    ========================================================================= */
 const TABS = [
   {id: 'macro', nome: 'Visão Macro'}, {id: 'insights', nome: 'Insights'}, {id: 'performance', nome: 'Performance'}, {id: 'lista', nome: 'Lead a Lead'},
-  {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'consultores', nome: 'Consultores'}, {id: 'offline', nome: 'Offline'}];   // Offline (13/11/2026): IND, MFO e eventos   // Perdidos agora fica dentro do Lead a Lead (10/11/2026)
+  {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'consultores', nome: 'Consultores'}];   // a página Offline fica na seção 'Offline' do menu (TABS_PG)   // Perdidos agora fica dentro do Lead a Lead (10/11/2026)
 // B2B: seções em construção (sem dados do Funil Alpha; filtros B2C ficam ocultos)
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
 const TABS_RS = [{id: 'instagram', nome: 'Instagram'}, {id: 'youtube', nome: 'YouTube', off: 'Em breve: aguardando a conexão com a API do YouTube do Gabriel'}];
 const TABS_CT = [{id: 'blog', nome: 'Blog'}];  // Conteúdo: publicação no blog do site
-const TABS_PG = [{id: 'indicacoes', nome: 'Indique e Ganhe'}];  // Programas: Indique e Ganhe (dados ao vivo do Supabase, alimentados pelo n8n)
-const isB2B = id => TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id) || TABS_CT.some(t => t.id === id) || TABS_PG.some(t => t.id === id);
+const TABS_PG = [{id: 'offline', nome: 'Visão Macro'}, {id: 'indicacoes', nome: 'Indique e Ganhe'}];   // seção 'Offline' do menu (13/11/2026): Visão Macro offline (IND/MFO/EVT) + Indique e Ganhe  // Programas: Indique e Ganhe (dados ao vivo do Supabase, alimentados pelo n8n)
+const isB2B = id => id !== 'offline' && (TABS_B2B.some(t => t.id === id) || TABS_RS.some(t => t.id === id) || TABS_CT.some(t => t.id === id) || TABS_PG.some(t => t.id === id));   // Offline usa os filtros B2C
 const SO_PERIODO = new Set(['mppro', 'mphub', 'aplicacao', 'instagram', 'youtube', 'indicacoes']);
 const PRESETS = [['hoje', 'Hoje'], ['7d', 'Últimos 7 dias'], ['semana', 'Esta semana'], ['semana_ant', 'Semana passada'],
   ['28d', 'Últimos 28 dias'], ['30d', 'Últimos 30 dias'], ['mes', 'Este mês'], ['mes_ant', 'Mês passado'], ['tudo', 'Tudo']];
@@ -4998,7 +4998,7 @@ function viewOffline() {
   const conta = id => { const pr = makePred(offFiltros(id)); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
   const C = run(offFiltros(pf)), [pd, pa] = prevRange(), P = run(offFiltros(pf, {de: pd, ate: pa}));
   const k = C.res.kpis, e = C.res.eventos, pk = P.res.kpis, pe = P.res.eventos;
-  let h = viewHead('Offline', `Leads que não vêm da mídia: indicações (IND), Multi Family Office (MFO) e eventos (EVT) · ${periodCaption()} · agendados, reuniões, ganhos e perdidos = o que aconteceu no período`);
+  let h = viewHead('Visão Macro · Offline', `Leads que não vêm da mídia: indicações (IND), Multi Family Office (MFO) e eventos (EVT) · ${periodCaption()} · agendados, reuniões, ganhos e perdidos = o que aconteceu no período`);
   h += '<div class="offpf" role="radiogroup" aria-label="Pré-filtro">' + OFF_PF.map(([id, sig, o]) =>
     `<button type="button" data-offp="${id}" class="${pf === id ? 'on' : ''}" role="radio" aria-checked="${pf === id}"${o ? ` data-tip="${ESC(`${OFF_NOME[id]}: negócios com origem ${o} (etiqueta ou prefixo do título no Pipedrive)`)}"` : ''}><b>${sig}</b>${o ? OFF_NOME[id] : 'IND + MFO + EVT'}<small>${fN(conta(id))}</small></button>`).join('') + '</div>';
   const pct = (a, b) => b ? fP(a / b * 100) : '–';
@@ -5251,7 +5251,7 @@ function renderNav() {
   const min = document.body.classList.contains('navmin');
   document.getElementById('nav').innerHTML = `<div class="ncol"><button type="button" class="ncb" data-navcol="1" title="${min ? 'Abrir o menu' : 'Recolher o menu'}" aria-label="${min ? 'Abrir o menu' : 'Recolher o menu'}" aria-expanded="${min ? 'false' : 'true'}"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="${min ? 'm13 10 2 2-2 2' : 'm16 10-2 2 2 2'}"/></svg></button></div>` +
     '<div class="nh">B2C - Análises</div>' + TABS.map(t => `<button type="button" data-tab="${t.id}" class="${S.tab === t.id ? 'on' : ''}" title="${ESC(t.nome)}">${ICONS[t.id]}<span>${t.nome}</span>${badge[t.id] != null ? `<span class="bd">${fN(badge[t.id])}</span>` : ''}</button>`).join('') +
-    '<div class="nh nb">Programas</div>' + TABS_PG.map(btn).join('') +
+    '<div class="nh nb">Offline</div>' + TABS_PG.map(btn).join('') +
     '<div class="nh nb">B2B - Análises</div>' + TABS_B2B.map(btn).join('') +
     '<div class="nh nb">Redes Sociais</div>' + TABS_RS.map(btn).join('') +
     '<div class="nh nb">Conteúdo</div>' + TABS_CT.map(btn).join('') +
