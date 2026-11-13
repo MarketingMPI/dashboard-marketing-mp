@@ -381,6 +381,19 @@ def mppro(MP, f, agora_day):
             prev.append(dict(c=o["c"], ult=o["day"], due=due, pago=None, atraso=ab,
                              status="cancelada" if canc else "inadimplente" if ab > INADIMPLENTE_DIAS else "em_aberto", recusas=len(rr), motivo=mot))
     atrasou = [x for x in prev if x["status"] == "atrasou"]
+    r1 = {"base": 0, "pagaram": 0, "em_aberto": 0}   # renovação da 1ª cobrança (13/11/2026)
+    for o in firsts:
+        due = _mais1mes(o["day"])
+        if not inP(due) or due > agora_day:
+            continue
+        if next_sub.get(o["i"]):
+            r1["base"] += 1; r1["pagaram"] += 1; continue
+        ko = (MP.get("oficial") or {}).get(str(o["c"]))
+        canc = bool(ko and ko[0] == "cancelou" and ko[2] and ko[2] <= agora_day)
+        if o["st"] != "refunded" and not canc and (_d(agora_day) - _d(due)).days <= INADIMPLENTE_DIAS:
+            r1["em_aberto"] += 1; continue
+        r1["base"] += 1
+    r1["pct"] = r1["pagaram"] / r1["base"] * 100 if r1["base"] else None
 
     # base em T
     aprT = [o for o in apr if o["day"] <= T]
@@ -556,6 +569,7 @@ def mppro(MP, f, agora_day):
                    "ren_liquido": soma(pag_ren, "liq"), "reembolsos": len(reemb) + len(av_re), "reembolsos_valor": soma(reemb, "bruto") + soma(av_re, "bruto"),
                    "recusas": len(rec_p), "recusas_clientes": len({o["c"] for o in rec_p}), "recusas_novos": rec_novos,
                    "motivos_recusa": dict(motivos), "resultado": liq_p - m["inv"]},
+        "primeira_renovacao": r1,
         "renovacoes": {"previstas": len(prev), "pagas": sum(1 for x in prev if x["pago"]),
                        "em_dia": sum(1 for x in prev if x["status"] == "em_dia"), "atrasaram_pagas": len(atrasou),
                        "em_aberto": sum(1 for x in prev if x["status"] == "em_aberto"),
