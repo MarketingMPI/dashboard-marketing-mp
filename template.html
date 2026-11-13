@@ -3685,7 +3685,7 @@ function mpDrvHtml(o) {
       if (falta && depois > 0) ac.push(`Com o churn atual (${ch == null ? '–' : fP(ch)}), saem cerca de ${insN1(saem)} assinantes por mês: para somar ${insN1(sald)} de saldo, são <b>${fN(Math.ceil(sald + saem))} novas assinaturas por mês</b> (hoje: ${fN(x.novas)}).`);
       if (ch != null && ch > M('churn').meta) ac.push(`Baixar o churn para ${fP(M('churn').meta)} já evitaria ${insN1(Math.max(0, saem - base * M('churn').meta / 100))} saídas por mês (ver o card Churn).`);
       if (x.novas < M('novas').meta * frac) ac.push('Aquisição é o maior gargalo de volume: as ações do card Novas assinaturas (página, checkout e verba) são as que mais aproximam da meta.');
-      if (x.inadN) ac.push(`Recuperar as ${fN(x.inadN)} renovações que ficaram sem pagar antes que a Kiwify cancele (ver o card Taxa de renovação).`);
+      if (x.inadN) ac.push(`Recuperar as ${fN(x.inadN)} renovações que ficaram sem pagar antes que a Kiwify cancele: mensagem com o link de pagamento e opção de Pix.`);
       L += melhorar(st, ac);
     }
     if (falta) L += `<div class="dvlt">Até a meta</div>` + (depois > 0 ? `Faltam ${fN(falta)} assinantes em ${fN(depois)} ${depois === 1 ? 'mês' : 'meses'}${parcial ? ' (contando este)' : ''}: ${insN1(falta / depois)} de saldo por mês.` : `Faltaram ${fN(falta)} assinantes no prazo da meta.`);
@@ -3776,29 +3776,7 @@ function mpDrvHtml(o) {
       fk('Não renovaram', 'churnSairam', 'n', -1, 'Pagaram no mês anterior e não pagaram neste') + fk('Inadimplentes', 'inadN', 'n', -1, 'Renovação sem pagar em algum dia do mês')
       + (engaj != null ? fator('Acessaram as aulas (30 dias)', engaj, null, 'p', 1, `Fotografia da área de membros de ${fDay(AL.extraido_em.slice(0, 10))}`) : ''), L);
   }
-  // 5) Taxa de renovação (92%)
-  {
-    const alvo = M('renov').meta, v = x.previstas ? x.renov : null, st = stAlto(v, alvo), cs = [];
-    if (x.inad) cs.push(`${fN(x.inad)} ${x.inad === 1 ? 'renovação inadimplente' : 'renovações inadimplentes'}`);
-    if (x.recusas) cs.push(`${fN(x.recusas)} ${x.recusas === 1 ? 'recusa' : 'recusas'} no cartão`);
-    if (x.inadValor) cs.push(`${fRc(x.inadValor)} de mensalidade travada (${fRc(x.inadVPend || 0)} ainda pode entrar)`);
-    let L;
-    if (v == null) L = 'Nenhuma renovação prevista no mês.';
-    else if (st === 'bom') L = `<b>Meta atingida:</b> ${fP(v)} das ${fN(x.previstas)} renovações previstas foram pagas.` + lista('Atenção', cs);
-    else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fP(v)} das ${fN(x.previstas)} renovações previstas foram pagas.` + (cs.length ? lista('Fator provável', cs) : '');
-    {
-      const ac = [];
-      if (v != null && v < alvo) { const prec = Math.ceil(x.previstas * alvo / 100 - 1e-9), pagas = Math.round(x.previstas * v / 100); ac.push(`Para ${fP(alvo)} das ${fN(x.previstas)} previstas, são <b>${fN(prec)} renovações pagas</b> (neste mês: ${fN(pagas)}): ${fN(prec - pagas)} a mais.`); }
-      if (x.inadVPend) ac.push(`<b>Cobrar hoje os pendentes</b>: ${fRc(x.inadVPend)} ainda podem entrar. Mensagem com o link de pagamento e alternativa em Pix.`);
-      if (x.recusas) ac.push(`<b>${fN(x.recusas)} recusas no cartão</b>: aviso 3 dias antes do vencimento, mensagem no dia da recusa pedindo a atualização do cartão e retentativa no dia seguinte.`);
-      if (x.inadVPerd) ac.push(`${fRc(x.inadVPerd)} já foram perdidos (cancelados pela Kiwify): oferecer a volta com o mesmo preço a esses assinantes.`);
-      if (!ac.length && st === 'bom') ac.push('Manter a régua de cobrança e o aviso antes do vencimento.');
-      L += melhorar(st, ac);
-    }
-    card('Taxa de renovação', `Renovações pagas ÷ previstas no mês · meta ${fP(alvo)}`, FM.p(v), `meta ${fP(alvo)}`, st,
-      fk('Previstas', 'previstas', 'n', 0, 'Assinaturas com vencimento no mês') + fk('Recusas no cartão', 'recusas', 'n', -1, 'Cobranças recusadas no mês')
-      + fk('Receita travada', 'inadValor', 'rs', -1, 'Mensalidades dos inadimplentes que não entraram'), L);
-  }
+  // card 'Taxa de renovação' saiu dos Insights (pedido 12/11/2026)
   const nS = s => (cards.join('').match(new RegExp(`dvst ${s}`, 'g')) || []).length;
   return `<div class="card mt insdrv"><div class="ch"><div><h3>🎯 Metas e o que influencia</h3><p>Cada meta até ${fDay(MP_METAS_ATE)}, os fatores que mexem nela e a leitura do mês · comparação com ${ESC(rotAnt)}${parcial ? ' (no mesmo ritmo de dias)' : ''}</p></div>
     <div class="dvr"><span class="dvst bom">${fN(nS('bom'))} bom</span><span class="dvst medida">${fN(nS('medida'))} na medida</span><span class="dvst ruim">${fN(nS('ruim'))} ruim</span></div></div>
