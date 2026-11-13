@@ -3604,7 +3604,7 @@ function viewInsights() {
       extra: pa('cpg', fRs), d: insVar(x.cpg, B && B.cpg, -1, fRs, rotMed),
       tip: 'Investimento no Meta Ads (campanhas B2C) no período ÷ ganhos no período (todas as origens, mesmo número do card Ganhos, da Visão Macro e da Performance)'})
   ].join('') + '</div>';
-  if (modo !== 'semanal') h += insMetasHtml(x, CP, P.parcial, modo, frac);   // semanal: metas ficam na aba Metas (pedido 10/11/2026)
+  // bloco 'Metas' saiu também do Mensal (pedido 13/11/2026): as metas ficam na aba Metas e no '🎯 Metas e o que influencia'
   // Funil Consultores saiu dos Insights (pedido 10/11/2026): fica só na página Consultores
   // Avaliação (pontos positivos/atenção) foi incorporada ao bloco "Metas e o que influencia" (pedido 10/11/2026)
   const {gs, comCpl, cs} = insGrp(x, modo);
@@ -3629,7 +3629,7 @@ function viewInsights() {
   h = h.replace('<!--INSRES-->', insResumoHtml({x, B, modo, CP, rotMed, nPos, nNeg, nMed: DST.medida || 0, AT, AS, SG, parcial: P.parcial, negT: neg.map(n => n[0]), recente}));
   h += insAssumidosHtml();
   // Sugestões, acompanhamento das sugestões e tabela por campanha saíram dos Insights (pedido 10/11/2026)
-  h += insRegistroHtml(P.de, P.fim, modo);
+  if (modo === 'semanal') h += insRegistroHtml(P.de, P.fim, modo);   // 'Registro de mudanças' saiu do Mensal (pedido 13/11/2026)
   // tabela 'Comparativo' saiu dos Insights B2C (pedido 13/11/2026)
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Semanal</b> = semana de terça a segunda; abre na última semana fechada, que termina na segunda (véspera da reunião de terça). <b>Mensal</b> = mês fechado.</li>
