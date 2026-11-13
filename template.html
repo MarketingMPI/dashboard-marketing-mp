@@ -1070,7 +1070,13 @@ const TRD_RX = /^\s*TRD\s*\|/i;  // prefixo exato da Tríade (exclui TRD-INT)
 // Campanhas pelo prefixo do título do negócio. Para adicionar outra, inclua aqui (e em audit.CAMPANHAS).
 const CAMPANHAS = {trd: {rx: TRD_RX, nome: 'TRD · Tríade', tip: "Negócios cujo título começa com 'TRD |' (campanha Tríade). TRD-INT fica de fora."},
   diag: {rx: /^\s*DIAG\s*\|/i, nome: 'DIAG · B2C interna', tip: "Negócios cujo título começa com 'DIAG |' (campanha B2C interna da Meu Patrimônio)."},
-  rcon: {rx: /^\s*RCON\b/i, nome: 'RCON · Análise de carteira', tip: "Negócios cujo título começa com 'RCON' (site: pedido de análise de carteira gratuita). Inclui 'RCON |', 'RCON-LP02' e 'RCON YT'."}};
+  rcon: {rx: /^\s*RCON\b/i, nome: 'RCON · Análise de carteira', tip: "Negócios cujo título começa com 'RCON' (site: pedido de análise de carteira gratuita). Inclui 'RCON |', 'RCON-LP02' e 'RCON YT'."},
+  /* Eventos (13/11/2026): etiqueta de evento (EV-…, EVFO-…, EV3FO, EV25-…, ev10-08) OU prefixo do título EV3FO / EVFO / IND EVFO
+     (indicação feita num evento). MedInvest e 'PROSP EVENTOS' ficam de fora (decisão do usuário). Espelho: audit.eh_evento. */
+  eventos: {rx: null, lead: l => ehEvento(l), nome: 'EVENTOS · Eventos', tip: "Negócios com etiqueta de evento (EV-…, EVFO-…, EV3FO…) ou com o título começando por EV3FO, EVFO ou IND EVFO (indicação feita num evento)."}};
+const EV_LB_RX = /^EV(?:\d|-|FO|\s)/i, EV_TT_RX = /^\s*(?:IND\s+)?EV\d*FO\b/i;
+function ehEvento(l) { return (l.lb || []).some(x => EV_LB_RX.test(String(x).trim())) || EV_TT_RX.test(l.n || ''); }
+const campOk = (c, l) => c.lead ? c.lead(l) : c.rx.test(l.n || '');
 let D = null;
 let STAGES = DEFAULT_STAGES;
 
@@ -1148,12 +1154,12 @@ function makePred(f, skip) {
   const q = skip === 'busca' ? '' : norm(f.busca || '');
   const ref = f.data_ref === 'l' ? 'l' : f.data_ref === 'w' ? 'w' : 'e', de = f.de || '', ate = f.ate || '';
   const base = f.incluir_base !== false;  // padrão: funil inteiro
-  const op = f.operacao === true;         // Insights: só a operação (sem base importada/reativada e sem lançamento retroativo)
+  const op = false;   // 13/11/2026 (decisão do usuário): o B2C conta TODOS os negócios do Funil Alpha — base importada e lançamentos retroativos entram; f.operacao não recorta mais nada
   const camp = CAMPANHAS[f.campanha || (f.so_trd ? 'trd' : '')] || null;  // campanha = prefixo do título
   return l => {
     if (!base && l.b) return false;
     if (op && (l.b || isRetro(l))) return false;
-    if (camp && !camp.rx.test(l.n || '')) return false;
+    if (camp && !campOk(camp, l)) return false;
     if (skip !== 'periodo' && (de || ate)) {
       const v = l[ref];
       if (!v) return false;
@@ -2304,7 +2310,7 @@ const viewHead = (t, sub, right = '') => `<div class="vh"><div><h2>${t}</h2><p>$
 /* Meta oficial do B2C: 40 MQL por mês. Conta só o MQL de mídia (pedido do usuário, 28/10/2026): etiqueta "Digital" E
    prefixo de campanha (TRD / DIAG / RCON), sem base importada nem lançamento retroativo. Fica de fora quem entra sem
    prefixo (eventos, cadastro manual). Mês corrente, independe dos filtros do topo. */
-const ehMetaMql = l => (l.lb || []).some(x => String(x).trim().toLowerCase() === 'digital') && Object.values(CAMPANHAS).some(c => c.rx.test(l.n || ''));
+const ehMetaMql = l => (l.lb || []).some(x => String(x).trim().toLowerCase() === 'digital') && Object.values(CAMPANHAS).some(c => c.rx && c.rx.test(l.n || ''));   // meta de MQL: só TRD/DIAG/RCON (Eventos fora)
 const contaMetaMql = f => run(f).rows.filter(r => ehMetaMql(r.l)).length;
 function metaMqlHtml() {
   const ym = TODAY.slice(0, 7), de = ym + '-01', fim = ymLast(ym);
@@ -2327,8 +2333,7 @@ function viewMacro() {
   const nBase = C.rows.reduce((a, r) => a + (r.l.b ? 1 : 0), 0);
   let h = viewHead('Visão Macro', periodCaption() + ' · agendados, reuniões, ganhos e perdidos = o que aconteceu no período');
   // meta do mês (MQL) saiu da Visão Macro (pedido 10/11/2026): fica em Insights › Metas e no Funil
-  const EXm = insExcl(S.de, S.ate);
-  if (EXm.base || EXm.retro) h += `<div class="note insexc">Fora do painel neste período: ${[EXm.base ? `<b>${fN(EXm.base)}</b> ${EXm.base === 1 ? 'contato importado da base/reativado' : 'contatos importados da base/reativados'}` : '', EXm.retro ? `<b>${fN(EXm.retro)}</b> ${EXm.retro === 1 ? 'lançamento retroativo' : 'lançamentos retroativos'} (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade)` : ''].filter(Boolean).join(' e ')}. Todas as abas do B2C contam só a operação.</div>`;
+  // nota 'Fora do painel neste período' saiu (13/11/2026): nada fica de fora
   h += '<div class="kpis k6 kmac">' + [
     kpiCard({label: 'Entraram no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k0.abertos)} ainda em aberto hoje`,
       extra: nBase > 0 ? `<div class="kx">inclui ${fN(nBase)} ex-clientes e contatos antigos reativados</div>` : '',
@@ -3201,11 +3206,11 @@ function insMetaSerie(meta, g, ini) {
 }
 function viewInsMetas() {
   const CN = S.camp && CAMPANHAS[S.camp] ? CAMPANHAS[S.camp].nome : '', CP = CN ? CN.split(' · ')[0] : '';
-  let h = viewHead(CN ? `Insights · ${CN}` : 'Insights', CN ? `B2C · somente os negócios com prefixo <b>${CP}</b> · evolução de cada meta` : 'B2C · evolução de cada meta da operação · escolha TRD, DIAG ou RCON no topo para ver só uma campanha');
+  let h = viewHead(CN ? `Insights · ${CN}` : 'Insights', CN ? `B2C · somente os negócios com prefixo <b>${CP}</b> · evolução de cada meta` : 'B2C · evolução de cada meta · todos os negócios do Funil Alpha · escolha TRD, DIAG, RCON ou Eventos no topo para ver só uma campanha');
   h += subAbas(INS_MODOS, 'metas', 'insmodo');
   const g = MPG.some(x => x[0] === S.mpG) ? S.mpG : 'mensal', ini = INS_METAS_DESDE < MIN_DAY ? MIN_DAY : INS_METAS_DESDE;
   h += `<div class="aplpx"><span>Evolução</span><div class="seg">${MPG.map(([k, l]) => `<button type="button" data-mpg="${k}" class="${g === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
-  h += `<div class="mph"><span>METAS B2C</span>dados desde ${fDay(ini)} · só a operação (sem base importada e lançamentos retroativos) · barras = valor de cada período · tracejado dourado = meta fixa · linha azul = meta proporcional (MQL realizado × taxa do funil: agendadas 30%, realizadas 15%, fechamentos 5%) · clique numa barra para ver o período no card</div>`;
+  h += `<div class="mph"><span>METAS B2C</span>dados desde ${fDay(ini)} · todos os negócios do Funil Alpha · barras = valor de cada período · tracejado dourado = meta fixa · linha azul = meta proporcional (MQL realizado × taxa do funil: agendadas 30%, realizadas 15%, fechamentos 5%) · clique numa barra para ver o período no card</div>`;
   if (CP) h += `<div class="note">Com ${ESC(CP)} selecionado, os gráficos mostram só os negócios ${ESC(CP)}, mas as metas de volume (40 MQL, 12 agendadas, 6 realizadas e 2 fechamentos por mês) são do B2C inteiro. As metas de conversão valem para cada campanha.</div>`;
   const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
   const linha = meta0 => {
@@ -3558,12 +3563,12 @@ function perSelect(itens, atual, attr, rotulo) {
 // quantos negócios do período ficaram fora dos Insights (base importada/reativados e lançamentos retroativos)
 /* Alerta: leads ABERTOS que um consultor assumiu (troca de responsável no Pipedrive) e que, desde então, não tiveram
    nenhuma atividade criada/concluída nem mudança de etapa (l.pp = momento da troca, calculado no painel.py).
-   Situação de hoje; só conta quem foi assumido há mais de 1 dia. Escopo = operação (base importada à parte). */
+   Situação de hoje; só conta quem foi assumido há mais de 1 dia. Escopo = todos os negócios do Funil Alpha. */
 function insAssumidos() {
   const lim = Date.now() - DAY, pr = makePred(filtros({de: '', ate: '', operacao: false}), 'periodo'), por = new Map();
   let n = 0, base = 0, velho = null;
   for (const l of LEADS) { if (l.s !== 'open' || !l.pp || tms(l.pp) > lim || !pr(l)) continue;
-    if (l.b || isRetro(l)) { base++; continue; }
+    // 13/11/2026: base importada e retroativos também entram (todos os negócios do Funil Alpha)
     n++; por.set(l.c, (por.get(l.c) || 0) + 1); if (!velho || l.pp < velho) velho = l.pp; }
   return {n, base, por: [...por].sort((a, b) => b[1] - a[1]), dias: velho ? Math.floor((Date.now() - tms(velho)) / DAY) : 0};
 }
@@ -3614,7 +3619,7 @@ function viewInsights() {
   const modo = S.insModo === 'mensal' ? 'mensal' : 'semanal', nm = INS_NOME[modo], nb = INS_BASE[modo];
   const {per, i, P} = insSel();
   const CN = S.camp && CAMPANHAS[S.camp] ? CAMPANHAS[S.camp].nome : '', CP = CN ? CN.split(' · ')[0] : '';
-  let h = viewHead(CN ? `Insights · ${CN}` : 'Insights', CN ? `B2C · somente os negócios com prefixo <b>${CP}</b> · para ver outra campanha, troque no seletor do topo` : `B2C · avaliação ${modo === 'semanal' ? 'semanal' : 'mensal'} da operação · escolha TRD, DIAG ou RCON no topo para ver só uma campanha`,
+  let h = viewHead(CN ? `Insights · ${CN}` : 'Insights', CN ? `B2C · somente os negócios com prefixo <b>${CP}</b> · para ver outra campanha, troque no seletor do topo` : `B2C · avaliação ${modo === 'semanal' ? 'semanal' : 'mensal'} · todos os negócios do Funil Alpha · escolha TRD, DIAG, RCON ou Eventos no topo para ver só uma campanha`,
     `<button type="button" class="btn gh" data-act="ins-pdf" title="Gera um PDF desta página para a reunião">⤓ Exportar para a reunião (PDF)</button>`);
   h += subAbas(INS_MODOS, modo, 'insmodo');
   if (!P) return h + `<div class="card">${emptyBox('Sem dados')}</div>`;
@@ -3627,8 +3632,7 @@ function viewInsights() {
   const rotAnt = modo === 'semanal' ? 'sem. anterior' : (per[i - 1] ? mesCurto(per[i - 1].k) : 'anterior');
   const rotMed = `média ${ants.length} ${ants.length === 1 ? nm[0] : nm[1]}`;
   h += `<div class="mph"><span>${modo === 'semanal' ? `SEMANA ${fDM(P.de)} A ${fDM(P.fim)}` : mesNome(P.k).toUpperCase()}</span>${CN ? `<span class="inscp">${ESC(CN)}</span>` : ''}${P.parcial ? `em andamento, dados até ${fDay(P.ate)} · comparação ajustada ao ritmo (${fN(diffDays(P.de, P.ate) + 1)} de ${fN(nDias)} dias)` : `comparado com a ${rotMed} (cores) e com a ${rotAnt}`}</div>`;
-  const EX = insExcl(P.de, P.ate);
-  if (EX.base || EX.retro) h += `<div class="note insexc">Fora desta análise${modo === 'semanal' ? ' nesta semana' : ' neste mês'}: ${[EX.base ? `<b>${fN(EX.base)}</b> ${EX.base === 1 ? 'contato importado da base/reativado' : 'contatos importados da base/reativados'}` : '', EX.retro ? `<b>${fN(EX.retro)}</b> ${EX.retro === 1 ? 'lançamento retroativo' : 'lançamentos retroativos'} (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade registrada)` : ''].filter(Boolean).join(' e ')}. Eles continuam nas outras abas.</div>`;
+  // nota 'Fora desta análise' saiu (13/11/2026): todos os negócios do Funil Alpha entram
   h += '<!--INSRES-->';
   // grandes números: cor/variação contra a média; período anterior em texto
   const fRs = v => v == null ? '–' : fR(v);
@@ -3666,7 +3670,7 @@ function viewInsights() {
   // por campanha (prefixo), contra a média: só quando o seletor de campanha está em "Todos"
   let pxRows = null;
   if (!S.camp && ants.length) {
-    const PX = Object.keys(CAMPANHAS);
+    const PX = Object.keys(CAMPANHAS).filter(c => CAMPANHAS[c].rx);   // por campanha de mídia (Eventos fora)
     pxRows = PX.map(c => ({n: CAMPANHAS[c].nome.split(' · ')[0], x: insCalc(P.de, P.ate, c), b: insBase(per.slice(Math.max(0, i - nb), i).map(q => insCalc(q.de, q.fim, c)), frac)}));
   }
   const DST = {};
@@ -3684,7 +3688,7 @@ function viewInsights() {
   // tabela 'Comparativo' saiu dos Insights B2C (pedido 13/11/2026)
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Semanal</b> = semana de terça a segunda; abre na última semana fechada, que termina na segunda (véspera da reunião de terça). <b>Mensal</b> = mês fechado.</li>
-    <li>Os Insights avaliam só a <b>operação</b>: ficam de fora os contatos importados da base/reativados e os lançamentos retroativos (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade registrada). Eles continuam nas outras abas.</li>
+    <li>Os Insights contam <b>todos os negócios do Funil Alpha</b> (inclusive contatos importados da base e negócios lançados direto em etapas avançadas), igual às outras abas. Só os negócios de teste ficam de fora e duplicados da mesma pessoa viram um lead.</li>
     <li><b>Leads novos</b> e <b>contato</b> olham só os leads que entraram no período. <b>Agendamentos, reuniões, faltas, ganhos e perdas</b> contam o que aconteceu no período, com leads de qualquer data de entrada.</li>
     <li>As cores e a <b>avaliação</b> comparam com a média dos ${fN(nb)} ${nm[1]} anteriores: até 15% de diferença é normal; volumes muito pequenos (menos de 3) não são julgados. O período anterior aparece em texto.</li>
     <li>Variações sempre em % e em número. Período em andamento: a comparação é ajustada ao mesmo número de dias.</li>

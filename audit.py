@@ -128,7 +128,14 @@ def lead_metrics(l, agora):
 
 
 # ----------------------------------------------------------------------------- filtro
-CAMPANHAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "rcon": r"^\s*RCON\b"}  # prefixo do título
+CAMPANHAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "rcon": r"^\s*RCON\b", "eventos": "EVENTOS"}  # prefixo do título; eventos = etiqueta ou prefixo
+EV_LB_RX = re.compile(r"^EV(?:\d|-|FO|\s)", re.I)
+EV_TT_RX = re.compile(r"^\s*(?:IND\s+)?EV\d*FO\b", re.I)
+
+
+def eh_evento(l):
+    """Espelho de ehEvento (template.html, 13/11/2026)."""
+    return any(EV_LB_RX.match(str(x).strip()) for x in (l.get("lb") or [])) or bool(EV_TT_RX.match(l.get("n") or ""))
 
 
 def retroativo(l):
@@ -148,13 +155,13 @@ def filtra(leads, f):
     out = []
     base = f.get("incluir_base") is not False   # padrão: funil inteiro
     camp = CAMPANHAS.get(f.get("campanha") or ("trd" if f.get("so_trd") else ""))
-    op = f.get("operacao") is True   # Insights: só a operação (sem base importada/reativada e sem lançamento retroativo)
+    op = False   # 13/11/2026: todos os negócios do Funil Alpha (espelho do template)
     for l in leads:
         if l.get("b") and not base:
             continue
         if op and (l.get("b") or retroativo(l)):
             continue
-        if camp and not re.match(camp, l.get("n") or "", re.I):
+        if camp and not (eh_evento(l) if camp == "EVENTOS" else re.match(camp, l.get("n") or "", re.I)):
             continue
         d = l["e"][:10]
         if not (de <= d <= ate):
@@ -900,6 +907,9 @@ def cenarios(D):
         ("tudo_busca_trd", filtros_base("2000-01-01", h, busca="trd")),
         ("ultimos_7_so_trd", filtros_base(d7, h, campanha="trd")),
         ("tudo_so_trd", filtros_base("2000-01-01", h, campanha="trd")),
+        ("tudo_eventos", filtros_base("2000-01-01", h, campanha="eventos")),
+        ("ultimos_30_eventos", filtros_base(d30, h, campanha="eventos")),
+        ("insights_mes_eventos", filtros_base(iso((hoje.replace(day=1) - timedelta(days=1)).replace(day=1)), iso(hoje.replace(day=1) - timedelta(days=1)), campanha="eventos", operacao=True)),
         ("tudo_so_diag", filtros_base("2000-01-01", h, campanha="diag")),
         ("ultimos_30_so_diag", filtros_base(d30, h, campanha="diag")),
         ("tudo_so_rcon", filtros_base("2000-01-01", h, campanha="rcon")),

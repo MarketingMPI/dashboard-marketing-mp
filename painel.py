@@ -367,6 +367,8 @@ def sync(full=False):
 # ---------------------------------------------------------------- modelagem
 def origem(title, label_names):
     t = (title or "").strip().upper(); L = {x.upper() for x in label_names}
+    # Eventos primeiro (13/11/2026): etiqueta EV-/EVFO-/EV3FO… ou título EV3FO/EVFO/IND EVFO — igual ao filtro fixo Eventos
+    if any(re.match(r"^EV(?:\d|-|FO|\s)", x.strip(), re.I) for x in label_names) or re.match(r"^\s*(?:IND\s+)?EV\d*FO\b", t): return "Eventos"
     if "TRIADE" in L or re.match(r"^TRD\s*\|", t): return "Tríade"
     if t.startswith("TRD-INT"): return "TRD-INT"
     if "DIGITAL" in L or t.startswith("DIAG"): return "Digital"
