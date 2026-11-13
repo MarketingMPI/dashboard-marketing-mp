@@ -4113,15 +4113,28 @@ function viewMPProPeriodo() {
       <div class="lg"><span><i style="background:#b4d6c6"></i>Já eram ativos</span><span><i style="background:#00503c"></i>Entraram no mês</span></div></div>${mpBaseChart(window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44)}</div>
     <div class="card"><div class="ch"><div><h3>Sobrevivência por coorte</h3><p>Mês de entrada → % que segue ativo em ${fDay(base)}</p></div></div>${coh}</div></div>`;
   // tabela 'Evolução mensal' saiu (pedido 12/11/2026)
-  // ---------- churn
-  h += `<div class="mph mt"><span>CHURN</span>Taxa de saída · janela M → M+1 só conta quando o mês seguinte já terminou</div>`;
+  // ---------- churn (13/11/2026: tudo segue o período do topo)
+  // churn do período = janelas M → M+1 cujo mês de renovação (M+1) cai no período e já terminou; cancelamentos e tempo até
+  // cancelar = quem cancelou dentro do período; acumulados = do lançamento até o fim do período; LTV com o churn do período.
+  const mDe = S.de.slice(0, 7), mAte = S.ate.slice(0, 7);
+  const jP = ch.janelas.filter(j => j.para >= mDe && j.para <= mAte), jBase = jP.reduce((s, j) => s + j.base, 0), jSai = jP.reduce((s, j) => s + j.sairam, 0);
+  const churnP = jBase ? jSai / jBase * 100 : null, vidaP = churnP ? 100 / churnP : null;
+  const liqMes = b.liquido_medio;
+  const cancP = m.compradores.filter(c => c.status === 'cancelou').map(c => ({...c, cd: c.cancelada || (c.ultimo ? addMonth1(c.ultimo) : null)})).filter(c => c.cd && c.cd >= S.de && c.cd <= base);
+  const tMed = cancP.length ? cancP.reduce((s, c) => s + diffDays(c.entrada, c.cd), 0) / cancP.length : null, pMed = cancP.length ? cancP.reduce((s, c) => s + c.pagamentos, 0) / cancP.length : null;
+  const mesAberto = !jP.length ? (mAte > mDe ? null : mAte) : null;
+  h += `<div class="mph mt"><span>CHURN</span>${ESC(periodCaption().replace(/^Leads por data de entrada /, ''))} · taxa de saída do período (janela M → M+1 só conta quando o mês seguinte já terminou) · acumulados = do lançamento até ${fDay(base)}</div>`;
   h += '<div class="kpis k3x">' + [
-    kpiCard({label: 'Churn da última janela', cls: 'red', v: fP(ch.ultimo), sub: ch.janelas.length ? (j => `${MESN(j.de)} → ${MESN(j.para)}: ${j.sairam} de ${j.base} não renovaram`)(ch.janelas[ch.janelas.length - 1]) : 'nenhuma janela completa', tip: 'Pagaram no mês e não pagaram no mês seguinte, sobre a base paga do mês'}),
-    kpiCard({label: 'Churn médio mensal', v: fP(ch.medio), sub: `média de ${pl(ch.janelas.length, 'janela completa', 'janelas completas')}`}),
-    kpiCard({label: 'Churn acumulado', v: fP(b.churn_acumulado), sub: `${b.cancelaram} de ${b.compradores} · com reembolso ${fP(b.churn_acumulado_com_reembolso)}`, tip: 'Cancelaram ÷ compradores desde o lançamento'}),
-    kpiCard({label: 'Retenção acumulada', v: fP(pctOf(b.ativos, b.compradores)), sub: `${b.ativos} de ${b.compradores} seguem ativos`}),
-    kpiCard({label: 'Tempo médio até o cancelamento', v: ch.tempo_cancel_dias == null ? '–' : ch.tempo_cancel_dias < 45 ? `${fN(Math.round(ch.tempo_cancel_dias))} dias` : `${f1(ch.tempo_cancel_dias / 30.44)} meses`, sub: ch.n_cancelados ? `${ch.tempo_cancel_dias < 45 ? `${f1(ch.tempo_cancel_dias / 30.44)} ${ch.tempo_cancel_dias / 30.44 < 2 ? 'mês' : 'meses'}` : `${fN(Math.round(ch.tempo_cancel_dias))} dias`} em média · ${f1(ch.pagamentos_ate_cancelar)} ${ch.pagamentos_ate_cancelar < 2 ? 'pagamento' : 'pagamentos'} antes de sair · ${pl(ch.n_cancelados, 'cancelado', 'cancelados')}` : 'nenhum cancelamento', tip: 'Dos assinantes que cancelaram: dias entre a entrada (1º pagamento) e o cancelamento.\nData do cancelamento = a registrada na Kiwify; sem ela, o vencimento do último mês pago.\nPagamentos = meses pagos, em média, antes de cancelar. Reembolsados ficam de fora.'}),
-    kpiCard({label: 'LTV projetado', v: fRc(ch.ltv_projetado), sub: ch.vida_media_meses ? `estimativa: vida média de ${f1(ch.vida_media_meses)} meses` : 'sem churn medido', tip: 'Estimativa, não valor medido: mantido o churn da última janela, vida média = 1 ÷ churn; LTV = vida × líquido mensal'})
+    kpiCard({label: 'Churn do período', cls: churnP > 12 ? 'red' : '', v: fP(churnP),
+      sub: jP.length ? (jP.length === 1 ? `${MESN(jP[0].de)} → ${MESN(jP[0].para)}: ${jSai} de ${jBase} não renovaram` : `${pl(jP.length, 'janela', 'janelas')} · ${jSai} de ${jBase} não renovaram`) : mesAberto ? `a janela de ${MESN(mesAberto)} fecha em ${fDay(ymLast(mesAberto))}` : 'nenhuma janela completa no período',
+      tip: 'Pagaram no mês e não pagaram no mês seguinte, sobre a base paga do mês. Conta as janelas cujo mês de renovação está no período escolhido e já terminou.'}),
+    kpiCard({label: 'Cancelaram no período', cls: cancP.length ? 'red' : '', v: fN(cancP.length), sub: cancP.length ? `cancelaram entre ${fDM(S.de)} e ${fDM(base)}` : 'nenhum cancelamento no período', tip: 'Assinantes com cancelamento na Kiwify dentro do período (sem a data oficial: vencimento do último mês pago)'}),
+    kpiCard({label: 'Churn acumulado', v: fP(b.churn_acumulado), sub: `${b.cancelaram} de ${b.compradores} até ${fDM(base)} · com reembolso ${fP(b.churn_acumulado_com_reembolso)}`, tip: 'Cancelaram ÷ compradores, do lançamento até o fim do período'}),
+    kpiCard({label: 'Retenção acumulada', v: fP(pctOf(b.ativos, b.compradores)), sub: `${b.ativos} de ${b.compradores} seguem ativos em ${fDM(base)}`}),
+    kpiCard({label: 'Tempo médio até o cancelamento', v: tMed == null ? '–' : tMed < 45 ? `${fN(Math.round(tMed))} dias` : `${f1(tMed / 30.44)} meses`,
+      sub: cancP.length ? `${f1(pMed)} ${pMed < 2 ? 'pagamento' : 'pagamentos'} antes de sair · ${pl(cancP.length, 'cancelado', 'cancelados')} no período` : 'nenhum cancelamento no período',
+      tip: 'Dos que cancelaram NO PERÍODO: dias entre a entrada (1º pagamento) e o cancelamento. Data do cancelamento = a registrada na Kiwify; sem ela, o vencimento do último mês pago.'}),
+    kpiCard({label: 'LTV projetado', v: fRc(vidaP != null && liqMes != null ? vidaP * liqMes : null), sub: vidaP ? `estimativa com o churn do período: vida média de ${f1(vidaP)} meses` : 'sem churn medido no período', tip: 'Estimativa, não valor medido: mantido o churn do período, vida média = 1 ÷ churn; LTV = vida × líquido médio por mensalidade'})
   ].join('') + '</div>';
   // tabela 'Churn mês a mês' saiu (pedido 12/11/2026)
   // ---------- compradores
