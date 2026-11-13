@@ -128,7 +128,7 @@ def lead_metrics(l, agora):
 
 
 # ----------------------------------------------------------------------------- filtro
-CAMPANHAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "rcon": r"^\s*RCON\b", "eventos": "EVENTOS"}  # prefixo do título; eventos = etiqueta ou prefixo
+CAMPANHAS = {"trd": r"^\s*TRD\s*\|", "diag": r"^\s*DIAG\s*\|", "rcon": r"^\s*RCON\b"}  # prefixo do título (Eventos = página Offline, via origem)
 EV_LB_RX = re.compile(r"^EV(?:\d|-|FO|\s)", re.I)
 EV_TT_RX = re.compile(r"^\s*(?:IND\s+)?EV\d*FO\b", re.I)
 
@@ -907,9 +907,10 @@ def cenarios(D):
         ("tudo_busca_trd", filtros_base("2000-01-01", h, busca="trd")),
         ("ultimos_7_so_trd", filtros_base(d7, h, campanha="trd")),
         ("tudo_so_trd", filtros_base("2000-01-01", h, campanha="trd")),
-        ("tudo_eventos", filtros_base("2000-01-01", h, campanha="eventos")),
-        ("ultimos_30_eventos", filtros_base(d30, h, campanha="eventos")),
-        ("insights_mes_eventos", filtros_base(iso((hoje.replace(day=1) - timedelta(days=1)).replace(day=1)), iso(hoje.replace(day=1) - timedelta(days=1)), campanha="eventos", operacao=True)),
+        ("offline_todos", filtros_base(d30, h, origens=["Indicação", "MFO", "Eventos"])),
+        ("offline_evt_tudo", filtros_base("2000-01-01", h, origens=["Eventos"])),
+        ("offline_ind_tudo", filtros_base("2000-01-01", h, origens=["Indicação"])),
+        ("offline_mfo_tudo", filtros_base("2000-01-01", h, origens=["MFO"])),
         ("tudo_so_diag", filtros_base("2000-01-01", h, campanha="diag")),
         ("ultimos_30_so_diag", filtros_base(d30, h, campanha="diag")),
         ("tudo_so_rcon", filtros_base("2000-01-01", h, campanha="rcon")),

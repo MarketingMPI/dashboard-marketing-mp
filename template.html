@@ -260,6 +260,18 @@ table.t tr.tot td{background:#f7faf8;font-weight:700;border-top:1px solid var(--
 .empty b{display:block;color:var(--txt);font-size:14.5px;margin-bottom:3px;font-weight:600}
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.offpf{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.offpf button{border:1px solid var(--linha);background:#fff;border-radius:99px;padding:8px 15px;cursor:pointer;font:inherit;font-size:13px;color:#1c1c1c}
+.offpf button b{margin-right:5px}.offpf button small{color:#69727d;margin-left:6px}.offpf button.on{background:#00503c;border-color:#00503c;color:#fff}.offpf button.on small{color:#cfe6d8}
+.evg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}@media(max-width:1100px){.evg{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.evc{border:1px solid var(--linha);border-radius:14px;padding:14px;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}
+.evc:hover{border-color:#61ce70}.evc.on{border-color:#00503c;box-shadow:0 0 0 2px rgba(0,80,60,.15)}
+.evc .evh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.evc h4{font-size:14.5px;margin:0}.evc .evd{color:#69727d;font-size:11.5px;text-align:right}
+.evq{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:10px 0}.evq div{background:#f3f7f5;border-radius:8px;padding:6px 8px}
+.evq span{display:block;font-size:10.5px;color:#69727d}.evq b{font-size:16px}
+.evt{display:flex;gap:10px}.evt div{flex:1;font-size:11.5px;color:#69727d}.evt .bar{height:6px;background:#e8eeeb;border-radius:9px;overflow:hidden;margin-top:3px}.evt .bar i{display:block;height:100%;background:#00a611}
+.evf{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;margin-bottom:14px}.evf .fs2{flex:1;min-width:120px;background:#f3f7f5;border-radius:10px;padding:10px 12px}
+.evf .fs2 span{color:#69727d;font-size:12px}.evf .fs2 b{display:block;font-size:20px;color:#00503c}.evf .ar{align-self:center;color:#69727d;font-size:11px;text-align:center;min-width:64px}.evf .ar b{display:block;color:#1c1c1c;font-size:13px}.evf .gap{width:14px}
+.evtg{font-size:11px;border-radius:99px;padding:2px 8px;background:#eef2f0;white-space:nowrap}.evtg.p{background:#e3f6e6;color:#0b7a1a}.evtg.c{background:#00503c;color:#fff}.evtg.l{background:#fff4dc;color:#8a5a00}.evtg.w{background:#e3f6e6;color:#0b7a1a}.evtg.x{background:#fdecea;color:#a3261b}
 @media(min-width:1281px){.kpis.k6{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media(min-width:761px){.kpis.kmac .kpi.hero{grid-row:span 2;display:flex;flex-direction:column;justify-content:center}}
 .kpi.clk{cursor:pointer;transition:border-color .15s,box-shadow .15s}.kpi.clk:hover{border-color:var(--v200);box-shadow:0 4px 14px rgba(0,51,38,.08)}
@@ -1070,10 +1082,8 @@ const TRD_RX = /^\s*TRD\s*\|/i;  // prefixo exato da Tríade (exclui TRD-INT)
 // Campanhas pelo prefixo do título do negócio. Para adicionar outra, inclua aqui (e em audit.CAMPANHAS).
 const CAMPANHAS = {trd: {rx: TRD_RX, nome: 'TRD · Tríade', tip: "Negócios cujo título começa com 'TRD |' (campanha Tríade). TRD-INT fica de fora."},
   diag: {rx: /^\s*DIAG\s*\|/i, nome: 'DIAG · B2C interna', tip: "Negócios cujo título começa com 'DIAG |' (campanha B2C interna da Meu Patrimônio)."},
-  rcon: {rx: /^\s*RCON\b/i, nome: 'RCON · Análise de carteira', tip: "Negócios cujo título começa com 'RCON' (site: pedido de análise de carteira gratuita). Inclui 'RCON |', 'RCON-LP02' e 'RCON YT'."},
-  /* Eventos (13/11/2026): etiqueta de evento (EV-…, EVFO-…, EV3FO, EV25-…, ev10-08) OU prefixo do título EV3FO / EVFO / IND EVFO
-     (indicação feita num evento). MedInvest e 'PROSP EVENTOS' ficam de fora (decisão do usuário). Espelho: audit.eh_evento. */
-  eventos: {rx: null, lead: l => ehEvento(l), nome: 'EVENTOS · Eventos', tip: "Negócios com etiqueta de evento (EV-…, EVFO-…, EV3FO…) ou com o título começando por EV3FO, EVFO ou IND EVFO (indicação feita num evento)."}};
+  rcon: {rx: /^\s*RCON\b/i, nome: 'RCON · Análise de carteira', tip: "Negócios cujo título começa com 'RCON' (site: pedido de análise de carteira gratuita). Inclui 'RCON |', 'RCON-LP02' e 'RCON YT'."}};
+// EVENTOS saiu da barra de campanhas (13/11/2026): fica só na página Offline (pré-filtro EVT)
 const EV_LB_RX = /^EV(?:\d|-|FO|\s)/i, EV_TT_RX = /^\s*(?:IND\s+)?EV\d*FO\b/i;
 function ehEvento(l) { return (l.lb || []).some(x => EV_LB_RX.test(String(x).trim())) || EV_TT_RX.test(l.n || ''); }
 const campOk = (c, l) => c.lead ? c.lead(l) : c.rx.test(l.n || '');
@@ -1942,6 +1952,7 @@ const ICONS = {
   blog: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   aplicacao: '<svg viewBox="0 0 24 24"><circle cx="12" cy="6.5" r="3.5"/><path d="M4.5 21c.5-4.3 3.5-7 7.5-7s7 2.7 7.5 7"/><path d="M10.9 14.2h2.2l-.5 1.6h-1.2z"/><path d="M11.4 15.8l-.9 3.7 1.5 1.3 1.5-1.3-.9-3.7"/></svg>',
   performance: '<svg viewBox="0 0 24 24"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg>',
+  offline: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg>',
   consultores: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .7 3.2 2.5 3.6 5.2"/></svg>'
 };
 const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>';
@@ -1951,7 +1962,7 @@ const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20
    ========================================================================= */
 const TABS = [
   {id: 'macro', nome: 'Visão Macro'}, {id: 'insights', nome: 'Insights'}, {id: 'performance', nome: 'Performance'}, {id: 'lista', nome: 'Lead a Lead'},
-  {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'consultores', nome: 'Consultores'}];   // Perdidos agora fica dentro do Lead a Lead (10/11/2026)
+  {id: 'funil', nome: 'Funil / Mapa do CRM'}, {id: 'consultores', nome: 'Consultores'}, {id: 'offline', nome: 'Offline'}];   // Offline (13/11/2026): IND, MFO e eventos   // Perdidos agora fica dentro do Lead a Lead (10/11/2026)
 // B2B: seções em construção (sem dados do Funil Alpha; filtros B2C ficam ocultos)
 const TABS_B2B = [{id: 'mppro', nome: 'MP PRO'}, {id: 'mphub', nome: 'Usuários MP HUB'}, {id: 'aplicacao', nome: 'Aplicação Direta'}];
 const TABS_RS = [{id: 'instagram', nome: 'Instagram'}, {id: 'youtube', nome: 'YouTube', off: 'Em breve: aguardando a conexão com a API do YouTube do Gabriel'}];
@@ -1966,7 +1977,7 @@ const DIMS = [
   {k: 'etapas', nome: 'Etapa', h: 'et'}, {k: 'etiquetas', nome: 'Etiqueta', h: 'lb'}, {k: 'motivos', nome: 'Motivo da perda', h: 'mt', hidden: true}];
 let LEADS = [], BYID = new Map(), AGORA_STR = '', AGORA = 0, TODAY = '', MIN_DAY = '';
 const S = {
-  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: true, camp: '', igModo: 'org',
+  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: true, camp: '', igModo: 'org', offP: 'todos', offEv: '', offF: 'todos',
   consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [],
   ll: {sort: 'e', dir: -1, page: 0, quick: 'todos'}, lost: {sort: 'l', dir: -1, page: 0},
   cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false, mapaM: 'carteira', consM: 'periodo', mapaOpen: {}
@@ -4938,6 +4949,104 @@ const CONS_COLS = [
   {k: 'media_dias_1o_contato', t: '1º contato média', num: 1}, {k: 'mediana_dias_1o_contato', t: '1º contato mediana', num: 1}, {k: 'contatos_por_lead', t: 'Contatos/lead', num: 1},
   {k: 'agendados', t: 'Agendados', num: 1}, {k: 'reunioes', t: 'Reuniões', num: 1}, {k: 'ganhos', t: 'Ganhos', num: 1}, {k: 'perdidos', t: 'Perdidos', num: 1},
   {k: 'abertos', t: 'Abertos', num: 1}, {k: 'abertos_sem_contato', t: 'Abertos s/ contato', num: 1}, {k: 'parados_7d', t: 'Parados > 7d', num: 1}];
+/* ===== Offline (13/11/2026): leads que não vêm da mídia — IND (indicação), MFO e EVT (eventos) =====
+   Pré-filtros = origem do negócio (painel.origem: Eventos tem prioridade, depois Indicação, depois MFO), então os três
+   somam sem repetir ninguém. Dados básicos = mesmas contas da Visão Macro (filtro de data e filtros laterais valem).
+   Eventos: um bloco por etiqueta de evento (EV-…, EVFO-…, EV3FO; título EV3FO/IND EVFO). Marcação no Pipedrive por
+   etiqueta no negócio: PRESENTE, CONVIDADO e CLIENTE (também aceitas com prefixo EVT-, ex.: EVT-PRESENTE). */
+const OFF_PF = [['todos', 'Todos', null], ['ind', 'IND', 'Indicação'], ['mfo', 'MFO', 'MFO'], ['evt', 'EVT', 'Eventos']];
+const OFF_NOME = {ind: 'Indicação', mfo: 'Multi Family Office', evt: 'Eventos'};
+const OFF_ORIG = OFF_PF.filter(x => x[2]).map(x => x[2]);
+const EVT_MARCA = {p: /^(EVT[-\s]?)?PRESENTE$/i, l: /^(EVT[-\s]?)?CONVIDADO$/i, c: /^(EVT[-\s]?)?CLIENTE( ATUAL)?$/i};
+const evtMarca = (l, k) => (l.lb || []).some(x => EVT_MARCA[k].test(String(x).trim()));
+const MES3 = {JAN: 'jan', FEV: 'fev', MAR: 'mar', ABR: 'abr', MAI: 'mai', JUN: 'jun', JUL: 'jul', AGO: 'ago', SET: 'set', OUT: 'out', NOV: 'nov', DEZ: 'dez'};
+function evChaves(l) {   // eventos do negócio (um negócio pode estar em mais de um evento)
+  const ks = (l.lb || []).map(x => String(x).trim()).filter(x => EV_LB_RX.test(x)).map(x => x.toUpperCase());
+  if (!ks.length) { const m = (l.n || '').match(EV_TT_RX); if (m) ks.push(/^IND/i.test(m[0].trim()) ? 'IND EVFO' : m[0].trim().toUpperCase()); }
+  return [...new Set(ks)];
+}
+function evNome(k) {
+  if (/^EV3FO$/i.test(k)) return 'EV - 3º FO';
+  if (k === 'IND EVFO') return 'EV - Indicações em eventos';
+  let r = k.replace(/^EVFO[-\s]?|^EV[-\s]?/i, '').replace(/\bVIX\b/g, 'Vitória');
+  r = r.replace(/\b(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)(\d{2})\b/g, (_, m, a) => `${MES3[m]}/${a}`);
+  r = r.split('-').map(w => /\d/.test(w) || w === 'Vitória' ? w : w.charAt(0) + w.slice(1).toLowerCase()).join(' ').trim();
+  return 'EV - ' + (r || k);
+}
+function evData(k) {
+  const d = k.match(/(\d{2})\/(\d{2})\/(\d{2})/); if (d) return `${d[1]}/${d[2]}/20${d[3]}`;
+  const m = k.match(/(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)(\d{2})/); if (m) return `${MES3[m[1]]}/20${m[2]}`;
+  return 'sem data na etiqueta';
+}
+function offFiltros(pf, over) {   // pré-filtro × filtro lateral de origem (os dois valem)
+  const sel = pf === 'todos' ? OFF_ORIG : [OFF_PF.find(x => x[0] === pf)[2]];
+  const orig = S.origens.length ? sel.filter(o => S.origens.includes(o)) : sel;
+  return filtros(Object.assign({origens: orig.length ? orig : ['__nenhuma__'], campanha: null}, over || {}));
+}
+function offEventos() {
+  const pr = makePred(offFiltros('evt')), ev = new Map();
+  for (const l of LEADS) { if (!pr(l)) continue;
+    for (const k of evChaves(l)) { if (!ev.has(k)) ev.set(k, []); ev.get(k).push(l); } }
+  return [...ev].map(([k, ls]) => {
+    const p = ls.filter(l => evtMarca(l, 'p')), c = ls.filter(l => evtMarca(l, 'c')), cv = ls.filter(l => evtMarca(l, 'l'));
+    return {k, nome: evNome(k), data: evData(k), ls, tot: ls.length, pres: p.length, conv: cv.length, cli: c.length,
+      convWon: cv.filter(l => l.s === 'won').length, won: ls.filter(l => l.s === 'won').length, marc: p.length + c.length + cv.length > 0};   // marc = evento já tem alguma marcação (senão a presença fica '–')
+  }).sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+function viewOffline() {
+  const pf = OFF_PF.some(x => x[0] === S.offP) ? S.offP : 'todos';
+  const conta = id => { const pr = makePred(offFiltros(id)); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
+  const C = run(offFiltros(pf)), [pd, pa] = prevRange(), P = run(offFiltros(pf, {de: pd, ate: pa}));
+  const k = C.res.kpis, e = C.res.eventos, pk = P.res.kpis, pe = P.res.eventos;
+  let h = viewHead('Offline', `Leads que não vêm da mídia: indicações (IND), Multi Family Office (MFO) e eventos (EVT) · ${periodCaption()} · agendados, reuniões, ganhos e perdidos = o que aconteceu no período`);
+  h += '<div class="offpf" role="radiogroup" aria-label="Pré-filtro">' + OFF_PF.map(([id, sig, o]) =>
+    `<button type="button" data-offp="${id}" class="${pf === id ? 'on' : ''}" role="radio" aria-checked="${pf === id}"${o ? ` data-tip="${ESC(`${OFF_NOME[id]}: negócios com origem ${o} (etiqueta ou prefixo do título no Pipedrive)`)}"` : ''}><b>${sig}</b>${o ? OFF_NOME[id] : 'IND + MFO + EVT'}<small>${fN(conta(id))}</small></button>`).join('') + '</div>';
+  const pct = (a, b) => b ? fP(a / b * 100) : '–';
+  h += '<div class="kpis k6">' + [
+    kpiCard({label: 'Leads no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k.abertos)} ainda em aberto hoje`, d: delta(k.leads, pk.leads, 0), tip: 'Negócios do pré-filtro que entraram no Funil Alpha no período'}),
+    kpiCard({label: 'Com contato', v: `${fN(k.contatados)}<small>${fP(k.pct_contatados)}</small>`, sub: 'dos leads do período', d: delta(k.pct_contatados, pk.pct_contatados, 1, fP), tip: 'Leads com ao menos um contato concluído ou já agendados'}),
+    kpiCard({label: 'Agendados', v: fN(e.agendamentos), sub: 'reuniões marcadas no período', d: delta(e.agendamentos, pe.agendamentos), tip: 'Reuniões marcadas no período (lead de qualquer data)'}),
+    kpiCard({label: 'Reuniões', v: fN(e.reunioes), sub: 'realizadas no período', d: delta(e.reunioes, pe.reunioes), tip: 'Reuniões concluídas no período'}),
+    kpiCard({label: 'Ganhos', cls: 'gain', v: fN(e.ganhos), sub: 'viraram cliente no período', d: delta(e.ganhos, pe.ganhos), tip: 'Negócios ganhos no período'}),
+    kpiCard({label: 'Perdidos', v: fN(e.perdidos), sub: 'perdidos no período', d: delta(e.perdidos, pe.perdidos, -1), tip: 'Negócios perdidos no período'})
+  ].join('') + '</div>';
+  h += `<div class="card mt"><div class="ch"><div><h3>Funil do período${pf === 'todos' ? '' : ' · ' + OFF_NOME[pf]}</h3><p>Leads do período → contatados; agendados, reuniões e ganhos = o que aconteceu no período (mesmas contas da Visão Macro)</p></div></div>
+    <div class="evf"><div class="fs2"><span>Leads</span><b>${fN(k.leads)}</b></div><div class="ar">contato<b>${pct(k.contatados, k.leads)}</b></div>
+    <div class="fs2"><span>Contatados</span><b>${fN(k.contatados)}</b></div><div class="ar">agendou<b>${fPc(pctOf(e.agendamentos, k.leads))}</b></div>
+    <div class="fs2"><span>Agendados</span><b>${fN(e.agendamentos)}</b></div><div class="ar">realizou<b>${fPc(pctOf(e.reunioes, e.agendamentos))}</b></div>
+    <div class="fs2"><span>Reuniões</span><b>${fN(e.reunioes)}</b></div><div class="ar">fechou<b>${fPc(pctOf(e.ganhos, e.reunioes))}</b></div>
+    <div class="fs2"><span>Ganhos</span><b>${fN(e.ganhos)}</b></div></div></div>`;
+  if (pf !== 'evt') return h;
+
+  // ---- eventos: um bloco por evento ----
+  const EV = offEventos();
+  if (!EV.length) return h + `<div class="card mt">${emptyBox('Nenhum lead de evento no período', 'Ajuste o período no topo.')}</div>`;
+  const semMarca = !EV.some(x => x.pres || x.conv || x.cli);
+  if (semMarca) h += `<div class="note mt">Para preencher <b>Presentes</b>, <b>Leads (convidados)</b> e <b>Clientes</b>, marque o negócio no Pipedrive com a etiqueta <b>PRESENTE</b>, <b>CONVIDADO</b> ou <b>CLIENTE</b>. Hoje nenhum negócio de evento tem essas etiquetas, por isso aparecem zerados.</div>`;
+  const sel = EV.find(x => x.k === S.offEv) || null;
+  h += `<div class="card mt"><div class="ch"><div><h3>Eventos</h3><p>Um bloco por evento (etiqueta do Pipedrive) · leads que entraram no período · clique no evento para ver todos os relacionados</p></div></div><div class="evg">` +
+    EV.map(x => `<div class="evc${sel && sel.k === x.k ? ' on' : ''}" data-offev="${ESC(x.k)}" role="button" tabindex="0">
+      <div class="evh"><h4>${ESC(x.nome)}</h4><span class="evd">${ESC(x.data)}</span></div>
+      <div class="evq"><div><span>Lista total</span><b>${fN(x.tot)}</b></div><div><span>Presentes</span><b>${fN(x.pres)}</b></div><div><span>Leads</span><b>${fN(x.conv)}</b></div><div><span>Clientes</span><b>${fN(x.cli)}</b></div></div>
+      <div class="evt"><div>Presença <b>${x.marc ? fPc(pctOf(x.pres, x.tot)) : '–'}</b><div class="bar"><i style="width:${Math.min(100, pctOf(x.pres, x.tot) || 0)}%"></i></div></div>
+      <div>Lead → cliente <b>${x.conv ? fPc(pctOf(x.convWon, x.conv)) : '–'}</b><div class="bar"><i style="width:${Math.min(100, pctOf(x.convWon, x.conv) || 0)}%"></i></div></div></div></div>`).join('') + '</div></div>';
+  if (!sel) return h;
+  const F = ['todos', 'p', 'l', 'c'].includes(S.offF) ? S.offF : 'todos';
+  const lista = sel.ls.filter(l => F === 'todos' || evtMarca(l, F)).sort((a, b) => String(b.e).localeCompare(String(a.e)));
+  const sit = l => l.s === 'won' ? '<span class="evtg w">Ganho</span>' : l.s === 'lost' ? '<span class="evtg x">Perdido</span>' : 'Aberto';
+  const tipo = l => evtMarca(l, 'c') ? '<span class="evtg c">Cliente</span>' : evtMarca(l, 'l') ? '<span class="evtg l">Lead (convidado)</span>' : '<span class="evtg">não marcado</span>';
+  h += `<div class="card mt"><div class="ch"><div><h3>${ESC(sel.nome)}</h3><p>Etiqueta ${ESC(sel.k)} · ${ESC(sel.data)} · todos os negócios do Funil Alpha deste evento que entraram no período</p></div></div>
+    <div class="evf"><div class="fs2"><span>Lista total</span><b>${fN(sel.tot)}</b></div><div class="ar">presença<b>${sel.marc ? fPc(pctOf(sel.pres, sel.tot)) : '–'}</b></div>
+    <div class="fs2"><span>Presentes</span><b>${fN(sel.pres)}</b></div><div class="gap"></div>
+    <div class="fs2"><span>Leads (convidados)</span><b>${fN(sel.conv)}</b></div><div class="ar">conversão<b>${sel.conv ? fPc(pctOf(sel.convWon, sel.conv)) : '–'}</b></div>
+    <div class="fs2"><span>Viraram cliente</span><b>${fN(sel.convWon)}</b></div><div class="gap"></div>
+    <div class="fs2"><span>Clientes</span><b>${fN(sel.cli)}</b></div><div class="fs2"><span>Ganhos do evento</span><b>${fN(sel.won)}</b></div></div>
+    <div class="seg" style="margin-bottom:10px">${[['todos', 'Lista total', sel.tot], ['p', 'Presentes', sel.pres], ['l', 'Leads', sel.conv], ['c', 'Clientes', sel.cli]].map(([id, n, q]) => `<button type="button" data-offf="${id}" class="${F === id ? 'on' : ''}">${n} (${fN(q)})</button>`).join('')}</div>
+    <div class="tw"><table class="t"><thead><tr><th>Negócio</th><th>Tipo</th><th>Presença</th><th>Etapa</th><th>Consultor</th><th>Entrada</th><th>Situação</th></tr></thead><tbody>` +
+    (lista.length ? lista.map(l => `<tr data-lead="${l.id}" style="cursor:pointer"><td class="wrap">${ESC(l.n || '')}</td><td>${tipo(l)}</td><td>${evtMarca(l, 'p') ? '<span class="evtg p">Presente</span>' : '–'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
+      : '<tr><td colspan="7" class="mut">Nenhum negócio com essa marcação neste evento.</td></tr>') + '</tbody></table></div></div>';
+  return h;
+}
 function viewConsultores() {
   const C = cur(), cs = C.res.consultores.map(c => { const e = evCons(c.consultor);
     return Object.assign({}, c, {agendados: e.agendamentos, reunioes: e.reunioes, ganhos: e.ganhos, perdidos: e.perdidos}); });
@@ -5128,7 +5237,7 @@ function renderChips() {
   if (any) h += '<button class="clr" data-act="clear">Limpar filtros</button>';
   const IP = S.tab === 'insights' ? insSel().P : null;
   const nCamp = id => { const pr = makePred(filtros(IP ? {campanha: id, de: IP.de, ate: IP.ate, operacao: true} : {campanha: id})); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
-  h += '<span class="cps" role="radiogroup" aria-label="Campanha">' +
+  if (S.tab !== 'offline') h += '<span class="cps" role="radiogroup" aria-label="Campanha">' +
     `<button type="button" class="cp${S.camp ? '' : ' on'}" data-act="camp" data-v="" role="radio" aria-checked="${!S.camp}" title="Todos os negócios do Funil Alpha">Todos os leads (${fN(nCamp(null))})</button>` +
     Object.entries(CAMPANHAS).map(([id, c]) => `<button type="button" class="cp${S.camp === id ? ' on' : ''}" data-act="camp" data-v="${id}" role="radio" aria-checked="${S.camp === id}" title="${ESC(c.tip)}">${c.nome} (${fN(nCamp(id))})</button>`).join('') + '</span>';
   document.getElementById('chips').innerHTML = h;
@@ -5722,7 +5831,7 @@ function blChange(ev) {
 }
 window.addEventListener('beforeunload', ev => { if (window.BLOG_SUJO()) { ev.preventDefault(); ev.returnValue = ''; } });
 
-const VIEWS = {blog: viewBlog, macro: viewMacro, insights: viewInsights, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, mppro: viewMPPro, mphub: viewMPHub, instagram: viewInstagram, youtube: viewYouTube, aplicacao: viewAplicacao, indicacoes: viewIndicacoes};
+const VIEWS = {blog: viewBlog, macro: viewMacro, insights: viewInsights, performance: viewPerformance, lista: viewLista, tempo: viewTempo, funil: viewFunil, perdidos: viewPerdidos, consultores: viewConsultores, offline: viewOffline, mppro: viewMPPro, mphub: viewMPHub, instagram: viewInstagram, youtube: viewYouTube, aplicacao: viewAplicacao, indicacoes: viewIndicacoes};
 function renderView(anim) {
   const v = document.getElementById('view');
   document.getElementById('tip').classList.remove('on');
@@ -5839,6 +5948,12 @@ function bindEvents() {
     if (row) { openDrawer(row.dataset.lead); return; }
     const mpg = t.closest('[data-mpg]'), mpmb = t.closest('[data-mpmb]');
     if (mpg || mpmb) { if (mpg) { S.mpG = mpg.dataset.mpg; S.mpMB = null; } else { const k = Number(mpmb.dataset.mpmb); S.mpMB = S.mpMB === k ? null : k; } const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
+    const offp = t.closest('[data-offp]'), offev = t.closest('[data-offev]'), offf = t.closest('[data-offf]');
+    if (offp || offev || offf) { const y = window.scrollY;
+      if (offp) { S.offP = offp.dataset.offp; S.offEv = ''; S.offF = 'todos'; }
+      if (offev) { S.offEv = S.offEv === offev.dataset.offev ? '' : offev.dataset.offev; S.offF = 'todos'; }
+      if (offf) S.offF = offf.dataset.offf;
+      renderView(); window.scrollTo(0, y); return; }
     const igp = t.closest('[data-igp]');
     if (igp) { S.igP = igp.dataset.igp || null; S.mpMB = null; renderView(); const m = document.querySelector('#view .igmenu'); if (m) window.scrollTo(0, Math.max(0, m.getBoundingClientRect().top + scrollY - 90)); return; }
     const ighp = t.closest('[data-ighp]'), ighm = t.closest('[data-ighm]');
