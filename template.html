@@ -2738,6 +2738,7 @@ const MP_METAS = [
   {k: 'churn', t: 'Churn mensal', meta: 12, bom: 'baixo', fmt: v => fP(v), nota: 'no máximo'},
   {k: 'renov', t: 'Taxa de renovação', meta: 92, bom: 'alto', fmt: v => fP(v)},
   {k: 'cac', t: 'CAC', meta: 20000, bom: 'baixo', fmt: v => fRc(v), nota: 'no máximo · meta inicial'},
+  {k: 'convVisita', t: 'Conversão da página', meta: 2, bom: 'alto', fmt: v => nf1.format(v) + '%', nota: 'visita → assinatura · referência Brasil 1,5–2%'},   // 13/11/2026
   {k: 'cpm', t: 'CPM', meta: 6000, bom: 'baixo', fmt: v => fRc(v), nota: 'no máximo'},
   {k: 'reembPct', t: 'Reembolso das novas', meta: 10, bom: 'baixo', fmt: v => fP(v), nota: 'no máximo'},
   {k: 'ltvCac', t: 'LTV ÷ CAC', meta: 1, bom: 'alto', fmt: v => fX(v) + 'x'}
@@ -2796,7 +2797,7 @@ function mpValor(k, m) {
   if (!m) return null;
   const v = m.vendas, div = (a, b) => b ? a / b : null;
   return {ativos: m.base.ativos, mrr: m.base.mrr, novas: v.novas_assinaturas, renov: div(m.renovacoes.pagas * 100, m.renovacoes.previstas),
-    cac: m.unit.cac, cpm: m.midia.cpm, reembPct: div(v.novas_reembolsadas * 100, v.novas_assinaturas), ltvCac: m.unit.ltv_cac}[k] ?? null;
+    cac: m.unit.cac, cpm: m.midia.cpm, convVisita: div(v.novas_assinaturas * 100, m.midia.visitas), reembPct: div(v.novas_reembolsadas * 100, v.novas_assinaturas), ltvCac: m.unit.ltv_cac}[k] ?? null;
 }
 function mpChurnJan(janelas, deYm, ateYm) {
   const js = janelas.filter(j => j.para >= deYm && j.para <= ateYm), b = js.reduce((a, j) => a + j.base, 0);
@@ -2810,7 +2811,8 @@ function mpMetaSerie(meta, g, ini) {
   const pts = bs.map(b => {
     let v, acc, extra = null;
     if (meta.k === 'churn') { const c = mpChurnJan(jan, b.de.slice(0, 7), b.ate.slice(0, 7)), a = mpChurnJan(jan, '0000-00', b.ate.slice(0, 7)); v = c ? c.v : null; acc = a ? a.v : null; extra = c; }
-    else { v = mpValor(meta.k, mpCalc(b.de, b.ate)); acc = tipo === 'estoque' ? v : mpValor(meta.k, mpCalc(ini, b.ate)); }
+    else { const mc = mpCalc(b.de, b.ate); v = mpValor(meta.k, mc); acc = tipo === 'estoque' ? v : mpValor(meta.k, mpCalc(ini, b.ate));
+      if (meta.k === 'convVisita' && mc) extra = {novas: mc.vendas.novas_assinaturas, visitas: mc.midia.visitas}; }
     const delta = tipo === 'estoque' && v != null ? v - antes : null; if (tipo === 'estoque' && v != null) antes = v;
     // meta DO PERÍODO (12/11/2026): estoque = onde a trajetória até a meta final deveria estar no fim do período
     // (0 em ${ini} → meta em MP_METAS_ATE, proporcional aos dias); fluxo = meta mensal × tamanho do período; taxa = fixa
@@ -2824,7 +2826,7 @@ const mpCls = p => p == null ? 'na' : p >= 100 ? 'ok' : p >= 80 ? 'quase' : 'lon
 const MP_COR = {ok: '#00a611', quase: '#d9a441', longe: '#c0392b', na: '#cfd9d4'};
 function mpMetaChart(meta, S0, sel, W) {
   const P = S0.pts, Hh = S0.tipo === 'fluxo' ? 172 : 160, pl = 62, pr = 12, pt = 18, pb = S0.tipo === 'fluxo' ? 30 : 20, pw = W - pl - pr, ph = Hh - pt - pb;
-  const tick = meta.k === 'mrr' || meta.k === 'cac' || meta.k === 'cpm' ? fRc0 : meta.k === 'ltvCac' ? (v => fX(v) + 'x') : (meta.k === 'churn' || meta.k === 'renov' || meta.k === 'reembPct' || meta.pct) ? (v => fN(Math.round(v)) + '%') : (v => fN(Math.round(v * 10) / 10));
+  const tick = meta.k === 'convVisita' ? (v => nf1.format(v) + '%') : meta.k === 'mrr' || meta.k === 'cac' || meta.k === 'cpm' ? fRc0 : meta.k === 'ltvCac' ? (v => fX(v) + 'x') : (meta.k === 'churn' || meta.k === 'renov' || meta.k === 'reembPct' || meta.pct) ? (v => fN(Math.round(v)) + '%') : (v => fN(Math.round(v * 10) / 10));
   const fmtA = v => v == null ? '–' : S0.tipo === 'fluxo' && !Number.isInteger(v) ? f1(v) : meta.fmt(v);
   const vals = P.flatMap(x => [x.v, S0.tipo === 'taxa' ? x.acc : null, S0.movel ? x.mov : null]).filter(x => x != null);
   const mx = niceMax(Math.max(S0.tipo === 'estoque' ? Math.max(...P.map(x => x.alvo || 0)) * 1.08 : S0.alvo * 1.08, ...vals, 1e-9)), y = v => pt + ph - ph * Math.max(0, v) / mx, bw = pw / Math.max(1, P.length), w = Math.max(4, Math.min(bw * .6, 54));
@@ -2852,6 +2854,7 @@ function mpMetaChart(meta, S0, sel, W) {
       `${meta.t}: ${fmtA(x.v)}`, S0.tipo === 'estoque' ? `No período: ${x.delta == null ? '–' : (x.delta > 0 ? '+' : x.delta < 0 ? '−' : '') + meta.fmt(Math.abs(x.delta))}` : null,
       S0.tipo !== 'estoque' ? `Acumulado até o fim do período: ${fmtA(x.acc)}` : null,
       meta.k === 'churn' && x.extra ? `${fN(x.extra.sairam)} de ${fN(x.extra.base)} não renovaram` : null,
+      meta.k === 'convVisita' && x.extra ? `${fN(x.extra.novas)} ${x.extra.novas === 1 ? 'assinatura' : 'assinaturas'} de ${fN(x.extra.visitas)} visitas na página` : null,
       `Meta${S0.tipo === 'fluxo' || S0.tipo === 'estoque' ? (nomeG === 'semana' ? ' da ' : ' do ') + nomeG : ''}: ${meta.bom === 'baixo' ? 'até ' : ''}${fmtA(x.alvo ?? S0.alvo)}${S0.tipo === 'estoque' ? ` (rumo a ${fmtA(S0.metaFinal)} em ${fDay(MP_METAS_ATE)})` : ''} · ${x.pct == null ? '–' : fP(x.pct)} atingido`,
       S0.movel && x.mov != null ? `Meta proporcional: ${f1(x.mov)} (${fN(x.mql)} MQL × ${fP(S0.movel)}) · ${x.pctMov == null ? '–' : fP(x.pctMov)} atingido` : null, 'Clique para ver no card'].filter(Boolean).join('\n');
     g += `<rect class="hit" x="${pl + i * bw}" y="${pt - 14}" width="${bw}" height="${ph + 14}" data-tip="${ESC(tip)}" data-mpmb="${i}" style="cursor:pointer"/>`;
@@ -2887,7 +2890,7 @@ function mpMetaCard(meta, S0, x) {
          !S0.movel ? '<span class="mut">Meta proporcional: não se aplica (o MQL é a base do cálculo)</span>'
          : !x.mql ? '<span class="mvl">Meta proporcional: sem MQL no período</span>'
          : `<span class="mvl">Meta proporcional: <b>${f1(x.mov)}</b> (${fN(x.mql)} MQL × ${fP(S0.movel)}) · <b class="${x.pctMov >= 100 ? 'mt-ok' : x.pctMov >= 80 ? '' : 'mvl-no'}">${fP(x.pctMov)}</b> atingido${x.pctMov >= 100 ? ' ✔' : ''}</span>`]
-      : [`No período: <b>${fmtA(x.v)}</b>`, `Acumulado desde ${fMesAno(S0.desde || mpMeses()[0])}: <b>${fmtA(x.acc)}</b>`];
+      : [`No período: <b>${fmtA(x.v)}</b>${meta.k === 'convVisita' && x.extra ? ` (${fN(x.extra.novas)} de ${fN(x.extra.visitas)} visitas)` : ''}`, `Acumulado desde ${fMesAno(S0.desde || mpMeses()[0])}: <b>${fmtA(x.acc)}</b>`];
   return `<div class="mt-i mpmc ${mpCls(p)}"><div class="mt-h"><span>${meta.t}<br><small>${ESC(x.nome)}${x.parcial ? ' · em andamento' : ''}</small></span><b>${fmtA(x.v)}</b></div>
     <div class="mt-bar"><i style="width:${Math.min(100, p || 0)}%"></i></div>
     <div class="mt-f"><span><b>${p == null ? '–' : fP(p)}</b> da meta</span><span>Meta ${S0.tipo === 'estoque' ? `${nomeG === 'semana' ? 'da' : 'do'} ${nomeG} ` : ''}${meta.bom === 'baixo' ? 'até ' : ''}<b>${fmtA(x.alvo ?? S0.alvo)}</b>${S0.tipo === 'fluxo' ? ' por ' + nomeG : ''}</span></div>
@@ -2905,7 +2908,7 @@ function viewMPProMetas() {
   h += `<div class="mph"><span>METAS ATÉ ${fDay(MP_METAS_ATE)}</span>dados desde ${fDay(ini)} · faltam ${fN(faltam)} dias · barras = valor de cada período · tracejado dourado = meta do período (ativos e MRR: onde a base deveria estar no fim de cada período para chegar à meta final em ${fDay(MP_METAS_ATE)}; novas: meta mensal × tamanho do período) · clique numa barra para ver o período no card</div>`;
   const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
   /* duas categorias (13/11/2026): ATRAÇÃO em cima, RETENÇÃO embaixo, com separador */
-  const GRUPOS = [['ATRAÇÃO', 'trazer assinantes novos: volume e custo da mídia', ['novas', 'cpm', 'cac']],
+  const GRUPOS = [['ATRAÇÃO', 'trazer assinantes novos: volume, conversão da página e custo da mídia', ['novas', 'convVisita', 'cpm', 'cac']],
     ['RETENÇÃO', 'manter quem já assina: base, receita recorrente e saídas', ['ativos', 'mrr', 'churn', 'ltvCac']]];
   const ordem = GRUPOS.flatMap(gr => gr[2]), grupoDe = k => GRUPOS.find(gr => gr[2].includes(k));
   let grAtual = null;
