@@ -2742,7 +2742,7 @@ const MP_METAS = [
   {k: 'reembPct', t: 'Reembolso das novas', meta: 10, bom: 'baixo', fmt: v => fP(v), nota: 'no máximo'},
   {k: 'ltvCac', t: 'LTV ÷ CAC', meta: 1, bom: 'alto', fmt: v => fX(v) + 'x'}
 ];
-const MP_METAS_FORA = new Set(['renov']);   // saíram da seção Metas a pedido do usuário (12/11/2026): Taxa de renovação
+const MP_METAS_FORA = new Set(['renov', 'reembPct']);   // + Reembolso das novas (13/11/2026: o churn já cobre)   // saíram da seção Metas a pedido do usuário (12/11/2026): Taxa de renovação
 function mpMetaPct(m, v) {
   if (v == null) return null;
   if (m.bom === 'alto') return m.meta ? Math.min(100, v / m.meta * 100) : null;
@@ -2905,7 +2905,7 @@ function viewMPProMetas() {
   h += `<div class="mph"><span>METAS ATÉ ${fDay(MP_METAS_ATE)}</span>dados desde ${fDay(ini)} · faltam ${fN(faltam)} dias · barras = valor de cada período · tracejado dourado = meta do período (ativos e MRR: onde a base deveria estar no fim de cada período para chegar à meta final em ${fDay(MP_METAS_ATE)}; novas: meta mensal × tamanho do período) · clique numa barra para ver o período no card</div>`;
   const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
   /* duas categorias (13/11/2026): ATRAÇÃO em cima, RETENÇÃO embaixo, com separador */
-  const GRUPOS = [['ATRAÇÃO', 'trazer assinantes novos: volume, custo da mídia e qualidade da venda', ['novas', 'cpm', 'cac', 'reembPct']],
+  const GRUPOS = [['ATRAÇÃO', 'trazer assinantes novos: volume e custo da mídia', ['novas', 'cpm', 'cac']],
     ['RETENÇÃO', 'manter quem já assina: base, receita recorrente e saídas', ['ativos', 'mrr', 'churn', 'ltvCac']]];
   const ordem = GRUPOS.flatMap(gr => gr[2]), grupoDe = k => GRUPOS.find(gr => gr[2].includes(k));
   let grAtual = null;
