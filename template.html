@@ -196,6 +196,8 @@ summary.dvh{cursor:pointer;list-style:none}summary.dvh::-webkit-details-marker{d
 .dvchev{width:20px;height:20px;flex:none;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .15s}details.dvk[open] .dvchev{transform:rotate(180deg)}
 details.dvk:not([open]){padding-top:12px;padding-bottom:12px}details.dvk:not([open]):hover{background:#fafcfb}
 .dvb{margin-top:10px}.dvsub{margin:0 0 8px;font-size:12px;color:var(--cinza)}
+.mpsec{display:flex;align-items:baseline;gap:12px;margin:22px 0 4px;padding-bottom:8px;border-bottom:2px solid var(--verde)}.mpsec b{font-size:15px;letter-spacing:.08em;color:var(--verde)}.mpsec span{font-size:12.5px;color:var(--cinza)}
+.mpsec2{margin-top:40px;padding-top:26px;border-top:1px dashed #cfd9d4}
 .dvmel{margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef7f1;border:1px solid #cfe6d8}.dvmel .dvlt{color:#00503c;margin-top:0}.dvmel ol{margin:4px 0 0;padding-left:20px}.dvmel li{margin:3px 0;line-height:1.45}
 .igmenu{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 16px}
 .igmenu button{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border:1px solid var(--linha);border-radius:999px;background:#fff;cursor:pointer;font:inherit;color:inherit;text-align:left;transition:border-color .15s,box-shadow .15s}
@@ -2902,7 +2904,14 @@ function viewMPProMetas() {
   const faltam = Math.max(0, diffDays(TODAY, MP_METAS_ATE));
   h += `<div class="mph"><span>METAS ATÉ ${fDay(MP_METAS_ATE)}</span>dados desde ${fDay(ini)} · faltam ${fN(faltam)} dias · barras = valor de cada período · tracejado dourado = meta do período (ativos e MRR: onde a base deveria estar no fim de cada período para chegar à meta final em ${fDay(MP_METAS_ATE)}; novas: meta mensal × tamanho do período) · clique numa barra para ver o período no card</div>`;
   const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
-  for (const meta0 of MP_METAS.filter(m => !MP_METAS_FORA.has(m.k))) {
+  /* duas categorias (13/11/2026): ATRAÇÃO em cima, RETENÇÃO embaixo, com separador */
+  const GRUPOS = [['ATRAÇÃO', 'trazer assinantes novos: volume, custo da mídia e qualidade da venda', ['novas', 'cpm', 'cac', 'reembPct']],
+    ['RETENÇÃO', 'manter quem já assina: base, receita recorrente e saídas', ['ativos', 'mrr', 'churn', 'ltvCac']]];
+  const ordem = GRUPOS.flatMap(gr => gr[2]), grupoDe = k => GRUPOS.find(gr => gr[2].includes(k));
+  let grAtual = null;
+  for (const meta0 of MP_METAS.filter(m => !MP_METAS_FORA.has(m.k)).sort((a, b) => (ordem.indexOf(a.k) + 99 * (ordem.indexOf(a.k) < 0)) - (ordem.indexOf(b.k) + 99 * (ordem.indexOf(b.k) < 0)))) {
+    const gr = grupoDe(meta0.k);
+    if (gr && gr !== grAtual) { h += `<div class="mpsec${grAtual ? ' mpsec2' : ''}"><b>${gr[0]}</b><span>${gr[1]}</span></div>`; grAtual = gr; }
     const meta = {...meta0, t: meta0.t.replace(/ no mês$/, ''), nota: meta0.nota === 'no fim do mês' ? 'no fim do período' : meta0.nota};
     const S0 = mpMetaSerie(meta, g, ini), n = S0.pts.length;
     let ult = n - 1; while (ult > 0 && S0.pts[ult].v == null) ult--;   // padrão: último período com valor
