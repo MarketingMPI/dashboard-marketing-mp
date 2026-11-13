@@ -2158,7 +2158,7 @@ function chartDaily(rows, de, ate, width) {
     const x0 = pl + i * bw, cx = x0 + bw / 2, tot = b.c + b.s;
     if (b.fds) g += `<rect x="${x0}" y="${pt}" width="${bw}" height="${ph}" fill="#fbf4e6"/>`;
     if (b.c) g += `<rect class="bar" style="animation-delay:${Math.min(i * 12, 400)}ms" x="${cx - w / 2}" y="${y(b.c)}" width="${w}" height="${y(0) - y(b.c)}" fill="#00503c" rx="${Math.min(3, w / 4)}"/>`;
-    if (b.s) g += `<rect class="bar" style="animation-delay:${Math.min(i * 12, 400)}ms" x="${cx - w / 2}" y="${y(tot)}" width="${w}" height="${y(b.c) - y(tot) - (b.c ? 1 : 0)}" fill="#c2d3cb" rx="${Math.min(3, w / 4)}"/>`;
+    if (b.s) g += `<rect class="bar" style="animation-delay:${Math.min(i * 12, 400)}ms" x="${cx - w / 2}" y="${y(tot)}" width="${w}" height="${Math.max(0, y(b.c) - y(tot) - (b.c ? 1 : 0))}" fill="#c2d3cb" rx="${Math.min(3, w / 4)}"/>`;
     if (tot && bins.length <= 31 && bw > 16) g += `<text class="ax" x="${cx}" y="${y(tot) - 5}" text-anchor="middle" style="fill:#33413b;font-weight:600">${tot}</text>`;
     if (i % step === 0) {
       const lab = mode === 'dia' ? (bins.length <= 14 ? `${WD[weekday(b.from)].toLowerCase()} ${fDM(b.from)}` : fDM(b.from)) : mode === 'semana' ? fDM(b.from) : `${MES[+b.m.slice(5, 7) - 1]}/${b.m.slice(2, 4)}`;
@@ -2181,6 +2181,8 @@ function columns(items, o = {}) {
     <span class="cx">${ESC(i.label)}</span></div>`).join('') + '</div>';
 }
 
+// % com teto (regra do painel): acima de 100% aparece "100% ⚠" (eventos de leads de outros períodos / etapas puladas)
+function fPc(v) { return v != null && v > 100.05 ? '100% ⚠' : fP(v); }
 function miniFunnel(k) {
   const steps = [['Leads', k.leads], ['Contatados', k.contatados], ['Agendados', k.agendados, REF_PRU.ag], ['Reuniões', k.reunioes, REF_PRU.re], ['Ganhos', k.ganhos, REF_PRU.ga]];
   if (!k.leads) return emptyBox();
@@ -2191,7 +2193,7 @@ function miniFunnel(k) {
     const tip = `${nome}: ${fN(v)}\n${fP(pctOf(v, k.leads))} dos leads do período` + (i ? `\n${fP(pctOf(v, steps[i - 1][1]))} de ${steps[i - 1][0].toLowerCase()}` : '')
       + (ref ? `\nReferência: ${fP(ref)} dos leads (${fN(Math.round(k.leads * ref / 100))} esperados)` : '');
     h += `<div class="fs" data-tip="${ESC(tip)}"><span class="fl">${nome}</span><span class="ft"><i style="width:${Math.max(1.5, 100 * v / k.leads)}%;background:${cols[i]};animation-delay:${i * 70}ms"></i>${ref ? `<em style="width:${ref}%"></em>` : ''}</span>
-      <span class="fv"><b>${fN(v)}</b><small>${fP(pctOf(v, k.leads))}</small>${ref ? `<small class="rf">ref. ${fP(ref)}</small>` : ''}</span></div>`;
+      <span class="fv"><b>${fN(v)}</b><small>${fPc(pctOf(v, k.leads))}</small>${ref ? `<small class="rf">ref. ${fP(ref)}</small>` : ''}</span></div>`;
   });
   return h + '</div>';
 }
@@ -2389,7 +2391,8 @@ function consPerf(nome, cart) {
   const X = run(filtros(cart ? {consultores: [nome], de: MIN_DAY, ate: TODAY} : {consultores: [nome]})), kk = X.res.kpis, e = X.res.eventos;
   const k = {leads: kk.leads, agendados: e.agendamentos, reunioes: e.reunioes, ganhos: e.ganhos}, L = k.leads;
   const rap = X.rows.filter(r => r.d.d1 != null && r.d.d1 < 1).length, pc = (a, b) => b ? a / b * 100 : null;
-  return {L, cart, abertos: kk.abertos, won: kk.ganhos, lost: kk.perdidos, itens: [
+  // tem = houve lead OU evento no período (13/11/2026): com 0 leads novos mas reunião/ganho no período, as taxas aparecem (sem base = "–")
+  return {L, tem: !!(L || k.agendados || k.reunioes || k.ganhos), cart, abertos: kk.abertos, won: kk.ganhos, lost: kk.perdidos, itens: [
     ['Contato em menos de 1 dia', pc(rap, L), 80, `${fN(rap)} de ${fN(L)} leads`],
     ['MQL → reunião agendada', pc(k.agendados, L), REF_PRU.ag, `${fN(k.agendados)} agendamentos no período ÷ ${fN(L)} leads que entraram`],
     ['Agendada → realizada', pc(k.reunioes, k.agendados), REF_PRU.re / REF_PRU.ag * 100, `${fN(k.reunioes)} reuniões realizadas ÷ ${fN(k.agendados)} agendamentos no período`],
@@ -2408,7 +2411,7 @@ function consPerfHtml(nome) {
       <span class="cm-pq">${q == null ? 'sem base' : q >= 100 ? '✔ meta' : fP(q) + ' da meta'}</span></div>`;
   };
   return `<div class="cm-perf"><div class="cm-pt">${P.cart ? `Performance da carteira <small>todos os ${fN(P.L)} leads sob responsabilidade · ${fN(P.abertos)} em aberto, ${fN(P.won)} ${P.won === 1 ? 'ganho' : 'ganhos'}, ${fN(P.lost)} ${P.lost === 1 ? 'perdido' : 'perdidos'}</small>` : `Performance no período <small>${fDM(S.de)} a ${fDM(S.ate)} · ${fN(P.L)} ${P.L === 1 ? 'lead entrou' : 'leads entraram'}</small>`}</div>
-    ${P.L ? P.itens.map(linha).join('') : '<div class="mut">Nenhum lead entrou para este consultor no período.</div>'}</div>`;
+    ${P.tem ? P.itens.map(linha).join('') : '<div class="mut">Nenhum lead nem evento para este consultor no período.</div>'}</div>`;
 }
 /* Página Consultores (pedido 10/11/2026): uma linha por consultor, igual a Insights › Metas — à esquerda a conversão
    por etapa (× metas) e o gráfico de evolução (leads, agendadas, realizadas, ganhos por período); à direita o card da
@@ -2459,7 +2462,7 @@ function consLinhaHtml(nome, cardHtml, W, cart) {
   const C = consEvoChart(nome, W);
   const nomeG = consBins(S.de, S.ate).g;
   return `<div class="g g32 mprow cons-row"><div class="card"><div class="ch"><div><h3 data-xf="consultores" data-v="${ESC(nome)}" data-tip="Clique para filtrar este consultor" style="cursor:pointer">${ESC(nome)} <small>${P.cart ? `conversão da carteira inteira (${fN(P.L)} leads)` : `conversão de ${fDM(S.de)} a ${fDM(S.ate)}: ${fN(P.L)} ${P.L === 1 ? 'lead entrou' : 'leads entraram'}, eventos contam na data em que aconteceram`} · gráfico por ${nomeG}</small></h3></div><div class="lg">${C.leg}</div></div>
-    <div class="cvs">${P.L ? chips : '<div class="mut">Nenhum lead para este consultor com o seletor atual.</div>'}</div>${C.svg}</div>
+    <div class="cvs">${P.tem ? chips : '<div class="mut">Nenhum lead nem evento para este consultor com o seletor atual.</div>'}</div>${C.svg}</div>
     <div class="cons-side">${cardHtml}</div></div>`;
 }
 function mapaConsHtml(opt) {
@@ -4015,7 +4018,7 @@ function mpBaseChart(width) {
     const cx = pl + i * bw + bw / 2, noPer = x.ym >= S.de.slice(0, 7) && x.ym <= S.ate.slice(0, 7);
     if (noPer) g += `<rect x="${pl + i * bw + 2}" y="${pt - 18}" width="${bw - 4}" height="${ph + 18}" fill="#f1f6f3" rx="6"/>`;
     if (x.ant > 0) g += `<rect class="bar" x="${cx - w / 2}" y="${y(x.ant)}" width="${w}" height="${y(0) - y(x.ant)}" fill="#b4d6c6" rx="3"/>`;
-    if (x.novAt > 0) g += `<rect class="bar" x="${cx - w / 2}" y="${y(x.at)}" width="${w}" height="${y(x.ant) - y(x.at) - (x.ant ? 1 : 0)}" fill="#00503c" rx="3"/>`;
+    if (x.novAt > 0) g += `<rect class="bar" x="${cx - w / 2}" y="${y(x.at)}" width="${w}" height="${Math.max(0, y(x.ant) - y(x.at) - (x.ant ? 1 : 0))}" fill="#00503c" rx="3"/>`;
     const d = prev == null ? null : x.at - prev;
     g += `<text class="ax" x="${cx}" y="${y(x.at) - 6}" text-anchor="middle" style="fill:#1c1c1c;font-weight:700">${fN(x.at)}${d ? `<tspan style="fill:${d > 0 ? '#00a611' : '#c0392b'};font-weight:600"> ${d > 0 ? '+' : '−'}${fN(Math.abs(d))}</tspan>` : ''}</text>`;
     g += `<text class="ax" x="${cx}" y="${H - pb + 15}" text-anchor="middle"${noPer ? ' style="font-weight:700;fill:#1c1c1c"' : ''}>${MESN(x.ym)}${x.parcial ? '*' : ''}</text>`;
@@ -4035,7 +4038,7 @@ function mpEvolChart(ev, width) {
   ev.forEach((e, i) => {
     const cx = pl + i * bw + bw / 2;
     if (e.renovacoes) g += `<rect class="bar" x="${cx - w / 2}" y="${y(e.renovacoes)}" width="${w}" height="${y(0) - y(e.renovacoes)}" fill="#00503c" rx="3"/>`;
-    if (e.novas) g += `<rect class="bar" x="${cx - w / 2}" y="${y(e.pagamentos)}" width="${w}" height="${y(e.renovacoes) - y(e.pagamentos) - (e.renovacoes ? 1 : 0)}" fill="#c9a94f" rx="3"/>`;
+    if (e.novas) g += `<rect class="bar" x="${cx - w / 2}" y="${y(e.pagamentos)}" width="${w}" height="${Math.max(0, y(e.renovacoes) - y(e.pagamentos) - (e.renovacoes ? 1 : 0))}" fill="#c9a94f" rx="3"/>`;
     g += `<text class="ax" x="${cx}" y="${y(e.pagamentos) - 6}" text-anchor="middle" style="fill:#33413b;font-weight:600">${e.pagamentos}</text>`;
     g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${MESN(e.mes)}${e.parcial ? '*' : ''}</text>`;
     const tip = `${MESN(e.mes)}${e.parcial ? ' (mês em andamento)' : ''}\nPagamentos: ${fN(e.pagamentos)}\nNovas: ${fN(e.novas)} · Renovações: ${fN(e.renovacoes)}${e.formacao ? `\nFormação de Consultores: ${e.formacao} (${fRc(e.formacao_liquido)} líq.)` : ''}\nReceita bruta: ${fRc(e.bruto)} · líquida: ${fRc(e.liquido)}\nInvestimento Perpétuo: ${fRc(e.investimento)}\nCAC do mês: ${fRc(e.cac)}`;
@@ -4852,7 +4855,7 @@ function perdidosHtml() {
   const [C, P] = lostRun(), pr = C.res.perdidos, pp = P.res.perdidos, base = cur().res.kpis.leads, pbase = prev().res.kpis.leads;
   let h = '<div class="kpis mt">' + [
     kpiCard({label: 'Perdidos', cls: 'red', v: fN(pr.total), sub: S.perdaData ? 'perdidos dentro do período' : 'dos leads que entraram no período', d: delta(pr.total, pp.total, -1)}),
-    kpiCard({label: '% do período', v: fP(pctOf(pr.total, base)), sub: `sobre ${fN(base)} leads que entraram no período`, d: delta(pctOf(pr.total, base), pctOf(pp.total, pbase), -1, fP), tip: 'Perdidos ÷ leads que entraram no período (mesmos filtros)'}),
+    kpiCard({label: '% do período', v: fPc(pctOf(pr.total, base)), sub: `sobre ${fN(base)} leads que entraram no período`, d: delta(pctOf(pr.total, base), pctOf(pp.total, pbase), -1, fP), tip: 'Perdidos ÷ leads que entraram no período (mesmos filtros)'}),
     kpiCard({label: 'Tempo até a perda', v: `${f1(pr.media_dias_ate_perda)}<small>dias</small>`, sub: 'média desde a entrada', d: delta(pr.media_dias_ate_perda, pp.media_dias_ate_perda, 0, fD)}),
     kpiCard({label: 'Contatos até a perda', v: f1(pr.media_contatos_ate_perda), sub: 'média de contatos realizados', d: delta(pr.media_contatos_ate_perda, pp.media_contatos_ate_perda, 1, f1)}),
     kpiCard({label: 'Perdidos sem contato', cls: 'red', v: fN(pr.sem_contato), sub: pr.total ? fP(pr.sem_contato / pr.total * 100) + ' dos perdidos' : '', d: delta(pr.sem_contato, pp.sem_contato, -1), tip: 'Perdidos sem nenhum contato concluído até a perda'})
@@ -5127,8 +5130,8 @@ function aplChart(L, de, ate, width) {
   bs.forEach((b, i) => {
     const cx = pl + i * bw + bw / 2, tot = b.c + b.e + b.x, ce = b.c + b.e, r = Math.min(3, w / 4);
     if (b.c) g += `<rect class="bar" x="${cx - w / 2}" y="${y(b.c)}" width="${w}" height="${y(0) - y(b.c)}" fill="#00503c" rx="${r}"/>`;
-    if (b.e) g += `<rect class="bar" x="${cx - w / 2}" y="${y(ce)}" width="${w}" height="${y(b.c) - y(ce) - (b.c ? 1 : 0)}" fill="#c98a1b" rx="${r}"/>`;
-    if (b.x) g += `<rect class="bar" x="${cx - w / 2}" y="${y(tot)}" width="${w}" height="${y(ce) - y(tot) - (ce ? 1 : 0)}" fill="#c2cbc7" rx="${r}"/>`;
+    if (b.e) g += `<rect class="bar" x="${cx - w / 2}" y="${y(ce)}" width="${w}" height="${Math.max(0, y(b.c) - y(ce) - (b.c ? 1 : 0))}" fill="#c98a1b" rx="${r}"/>`;
+    if (b.x) g += `<rect class="bar" x="${cx - w / 2}" y="${y(tot)}" width="${w}" height="${Math.max(0, y(ce) - y(tot) - (ce ? 1 : 0))}" fill="#c2cbc7" rx="${r}"/>`;
     if (tot && bs.length <= 31 && bw > 16) g += `<text class="ax" x="${cx}" y="${y(tot) - 5}" text-anchor="middle" style="fill:#33413b;font-weight:600">${tot}</text>`;
     if (i % step === 0) g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${mode === 'mes' ? MESN(b.k) : fDM(b.from)}</text>`;
     g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)}\nLeads: ${tot}\nConsultor: ${b.c}\nEscritório Parceiro: ${b.e}\nModelo não informado: ${b.x}`)}" data-range="${b.from}|${b.to}"/>`;
@@ -5160,7 +5163,7 @@ function viewAplicacao() {
     kpiCard({label: 'Custo por lead', cls: off ? 'off' : '', v: off || !c.n ? '–' : fRc(md.gasto / c.n), sub: off ? sub0 : `investimento ÷ ${fN(c.n)} leads no Pipedrive`, tip: 'Investimento das campanhas B2B de Aplicação Direta ÷ leads que entraram no Pipedrive no período (prefixo escolhido no filtro)'}),
     kpiCard({label: 'Impressões', cls: off ? 'off' : '', v: off ? '–' : fN(md.impr), sub: off ? sub0 : 'vezes que os anúncios apareceram', tip: 'Impressões dos anúncios no período'}),
     kpiCard({label: 'Cliques no link', cls: off ? 'off' : '', v: off ? '–' : fN(md.cliques), sub: off ? sub0 : `taxa de cliques ${pct(md.cliques, md.impr)}`, tip: 'Cliques que levaram à página da Rede'}),
-    kpiCard({label: 'Conversão do clique', cls: off ? 'off' : '', v: off ? '–' : pct(c.n, md.cliques), sub: off ? sub0 : 'leads ÷ cliques no link', tip: 'De cada 100 cliques no anúncio, quantos viraram candidatura'})
+    kpiCard({label: 'Conversão do clique', cls: off ? 'off' : '', v: off ? '–' : fPc(pctOf(c.n, md.cliques)), sub: off ? sub0 : 'leads ÷ cliques no link', tip: 'De cada 100 cliques no anúncio, quantos viraram candidatura. Acima de 100% (⚠): no período entraram mais leads do que cliques, porque os leads incluem indicações (IND) e entradas orgânicas, não só os da campanha'})
   ].join('') + '</div>';
   if (!c.n) return h + `<div class="card mt">${emptyBox('Nenhuma candidatura no período', 'Ajuste o período para ver resultados.')}</div>`;
   // evolução + etapa atual
