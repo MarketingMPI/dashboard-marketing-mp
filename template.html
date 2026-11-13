@@ -196,6 +196,7 @@ summary.dvh{cursor:pointer;list-style:none}summary.dvh::-webkit-details-marker{d
 .dvchev{width:20px;height:20px;flex:none;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .15s}details.dvk[open] .dvchev{transform:rotate(180deg)}
 details.dvk:not([open]){padding-top:12px;padding-bottom:12px}details.dvk:not([open]):hover{background:#fafcfb}
 .dvb{margin-top:10px}.dvsub{margin:0 0 8px;font-size:12px;color:var(--cinza)}
+.kpis.k5c{grid-template-columns:repeat(5,minmax(0,1fr))}@media(max-width:1100px){.kpis.k5c{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mpsec{display:flex;align-items:baseline;gap:12px;margin:22px 0 4px;padding-bottom:8px;border-bottom:2px solid var(--verde)}.mpsec b{font-size:15px;letter-spacing:.08em;color:var(--verde)}.mpsec span{font-size:12.5px;color:var(--cinza)}
 .mpsec2{margin-top:40px;padding-top:26px;border-top:1px dashed #cfd9d4}
 .dvmel{margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef7f1;border:1px solid #cfe6d8}.dvmel .dvlt{color:#00503c;margin-top:0}.dvmel ol{margin:4px 0 0;padding-left:20px}.dvmel li{margin:3px 0;line-height:1.45}
@@ -4124,7 +4125,7 @@ function viewMPProPeriodo() {
   const tMed = cancP.length ? cancP.reduce((s, c) => s + diffDays(c.entrada, c.cd), 0) / cancP.length : null, pMed = cancP.length ? cancP.reduce((s, c) => s + c.pagamentos, 0) / cancP.length : null;
   const mesAberto = !jP.length ? (mAte > mDe ? null : mAte) : null;
   h += `<div class="mph mt"><span>CHURN</span>${ESC(periodCaption().replace(/^Leads por data de entrada /, ''))} · taxa de saída do período (janela M → M+1 só conta quando o mês seguinte já terminou) · acumulados = do lançamento até ${fDay(base)}</div>`;
-  h += '<div class="kpis k3x">' + [
+  h += '<div class="kpis k5c">' + [
     kpiCard({label: 'Churn do período', cls: churnP > 12 ? 'red' : '', v: fP(churnP),
       sub: jP.length ? (jP.length === 1 ? `${MESN(jP[0].de)} → ${MESN(jP[0].para)}: ${jSai} de ${jBase} não renovaram` : `${pl(jP.length, 'janela', 'janelas')} · ${jSai} de ${jBase} não renovaram`) : mesAberto ? `a janela de ${MESN(mesAberto)} fecha em ${fDay(ymLast(mesAberto))}` : 'nenhuma janela completa no período',
       tip: 'Pagaram no mês e não pagaram no mês seguinte, sobre a base paga do mês. Conta as janelas cujo mês de renovação está no período escolhido e já terminou.'}),
@@ -4133,8 +4134,9 @@ function viewMPProPeriodo() {
     kpiCard({label: 'Retenção acumulada', v: fP(pctOf(b.ativos, b.compradores)), sub: `${b.ativos} de ${b.compradores} seguem ativos em ${fDM(base)}`}),
     kpiCard({label: 'Tempo médio até o cancelamento', v: tMed == null ? '–' : tMed < 45 ? `${fN(Math.round(tMed))} dias` : `${f1(tMed / 30.44)} meses`,
       sub: cancP.length ? `${f1(pMed)} ${pMed < 2 ? 'pagamento' : 'pagamentos'} antes de sair · ${pl(cancP.length, 'cancelado', 'cancelados')} no período` : 'nenhum cancelamento no período',
-      tip: 'Dos que cancelaram NO PERÍODO: dias entre a entrada (1º pagamento) e o cancelamento. Data do cancelamento = a registrada na Kiwify; sem ela, o vencimento do último mês pago.'}),
-    kpiCard({label: 'LTV projetado', v: fRc(vidaP != null && liqMes != null ? vidaP * liqMes : null), sub: vidaP ? `estimativa com o churn do período: vida média de ${f1(vidaP)} meses` : 'sem churn medido no período', tip: 'Estimativa, não valor medido: mantido o churn do período, vida média = 1 ÷ churn; LTV = vida × líquido médio por mensalidade'})
+      tip: 'Dos que cancelaram NO PERÍODO: dias entre a entrada (1º pagamento) e o cancelamento. Data do cancelamento = a registrada na Kiwify; sem ela, o vencimento do último mês pago.'})
+    // card 'LTV projetado' saiu (pedido 13/11/2026)
+
   ].join('') + '</div>';
   // tabela 'Churn mês a mês' saiu (pedido 12/11/2026)
   // ---------- compradores
