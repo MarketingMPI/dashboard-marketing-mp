@@ -3619,19 +3619,7 @@ function viewInsights() {
   h += insAssumidosHtml();
   // Sugestões, acompanhamento das sugestões e tabela por campanha saíram dos Insights (pedido 10/11/2026)
   h += insRegistroHtml(P.de, P.fim, modo);
-  // comparativo
-  if (B) {
-    const rows = [['Leads novos', 'leads', 1, insN1], ['Contato em menos de 1 dia', 'rap', 1, fP], ['1º contato médio', 't1', -1, fD],
-      ['Contatos realizados', 'contatos', 1, insN1], ['Agendamentos', 'ag', 1, insN1], ['Reuniões realizadas', 'reu', 1, insN1], ['Faltas (no-show)', 'faltas', -1, insN1], ['Comparecimento', 'comp', 1, fP],
-      ['Ganhos', 'won', 1, insN1], ['Perdidos', 'lost', -1, insN1], ['Investimento Meta', 'inv', 0, fRs], ['Custo por lead', 'cpl', -1, fRs]];
-    const vr = (c, b, good, fmt) => { if (c == null || b == null) return '–'; const d = c - b; if (Math.abs(d) < 1e-9) return '<span class="dl neu">=</span>';
-      const tone = good === 0 ? 'neu' : ((d > 0) === (good > 0) ? 'pos' : 'neg'), pc = b ? nf1.format(Math.abs(d / b * 100)) + '%' : 'novo';
-      if (fmt === fP) return `<span class="dl ${tone}">${d > 0 ? '▲ +' : '▼ −'}${nf1.format(Math.abs(d))} p.p.</span>`;
-      const fd = fmt(Math.abs(d)); return `<span class="dl ${tone}">${d > 0 ? '▲' : '▼'} ${pc} (${d > 0 ? '+' : '−'}${fd})</span>`; };
-    h += `<details class="card mt np inscmp"><summary class="ch"><div><h3>Comparativo</h3><p>${P.parcial ? 'Período em andamento: anterior e média ajustados ao mesmo número de dias' : 'Período fechado'} · clique para abrir a tabela</p></div><svg class="fcc" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="tw"><table class="t"><thead><tr><th>Indicador</th><th class="num">${modo === 'semanal' ? 'Esta semana' : mesCurto(P.k)}</th><th class="num">${rotAnt[0].toUpperCase() + rotAnt.slice(1)}</th><th class="num">${rotMed[0].toUpperCase() + rotMed.slice(1)}</th><th class="num">Variação × média</th></tr></thead><tbody>` +
-      rows.map(([t, key, good, fmt]) => `<tr><td>${t}</td><td class="num"><b>${fmt(x[key])}</b></td><td class="num">${ant ? fmt(ant[key]) : '–'}</td><td class="num">${fmt(B[key])}</td><td class="num">${vr(x[key], B[key], good, fmt)}</td></tr>`).join('') +
-      `</tbody></table></div></details>`;
-  }
+  // tabela 'Comparativo' saiu dos Insights B2C (pedido 13/11/2026)
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
     <li><b>Semanal</b> = semana de terça a segunda; abre na última semana fechada, que termina na segunda (véspera da reunião de terça). <b>Mensal</b> = mês fechado.</li>
     <li>Os Insights avaliam só a <b>operação</b>: ficam de fora os contatos importados da base/reativados e os lançamentos retroativos (negócio criado direto em Reunião, Negociação ou Fechamento, ou ganho sem nenhuma atividade registrada). Eles continuam nas outras abas.</li>
