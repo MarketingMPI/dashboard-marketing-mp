@@ -3024,6 +3024,23 @@ function insDrvHtml(o) {
     <div class="dvfs"><em>O que influencia</em>${fatores}</div>
     <div class="dvl"><span class="dvli">💡</span><div>${leitura}</div></div></div></details>`);
   const parcial = frac < 1;
+  /* "Como melhorar" / "Para manter" (pedido 13/11/2026, regras do agente de performance validadas com os dados de jul–nov):
+     cada regra = condição sobre os números do período + ação pontual com a conta de quanto precisa mudar. Até 3 por meta;
+     se a regra de amostra pequena dispara, ela aparece sozinha (não dá para concluir com poucos casos). */
+  const V = Object.assign({}, x, {pMql: drvVal('pMql', x), tAg: drvVal('tAg', x), tRe: drvVal('tRe', x), tGa: drvVal('tGa', x), pAg7: drvVal('pAg7', x)});
+  const VA = ant ? Object.assign({}, ant, {pMql: drvVal('pMql', ant)}) : null;
+  const n1 = v => v == null ? '–' : nf1.format(v), pp = n => `${nf1.format(100 / n)} pontos`, pl = (n, s, p) => `${fN(n)} ${n === 1 ? s : p}`;
+  const consL = (x.consultores || []).filter(c => c.consultor && !/^Sem consultor/.test(c.consultor));
+  const acoes = (st, regras) => {
+    const out = [];
+    for (const r of regras) {
+      let ok = false; try { ok = !!r.se(); } catch (e) { ok = false; }
+      if (!ok) continue;
+      if (r.amostra) return `<div class="dvmel"><div class="dvlt">Antes de concluir</div><ol><li>${r.txt()}</li></ol></div>`;
+      out.push(r.txt()); if (out.length >= 3) break;
+    }
+    return out.length ? `<div class="dvmel"><div class="dvlt">${st === 'bom' ? 'Para manter' : 'Como melhorar'}</div><ol>${out.map(a => `<li>${a}</li>`).join('')}</ol></div>` : '';
+  };
 
   // 1) MQL — meta geral
   {
@@ -3048,9 +3065,15 @@ function insDrvHtml(o) {
     else if (st === 'bom') L = `<b>Meta atingida:</b> ${fN(v)} MQL${parcial ? ' até agora' : ''}, ${pct(v / alvo - 1)} acima do esperado.` + lista('Ajudou', bons) + lista('Atenção', cs);
     else {
       const falta = Math.ceil(alvo - v);
-      L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> faltaram ${fN(falta)} MQL${parcial ? ' para o esperado até hoje' : ''}.` + (cs.length ? lista('Fator provável', cs) : ` Verba, custo por lead e volume ficaram estáveis em relação a ${rotAnt}: o ritmo atual não chega à meta.`)
-        + (x.cpl ? `<div class="dvlt">Para fechar a diferença</div>${fN(falta)} MQL × ${fR(x.cpl)} (custo por lead atual) ≈ ${fR(falta * x.cpl)} de verba.` : '');
+      L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> faltaram ${fN(falta)} MQL${parcial ? ' para o esperado até hoje' : ''}.` + (cs.length ? lista('Fator provável', cs) : ` Verba, custo por lead e volume ficaram estáveis em relação a ${rotAnt}: o ritmo atual não chega à meta.`);  // "Para fechar a diferença" saiu (13/11/2026): a conta de verba está no "Como melhorar", já com a taxa de MQL
     }
+    L += acoes(st, [
+      {amostra: 1, se: () => V.leads < 5, txt: () => `Poucos leads no período (${fN(V.leads)}): ainda não dá para avaliar volume nem custo por lead. Esperar mais alguns dias antes de mexer em verba ou criativos.`},
+      {se: () => alvo != null && V.mql < alvo && VA && VA.cpl > 0 && V.cpl > VA.cpl * 1.15, txt: () => `O custo por lead subiu de ${fR(VA.cpl)} para ${fR(V.cpl)}. Antes de pôr mais verba, pausar no Meta os anúncios e públicos que mais encareceram e passar a verba para o conjunto com menor custo por lead.`},
+      {se: () => V.pMql != null && V.pMql < 80 && (!VA || VA.pMql == null || V.pMql < VA.pMql - 10), txt: () => `Só ${fP(V.pMql)} dos leads viraram MQL${VA && VA.pMql != null ? ` (antes ${fP(VA.pMql)})` : ''}. Revisar no Meta o público e as perguntas de qualificação do formulário (renda e profissão) e cortar os anúncios que mais trazem lead fora do perfil.`},
+      {se: () => alvo != null && V.mql < alvo && V.cpl > 0 && V.pMql > 0, txt: () => { const f = Math.ceil(alvo - V.mql); return `${f === 1 ? 'Falta 1 MQL' : `Faltam ${fN(f)} MQL`}. Com ${fR(V.cpl)} por lead e ${fP(V.pMql)} dos leads virando MQL, isso pede cerca de ${fR(f / (V.pMql / 100) * V.cpl)} a mais de verba no Meta, nas campanhas que já geram agendamento.`; }},
+      {se: () => alvo != null && V.mql >= alvo && V.rap != null && V.rap < 80, txt: () => `Meta batida, mas não aumentar a verba agora: só ${fP(V.rap)} dos leads tiveram contato em menos de 1 dia. Mais volume sem contato rápido vira lead perdido por "Sem contato".`},
+      {se: () => alvo != null && V.mql >= alvo && V.rap != null && V.rap >= 80, txt: () => `Meta batida e contato rápido (${fP(V.rap)}). Manter verba e criativos; para crescer, subir a verba aos poucos (até 20% por semana) acompanhando o custo por lead.`}]);
     card('MQL', `Meta geral do B2C · leads qualificados (etiqueta Digital, prefixo TRD/DIAG/RCON)`, fN(v), alvo == null ? 'sem meta por campanha' : `meta ${insN1(alvo)}${parcial ? ' até hoje' : ''}`, st, '',
       fator('Leads novos', 'leads', 'n', 1, 'Leads que entraram no período, de todas as origens') + (S.camp && !PAGAS[S.camp] ? '' : fator('Investimento', 'inv', 'rs', 0, 'Verba no Meta Ads (B2C)') + fator('Custo por lead', 'cpl', 'rs', -1, 'Investimento ÷ leads novos'))
       + fator('Viraram MQL', 'pMql', 'p', 1, 'Parte dos leads novos que conta na meta de MQL'), L);
@@ -3071,6 +3094,13 @@ function insDrvHtml(o) {
     if (tz.length >= 2 && tz[0].pct_contatados - tz[tz.length - 1].pct_contatados >= 20)
       L += `<div class="dvlt">Destaque do time</div>${ESC(tz[0].consultor)} contatou ${fP(tz[0].pct_contatados)} dos ${fN(tz[0].leads)} leads${tz[0].media_dias_1o_contato != null ? `, 1º contato em ${fD(tz[0].media_dias_1o_contato)} em média` : ''}.`;
     if (x.leads && x.leads < 5) L += '<div class="dvln">Poucos leads no período: 1 lead muda a taxa em mais de 20 pontos.</div>';
+    L += acoes(st, [
+      {amostra: 1, se: () => V.leads > 0 && V.leads < 5, txt: () => `Só ${fN(V.leads)} leads no período: cada lead pesa mais de 20 pontos na taxa. Focar em zerar quem está sem contato, sem tirar conclusão da porcentagem.`},
+      {se: () => V.semCont >= 1, txt: () => `Zerar hoje ${V.semCont === 1 ? 'o lead novo' : `os ${fN(V.semCont)} leads novos`} sem nenhum contato: ligar (pelo menos 3 tentativas), mandar WhatsApp se não atender e registrar a atividade no Pipedrive.`},
+      {se: () => V.leads >= 5 && V.rap < 80, txt: () => `${(f => f === 1 ? 'Falta 1 lead contatado' : `Faltam ${fN(f)} leads contatados`)(Math.max(1, Math.ceil(V.leads * 0.8 - V.rapN)))} em menos de 1 dia para chegar a 80%. Com ${fN(V.leads)} leads, cada um a mais soma ${pp(V.leads)}; fazer a A01 no dia da entrada, antes de qualquer outra atividade.`},
+      {se: () => consL.some(c => c.leads >= 3 && c.media_dias_1o_contato != null && c.media_dias_1o_contato > 1), txt: () => `1º contato lento com ${consL.filter(c => c.leads >= 3 && c.media_dias_1o_contato != null && c.media_dias_1o_contato > 1).map(c => `${ESC(c.consultor)} (${fD(c.media_dias_1o_contato)} em média, ${fN(c.leads)} leads)`).join(', ')}: rever a agenda para a ligação A01 e a divisão do rodízio até a média ficar abaixo de 1 dia.`},
+      {se: () => V.leads >= 5 && V.fds >= 3 && V.rap < 80, txt: () => `${fN(V.fds)} leads entraram no fim de semana: definir um plantão de sábado e domingo no rodízio ou, no mínimo, ligar para todos na segunda até as 10h.`},
+      {se: () => V.leads >= 5 && V.rap >= 80, txt: () => { const folga = V.rapN - Math.ceil(V.leads * 0.8); return `${folga <= 0 ? 'Está no limite: um lead atrasado já derruba a meta.' : `Folga de ${fN(folga)} ${folga === 1 ? 'lead' : 'leads'}.`} Manter o rodízio e a A01 no dia da entrada, inclusive para quem entra sexta à noite.`; }}]);
     card('Contato em menos de 1 dia', 'Leads novos contatados (ou agendados) em até 24 horas', fP(v), 'meta 80%', x.leads ? st : null, '',
       fator('1º contato médio', 't1', 'd', -1, 'Tempo médio da entrada até o 1º contato') + fator('Sem contato', 'semCont', 'n', -1, 'Leads novos sem nenhum contato registrado')
       + fator('Entraram no fim de semana', 'fds', 'n', 0, 'Leads que entraram sábado ou domingo'), L);
@@ -3088,6 +3118,13 @@ function insDrvHtml(o) {
     else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fN(x.ag)} agendamentos para ${fN(x.leads)} leads novos.` + (cs.length ? lista('Fator provável', cs) : ' Contato e cadência estáveis: o gargalo está na conversa (convite para a reunião).');
     if (recente && recente.leads_em_atraso) L += `<div class="dvlt">Hoje, na carteira toda</div>${fN(recente.leads_em_atraso)} ${recente.leads_em_atraso === 1 ? 'lead em aberto' : 'leads em aberto'} com atividade vencida${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${recente.leads_sem_proxima ? ` e ${fN(recente.leads_sem_proxima)} sem próxima atividade` : ''}: lead esquecido não agenda.`;
     else if (recente) L += '<div class="dvlt">Hoje, na carteira toda</div>Nenhum lead em aberto com atividade vencida.';
+    L += acoes(st, [
+      {amostra: 1, se: () => V.leads > 0 && V.leads < 5, txt: () => `Só ${fN(V.leads)} leads no período: cada agendamento muda a taxa em mais de 20 pontos. Acompanhar lead a lead em vez da porcentagem.`},
+      {se: () => V.leads >= 5 && V.tAg < 30, txt: () => `${(f => f === 1 ? 'Falta 1 agendamento' : `Faltam ${fN(f)} agendamentos`)(Math.ceil(V.leads * 0.3 - V.ag))} para 30%. Com ${fN(V.leads)} leads, cada reunião a mais soma ${pp(V.leads)}. Só ${fP(V.pAg7)} marcaram reunião em até 7 dias da entrada: no convite, oferecer 2 horários fechados já na 1ª ligação.`},
+      {se: () => V.pSemAg >= 3 && V.tPerda != null && V.tPerda < 5, txt: () => `${fN(V.pSemAg)} leads perdidos sem agendar depois de só ${n1(V.tPerda)} tentativas em média: só marcar como perdido depois das 5 atividades da cadência (A01 a A15), sempre com motivo.`},
+      {se: () => V.pSemAg >= 5 && V.tPerda != null && V.tPerda >= 5, txt: () => `${fN(V.pSemAg)} leads perdidos sem agendar mesmo com ${n1(V.tPerda)} tentativas em média: o problema é alcançar o lead. Variar o horário das ligações (início da manhã e depois das 18h) e intercalar mensagens de WhatsApp, em vez de repetir só ligação.`},
+      {se: () => recente && ((recente.leads_sem_proxima || 0) > 0 || (recente.leads_em_atraso || 0) > 0), txt: () => `Hoje há ${fN(recente.leads_sem_proxima || 0)} leads sem próxima atividade e ${fN(recente.leads_em_atraso || 0)} com atividade atrasada: cada consultor marca no Pipedrive o próximo passo de todos os seus leads abertos ainda esta semana.`},
+      {se: () => V.leads >= 5 && V.tAg >= 30, txt: () => `${fN(V.ag)} agendamentos para ${fN(V.leads)} leads, ${fN(Math.max(0, Math.floor(V.ag - V.leads * 0.3)))} acima dos 30%. Manter o convite com 2 horários já na 1ª ligação.`}]);
     card('MQL → reunião agendada', 'Agendamentos ÷ leads novos do período', v != null && v > 100 ? '100% ⚠' : fP(v), `meta ${fP(REF_PRU.ag)}`, x.leads ? st : null,
       sec('Reuniões agendadas', x.ag, vol('ag', 'ag')),
       fator('Agendados em até 7 dias', 'pAg7', 'p', 1, 'Leads novos com reunião marcada em até 7 dias da entrada') + fator('Perdidos sem agendar', 'pSemAg', 'n', -1, 'Perdidos no período sem nunca ter marcado reunião')
@@ -3104,6 +3141,13 @@ function insDrvHtml(o) {
     else if (st === 'bom') L = `<b>Meta atingida:</b> ${fN(x.reu)} reuniões realizadas para ${fN(x.ag)} agendadas${x.faltas ? `, com ${fN(x.faltas)} ${x.faltas === 1 ? 'falta' : 'faltas'}` : ', sem faltas'}.`;
     else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fN(x.reu)} reuniões realizadas para ${fN(x.ag)} agendadas.` + lista('Fator provável', cs);
     if (x.ag && x.ag < 4) L += '<div class="dvln">Poucos agendamentos: a taxa varia muito de um período para o outro.</div>';
+    L += acoes(st, [
+      {amostra: 1, se: () => V.ag > 0 && V.ag < 5, txt: () => `Só ${fN(V.ag)} ${V.ag === 1 ? 'reunião agendada' : 'reuniões agendadas'}: cada uma vale ${pp(V.ag)} na taxa. Confirmar uma a uma, sem tirar conclusão da porcentagem.`},
+      {se: () => V.ag >= 5 && V.tRe != null && V.tRe < 50, txt: () => `${(f => f === 1 ? 'Falta 1 reunião realizada' : `Faltam ${fN(f)} reuniões realizadas`)(Math.ceil(V.ag * 0.5 - V.reu))} para 50% (cada uma soma ${pp(V.ag)}). Confirmar toda reunião por WhatsApp na véspera e 2 horas antes; antes de cobrar o time, ver quantas ainda estão marcadas para os próximos dias.`},
+      {se: () => V.faltas >= 1, txt: () => `${fN(V.faltas)} ${V.faltas === 1 ? 'falta' : 'faltas'} no período: remarcar em até 24 horas pelo WhatsApp e registrar a falta no Pipedrive.`},
+      {se: () => V.ag >= 5 && V.tRe != null && V.tRe < 50 && !V.faltas, txt: () => `${fN(V.ag - V.reu)} agendamentos sem reunião realizada e sem falta registrada: conferir com cada consultor se a reunião aconteceu e não foi lançada como concluída no Pipedrive.`},
+      {se: () => V.ag >= 3 && V.dAR != null && V.dAR > 4, txt: () => `Entre marcar e realizar estão passando ${fD(V.dAR)}: oferecer horários em até 3 dias úteis e, se a data for mais longe, fazer um contato no meio do caminho.`},
+      {se: () => V.ag >= 5 && V.tRe != null && V.tRe >= 50, txt: () => `${fN(V.reu)} de ${fN(V.ag)} agendadas foram realizadas. Manter a confirmação por WhatsApp na véspera e no dia.`}]);
     card('Agendada → realizada', 'Reuniões realizadas ÷ agendadas no período', v != null && v > 100 ? '100% ⚠' : fP(v), `meta ${fP(metaR)}`, x.ag ? st : null,
       sec('Reuniões realizadas', x.reu, vol('reu', 're')),
       fator('Faltas (no-show)', 'faltas', 'n', -1, 'Atividades de no-show concluídas no período') + fator('Dias até a reunião', 'dAR', 'd', -1, 'Mediana de dias entre marcar e realizar a reunião'), L);
@@ -3119,6 +3163,13 @@ function insDrvHtml(o) {
     else if (st === 'bom' || (!x.reu && x.won)) L = `<b>Meta atingida:</b> ${fN(x.won)} ${x.won === 1 ? 'fechamento' : 'fechamentos'}${x.reu ? ` para ${fN(x.reu)} reuniões realizadas` : ''}${x.dRG != null ? `, em ${fD(x.dRG)} (mediana) da 1ª reunião ao ganho` : ''}.`;
     else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fN(x.won)} ${x.won === 1 ? 'fechamento' : 'fechamentos'} para ${fN(x.reu)} reuniões realizadas.` + lista('Fator provável', cs)
       + (x.neg ? `<div class="dvlt">O que vem pela frente</div>${fN(x.neg)} ${x.neg === 1 ? 'lead avançou' : 'leads avançaram'} para Negociação no período: é de onde saem os próximos fechamentos.` : '');
+    L += acoes(st, [
+      {amostra: 1, se: () => V.reu > 0 && V.reu < 5, txt: () => `Só ${fN(V.reu)} ${V.reu === 1 ? 'reunião realizada' : 'reuniões realizadas'}: cada fechamento muda a taxa em ${pp(V.reu)}. Olhar o acumulado do mês ou do trimestre antes de concluir.`},
+      {se: () => V.reu >= 5 && V.tGa != null && V.tGa < 33.3, txt: () => `${(f => f === 1 ? 'Falta 1 fechamento' : `Faltam ${fN(f)} fechamentos`)(Math.max(1, Math.ceil(V.reu / 3 - V.won)))} para 33% (cada um soma ${pp(V.reu)}). Sair de toda reunião com o próximo passo marcado no Pipedrive: envio da proposta e data do retorno.`},
+      {se: () => V.neg >= 3 && V.won < V.neg, txt: () => `${fN(V.neg)} leads chegaram à Negociação e ${fN(V.won)} fecharam: agendar retorno em até 48 horas depois da reunião e revisar na reunião semanal os que estão parados há mais de 7 dias.`},
+      {se: () => V.pPos >= 2, txt: () => `${fN(V.pPos)} leads perdidos depois da reunião: rever com cada consultor o motivo de cada perda e ajustar a apresentação (como a consultoria é cobrada e qual o próximo passo concreto).`},
+      {se: () => V.won >= 1 && V.dRG != null && V.dRG > 15, txt: () => `Da 1ª reunião ao fechamento estão passando ${fD(V.dRG)}: marcar a 2ª conversa (proposta) ainda na 1ª reunião, com data em até 7 dias.`},
+      {se: () => V.reu >= 5 && V.tGa != null && V.tGa >= 33.3, txt: () => `${fN(V.won)} fechamentos em ${fN(V.reu)} reuniões. Manter o roteiro; agora o limite é o volume: cada 3 reuniões a mais rendem cerca de 1 fechamento.`}]);
     card('Realizada → fechamento', 'Fechamentos ÷ reuniões realizadas no período', v != null && v > 100 ? '100% ⚠' : fP(v), `meta ${fP(metaG)}`, x.reu ? st : null,
       sec('Fechamentos', x.won, vol('won', 'ga')) + sec('MQL → fechamento', tot ?? 0, REF_PRU.ga, fP),
       fator('Avançaram para Negociação', 'neg', 'n', 1, 'Leads que entraram na etapa Negociação no período') + fator('Perdidos depois da reunião', 'pPos', 'n', -1, 'Perdidos no período que já tinham tido reunião')
