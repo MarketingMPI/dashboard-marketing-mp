@@ -249,7 +249,9 @@ def performance(leads, f, agora, midia):
         g["investimento_centavos"] += cent; g["impressoes"] += imp; g["cliques"] += cl
     dentro = lambda x: bool(x) and (not de or str(x)[:10] >= de) and (not ate or str(x)[:10] <= ate)
     # filtros laterais valem nas contagens (11/11/2026); custos vazios quando algum está ativo (investimento não se divide)
-    lateral = any(f.get(k) for k in ("consultores", "origens", "status", "etapas", "etiquetas", "motivos")) or bool((f.get("busca") or "").strip())
+    ativos_lat = [k for k in ("consultores", "origens", "status", "etapas", "etiquetas", "motivos") if f.get(k)]
+    so_digital = ativos_lat == ["etiquetas"] and len(f["etiquetas"]) == 1 and str(f["etiquetas"][0]).strip().lower() == "digital"
+    lateral = bool((f.get("busca") or "").strip()) or (bool(ativos_lat) and not so_digital)   # etiqueta Digital sozinha mantém os custos (13/11/2026)
     PG = filtra(leads, dict(f, de=None, ate=None, campanha=None, so_trd=None))
     PT = filtra(leads, dict(f, de=None, ate=None))
     for l in PG:

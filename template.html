@@ -1337,6 +1337,14 @@ function computeEventos(leads, f) {
     perdidos_sem_agendar: semAg, tentativas_ate_perda: mean(tent), perdidos_pos_reuniao: posReu,
     lt_agendamento: mean(ltAg), lt_reuniao: mean(ltReu), lt_perda: mean(ltLost), lt_ganho: mean(ltWon)};
 }
+/* Etiqueta "Digital" sozinha NÃO bloqueia os custos (13/11/2026): os leads Digital são os da mídia, então investimento ÷
+   leads Digital é um custo por lead válido. Qualquer outro filtro lateral (ou Digital junto com outra etiqueta) bloqueia. */
+function filtroLateral(f) {
+  const ativos = ['consultores', 'origens', 'status', 'etapas', 'etiquetas', 'motivos'].filter(k => Array.isArray(f[k]) && f[k].length);
+  if (String(f.busca || '').trim()) return true;
+  const soDigital = ativos.length === 1 && ativos[0] === 'etiquetas' && f.etiquetas.length === 1 && String(f.etiquetas[0]).trim().toLowerCase() === 'digital';
+  return ativos.length > 0 && !soDigital;
+}
 function computePerf(leads, f, agora) {
   f = f || {};
   const M = (D && D.midia) || {camps: [], dias: []};
@@ -1353,7 +1361,7 @@ function computePerf(leads, f, agora) {
   const dentro = s => { if (!s) return false; const x = String(s).slice(0, 10); return (!de || x >= de) && (!ate || x <= ate); };
   // filtros laterais (consultor, origem, status, etapa, etiqueta, motivo, busca) valem nas contagens, como em todas as abas
   // (11/11/2026); o investimento da Meta não se divide por eles, então os custos ficam vazios quando algum está ativo
-  const lateral = ['consultores', 'origens', 'status', 'etapas', 'etiquetas', 'motivos'].some(k => Array.isArray(f[k]) && f[k].length) || !!String(f.busca || '').trim();
+  const lateral = filtroLateral(f);
   const pG = makePred(Object.assign({}, f, {campanha: null, so_trd: false}), 'periodo'), pT = makePred(f, 'periodo');
   for (const l of leads || []) {
     if (!pG(l)) continue;
@@ -2098,7 +2106,7 @@ function chartCPLDiario(de, ate, width) {
     if (!l.e || !prF(l)) continue;
     const b = bins[idx.get(l.e.slice(0, 10))]; if (b) b.leads++;
   }
-  const lateral = ['consultores', 'origens', 'status', 'etapas', 'etiquetas', 'motivos'].some(k => S[k].length) || !!S.busca.trim();
+  const lateral = filtroLateral(S);
   bins.forEach(b => { b.cpl = b.leads && b.inv && !lateral ? b.inv / b.leads : null; });
   const totInv = bins.reduce((a, b) => a + b.inv, 0), totL = bins.reduce((a, b) => a + b.leads, 0), med = totL && totInv && !lateral ? totInv / totL : null;
   if (lateral) return {svg: emptyBox('Custo por lead não se divide por este filtro', 'O investimento da Meta não se divide por consultor, origem, status, etapa ou etiqueta. Limpe esses filtros para ver o custo por lead do dia.'), inv: totInv, leads: totL, med: null, semMidia: false, lateral: true};
@@ -3586,10 +3594,10 @@ function viewInsights() {
       tip: 'Reuniões CONCLUÍDAS dentro do período: cada reunião conta, inclusive a 2ª ou 3ª reunião do mesmo lead (reunião só marcada conta em Agendamentos). Falta = atividade "no-show" concluída no Pipedrive; comparecimento = realizadas ÷ (realizadas + faltas)'}),
     kpiCard({label: 'Ganhos', cls: 'gain', v: fN(x.won), sub: `${fN(x.lost)} ${x.lost === 1 ? 'perdido' : 'perdidos'} no período`, extra: pa('won', insN1), d: insVarN(x.won, B && B.won, 1, rotMed, ['ganho', 'ganhos']),
       tip: 'Negócios marcados como ganhos dentro do período (sem lançamentos retroativos)'}),
-    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.lat ? 'o investimento não se divide pelo filtro de consultor/origem/status/etapa/etiqueta' : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads no período`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
+    kpiCard({label: 'Custo por lead (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : fRs(x.cpl), sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.lat ? 'o investimento não se divide pelo filtro de consultor/origem/status/etapa (só a etiqueta Digital funciona)' : `${fRs(x.inv)} investidos · ${fN(x.pagos)} leads no período`, extra: pa('cpl', fRs), d: insVar(x.cpl, B && B.cpl, -1, fRs, rotMed),
       tip: 'Investimento no Meta Ads (campanhas B2C) ÷ leads que entraram no período (todas as origens, mesmo número de Leads novos e da Performance)'})
     ,kpiCard({label: 'Custo por ganho (Meta)', cls: S.camp && !PAGAS[S.camp] ? 'off' : '', v: S.camp && !PAGAS[S.camp] ? '–' : x.wonPagos && !x.lat ? fRs(x.cpg) : '–',
-      sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.lat ? 'o investimento não se divide pelo filtro de consultor/origem/status/etapa/etiqueta' : x.wonPagos ? `${fRs(x.inv)} investidos · ${fN(x.wonPagos)} ${x.wonPagos === 1 ? 'ganho' : 'ganhos'} no período` : `${fRs(x.inv)} investidos · nenhum ganho no período`,
+      sub: S.camp && !PAGAS[S.camp] ? `${ESC(CP)} não tem mídia paga na Meta` : x.lat ? 'o investimento não se divide pelo filtro de consultor/origem/status/etapa (só a etiqueta Digital funciona)' : x.wonPagos ? `${fRs(x.inv)} investidos · ${fN(x.wonPagos)} ${x.wonPagos === 1 ? 'ganho' : 'ganhos'} no período` : `${fRs(x.inv)} investidos · nenhum ganho no período`,
       extra: pa('cpg', fRs), d: insVar(x.cpg, B && B.cpg, -1, fRs, rotMed),
       tip: 'Investimento no Meta Ads (campanhas B2C) no período ÷ ganhos no período (todas as origens, mesmo número do card Ganhos, da Visão Macro e da Performance)'})
   ].join('') + '</div>';
