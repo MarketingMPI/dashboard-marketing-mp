@@ -5000,7 +5000,7 @@ function viewOffline() {
   const k = C.res.kpis, e = C.res.eventos, pk = P.res.kpis, pe = P.res.eventos;
   let h = viewHead('Visão Macro · Offline', `Leads que não vêm da mídia: indicações (IND), Multi Family Office (MFO) e eventos (EVT) · ${periodCaption()} · agendados, reuniões, ganhos e perdidos = o que aconteceu no período`);
   h += '<div class="offpf" role="radiogroup" aria-label="Pré-filtro">' + OFF_PF.map(([id, sig, o]) =>
-    `<button type="button" data-offp="${id}" class="${pf === id ? 'on' : ''}" role="radio" aria-checked="${pf === id}"${o ? ` data-tip="${ESC(`${OFF_NOME[id]}: negócios com origem ${o} (etiqueta ou prefixo do título no Pipedrive)`)}"` : ''}><b>${sig}</b>${o ? OFF_NOME[id] : 'IND + MFO + EVT'}<small>${fN(conta(id))}</small></button>`).join('') + '</div>';
+    `<button type="button" data-offp="${id}" class="${pf === id ? 'on' : ''}" role="radio" aria-checked="${pf === id}"${o ? ` data-tip="${ESC(`${OFF_NOME[id]}: negócios com origem ${o} (etiqueta ou prefixo do título no Pipedrive)`)}"` : ''}><b>${sig}</b>${o ? OFF_NOME[id] : ''}<small>${fN(conta(id))}</small></button>`).join('') + '</div>';
   const pct = (a, b) => b ? fP(a / b * 100) : '–';
   h += '<div class="kpis k6">' + [
     kpiCard({label: 'Leads no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k.abertos)} ainda em aberto hoje`, d: delta(k.leads, pk.leads, 0), tip: 'Negócios do pré-filtro que entraram no Funil Alpha no período'}),
