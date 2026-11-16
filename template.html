@@ -5031,10 +5031,10 @@ function viewOffline() {
     kpiCard({label: 'Perdidos', v: fN(e.perdidos), sub: 'perdidos no período', d: delta(e.perdidos, pe.perdidos, -1), tip: 'Negócios perdidos no período'})
   ].join('') + '</div>';
   h += `<div class="card mt"><div class="ch"><div><h3>Funil do período${pf === 'todos' ? '' : ' · ' + OFF_NOME[pf]}</h3><p>Leads do período → contatados; agendados, reuniões e ganhos = o que aconteceu no período (mesmas contas da Visão Macro)</p></div></div>
-    <div class="evf"><div class="fs2"><span>Leads</span><b>${fN(k.leads)}</b></div><div class="ar">contato<b>${pct(k.contatados, k.leads)}</b></div>
-    <div class="fs2"><span>Contatados</span><b>${fN(k.contatados)}</b></div><div class="ar">agendou<b>${fPc(pctOf(e.agendamentos, k.leads))}</b></div>
-    <div class="fs2"><span>Agendados</span><b>${fN(e.agendamentos)}</b></div><div class="ar">realizou<b>${fPc(pctOf(e.reunioes, e.agendamentos))}</b></div>
-    <div class="fs2"><span>Reuniões</span><b>${fN(e.reunioes)}</b></div><div class="ar">fechou<b>${fPc(pctOf(e.ganhos, e.reunioes))}</b></div>
+    <div class="evf"><div class="fs2"><span>Leads</span><b>${fN(k.leads)}</b></div><div class="ar" data-tip="${ESC(`Contatados ÷ leads do período: ${fN(k.contatados)} ÷ ${fN(k.leads)}`)}">contato<b>${fPc(pctOf(k.contatados, k.leads))}</b></div>
+    <div class="fs2"><span>Contatados</span><b>${fN(k.contatados)}</b></div><div class="ar" data-tip="${ESC(`Agendados ÷ contatados: ${fN(e.agendamentos)} ÷ ${fN(k.contatados)} (mesma conta da Visão Macro). Agendados ÷ leads: ${fPc(pctOf(e.agendamentos, k.leads))}`)}">agendou<b>${fPc(pctOf(e.agendamentos, k.contatados))}</b></div>
+    <div class="fs2"><span>Agendados</span><b>${fN(e.agendamentos)}</b></div><div class="ar" data-tip="${ESC(`Reuniões realizadas ÷ agendadas no período: ${fN(e.reunioes)} ÷ ${fN(e.agendamentos)}`)}">realizou<b>${fPc(pctOf(e.reunioes, e.agendamentos))}</b></div>
+    <div class="fs2"><span>Reuniões</span><b>${fN(e.reunioes)}</b></div><div class="ar" data-tip="${ESC(`Ganhos ÷ reuniões realizadas no período: ${fN(e.ganhos)} ÷ ${fN(e.reunioes)}`)}">fechou<b>${fPc(pctOf(e.ganhos, e.reunioes))}</b></div>
     <div class="fs2"><span>Ganhos</span><b>${fN(e.ganhos)}</b></div></div></div>`;
   const lista = offLeadsHtml(C.rows.map(r => r.l));
   if (pf !== 'evt') return h + lista;
