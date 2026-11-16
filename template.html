@@ -270,7 +270,7 @@ table.t tr.tot td{background:#f7faf8;font-weight:700;border-top:1px solid var(--
 .evq span{display:block;font-size:10.5px;color:#69727d}.evq b{font-size:16px}
 .evt{display:flex;gap:10px}.evt div{flex:1;font-size:11.5px;color:#69727d}.evt .bar{height:6px;background:#e8eeeb;border-radius:9px;overflow:hidden;margin-top:3px}.evt .bar i{display:block;height:100%;background:#00a611}
 .evf{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;margin-bottom:14px}.evf .fs2{flex:1;min-width:120px;background:#f3f7f5;border-radius:10px;padding:10px 12px}
-.evf .fs2 span{color:#69727d;font-size:12px}.evf .fs2 b{display:block;font-size:20px;color:#00503c}.evf .ar{align-self:center;color:#69727d;font-size:11px;text-align:center;min-width:64px}.evf .ar b{display:block;color:#1c1c1c;font-size:13px}.evf .gap{width:14px}
+.evf .fs2 span{color:#69727d;font-size:12px}.evf .fs2.fstot{background:#00503c;flex:0 0 auto;min-width:150px}.evf .fs2.fstot span,.evf .fs2.fstot small{color:#cfe6d8}.evf .fs2.fstot b{color:#fff}.evf .fs2.fstot small{display:block;font-size:11px}.evf .fs2 b{display:block;font-size:20px;color:#00503c}.evf .ar{align-self:center;color:#69727d;font-size:11px;text-align:center;min-width:64px}.evf .ar b{display:block;color:#1c1c1c;font-size:13px}.evf .gap{width:14px}
 .evtg{font-size:11px;border-radius:99px;padding:2px 8px;background:#eef2f0;white-space:nowrap}.evtg.p{background:#e3f6e6;color:#0b7a1a}.evtg.c{background:#00503c;color:#fff}.evtg.l{background:#fff4dc;color:#8a5a00}.evtg.w{background:#e3f6e6;color:#0b7a1a}.evtg.x{background:#fdecea;color:#a3261b}
 @media(min-width:1281px){.kpis.k6{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media(min-width:761px){.kpis.kmac .kpi.hero{grid-row:span 2;display:flex;flex-direction:column;justify-content:center}}
@@ -5035,7 +5035,7 @@ function viewOffline() {
     <div class="fs2"><span>Contatados</span><b>${fN(k.contatados)}</b></div><div class="ar" data-tip="${ESC(`Agendados ÷ contatados: ${fN(e.agendamentos)} ÷ ${fN(k.contatados)} (mesma conta da Visão Macro). Agendados ÷ leads: ${fPc(pctOf(e.agendamentos, k.leads))}`)}">agendou<b>${fPc(pctOf(e.agendamentos, k.contatados))}</b></div>
     <div class="fs2"><span>Agendados</span><b>${fN(e.agendamentos)}</b></div><div class="ar" data-tip="${ESC(`Reuniões realizadas ÷ agendadas no período: ${fN(e.reunioes)} ÷ ${fN(e.agendamentos)}`)}">realizou<b>${fPc(pctOf(e.reunioes, e.agendamentos))}</b></div>
     <div class="fs2"><span>Reuniões</span><b>${fN(e.reunioes)}</b></div><div class="ar" data-tip="${ESC(`Ganhos ÷ reuniões realizadas no período: ${fN(e.ganhos)} ÷ ${fN(e.reunioes)}`)}">fechou<b>${fPc(pctOf(e.ganhos, e.reunioes))}</b></div>
-    <div class="fs2"><span>Ganhos</span><b>${fN(e.ganhos)}</b></div></div></div>`;
+    <div class="fs2"><span>Ganhos</span><b>${fN(e.ganhos)}</b></div><div class="gap"></div><div class="fs2 fstot" data-tip="${ESC(`Conversão do funil inteiro = ganhos no período ÷ leads que entraram no período: ${fN(e.ganhos)} ÷ ${fN(k.leads)}`)}"><span>Leads → clientes</span><b>${fPc(pctOf(e.ganhos, k.leads))}</b><small>${fN(e.ganhos)} de ${fN(k.leads)} leads</small></div></div></div>`;
   const lista = offLeadsHtml(C.rows.map(r => r.l));
   if (pf !== 'evt') return h + lista;
 
