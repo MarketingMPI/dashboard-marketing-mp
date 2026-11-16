@@ -1977,7 +1977,7 @@ const DIMS = [
   {k: 'etapas', nome: 'Etapa', h: 'et'}, {k: 'etiquetas', nome: 'Etiqueta', h: 'lb'}, {k: 'motivos', nome: 'Motivo da perda', h: 'mt', hidden: true}];
 let LEADS = [], BYID = new Map(), AGORA_STR = '', AGORA = 0, TODAY = '', MIN_DAY = '';
 const S = {
-  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: true, camp: '', igModo: 'org', offP: 'todos', offEv: '', offF: 'todos',
+  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: true, camp: '', igModo: 'org', offP: 'todos', offEv: '', offF: 'todos', offL: 'todos',
   consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [],
   ll: {sort: 'e', dir: -1, page: 0, quick: 'todos'}, lost: {sort: 'l', dir: -1, page: 0},
   cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false, mapaM: 'carteira', consM: 'periodo', mapaOpen: {}
@@ -4993,6 +4993,26 @@ function offEventos() {
       convWon: cv.filter(l => l.s === 'won').length, won: ls.filter(l => l.s === 'won').length, marc: p.length + c.length + cv.length > 0};   // marc = evento já tem alguma marcação (senão a presença fica '–')
   }).sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
+/* Leads, um a um (16/11/2026, igual ao Indique e Ganhe): leads do pré-filtro que ENTRARAM no período (mesmo número do card
+   'Leads no período'), da entrada mais recente para a mais antiga · clique no nome abre o negócio no Pipedrive. */
+const OFF_LF = [['todos', 'Todos', () => true], ['open', 'Em andamento', l => l.s === 'open'], ['won', 'Viraram clientes', l => l.s === 'won'], ['lost', 'Perdidos', l => l.s === 'lost']];
+function offLeadsHtml(ls) {
+  const F = OFF_LF.find(x => x[0] === S.offL) || OFF_LF[0];
+  const L = ls.filter(F[2]).sort((a, b) => String(b.e).localeCompare(String(a.e)));
+  const sig = l => ({Indicação: 'IND', MFO: 'MFO', Eventos: 'EVT'})[l.o] || l.o;
+  const evs = l => l.o === 'Eventos' ? evChaves(l).map(evNome).join(', ') : '';
+  const sit = l => l.s === 'won' ? `${statusPill('won')}${l.w ? `<div class="mut">em ${fDay(l.w.slice(0, 10))}</div>` : ''}`
+    : l.s === 'lost' ? `${statusPill('lost')}<div class="mut">${ESC(l.lr || 'Sem motivo informado')}${l.l ? ` · ${fDay(l.l.slice(0, 10))}` : ''}</div>`
+    : `${statusPill('open')}<div class="mut">${ESC(stageName(l.sg))}</div>`;
+  return `<div class="card np mt"><div class="ch" style="padding:16px 20px 0"><div><h3>Leads, um a um</h3><p>${fN(L.length)} ${L.length === 1 ? 'lead' : 'leads'} que entraram no período, do mais recente para o mais antigo · clique no nome para abrir o negócio no Pipedrive</p></div>
+      <div class="seg">${OFF_LF.map(([k, n, f]) => `<button type="button" data-offl="${k}" class="${F[0] === k ? 'on' : ''}">${n}<small>${fN(ls.filter(f).length)}</small></button>`).join('')}</div></div>` +
+    (L.length ? `<div class="tw" style="max-height:560px"><table class="t stk"><thead><tr><th>Entrada</th><th>Lead</th><th>Origem</th><th>Situação no Pipedrive</th><th>Responsável</th></tr></thead><tbody>` +
+      L.map(l => `<tr><td>${fDMT(l.e)}<span class="wd">${WD[weekday(l.e.slice(0, 10))]}</span></td>
+        <td style="max-width:240px"><div class="lname"><a href="${pdUrl(l.id)}" target="_blank" rel="noopener" title="Abrir no Pipedrive">${ESC(l.n || '')}</a><span class="ext">↗</span></div></td>
+        <td class="wrap" style="max-width:220px"><b>${ESC(sig(l))}</b> · ${ESC(l.o)}${evs(l) ? `<div class="mut">${ESC(evs(l))}</div>` : ''}</td>
+        <td class="wrap" style="max-width:240px">${sit(l)}</td><td class="wrap" style="max-width:160px">${ESC(l.c || '–')}</td></tr>`).join('') + '</tbody></table></div>'
+      : emptyBox('Nenhum lead neste filtro', 'Escolha outro filtro acima ou ajuste o período.')) + '</div>';
+}
 function viewOffline() {
   const pf = OFF_PF.some(x => x[0] === S.offP) ? S.offP : 'todos';
   const conta = id => { const pr = makePred(offFiltros(id)); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
@@ -5016,11 +5036,12 @@ function viewOffline() {
     <div class="fs2"><span>Agendados</span><b>${fN(e.agendamentos)}</b></div><div class="ar">realizou<b>${fPc(pctOf(e.reunioes, e.agendamentos))}</b></div>
     <div class="fs2"><span>Reuniões</span><b>${fN(e.reunioes)}</b></div><div class="ar">fechou<b>${fPc(pctOf(e.ganhos, e.reunioes))}</b></div>
     <div class="fs2"><span>Ganhos</span><b>${fN(e.ganhos)}</b></div></div></div>`;
-  if (pf !== 'evt') return h;
+  const lista = offLeadsHtml(C.rows.map(r => r.l));
+  if (pf !== 'evt') return h + lista;
 
   // ---- eventos: um bloco por evento ----
   const EV = offEventos();
-  if (!EV.length) return h + `<div class="card mt">${emptyBox('Nenhum lead de evento no período', 'Ajuste o período no topo.')}</div>`;
+  if (!EV.length) return h + `<div class="card mt">${emptyBox('Nenhum lead de evento no período', 'Ajuste o período no topo.')}</div>` + lista;
   const semMarca = !EV.some(x => x.pres || x.conv || x.cli);
   if (semMarca) h += `<div class="note mt">Para preencher <b>Presentes</b>, <b>Leads (convidados)</b> e <b>Clientes</b>, marque o negócio no Pipedrive com a etiqueta <b>PRESENTE</b>, <b>CONVIDADO</b> ou <b>CLIENTE</b>. Hoje nenhum negócio de evento tem essas etiquetas, por isso aparecem zerados.</div>`;
   const sel = EV.find(x => x.k === S.offEv) || null;
@@ -5030,9 +5051,9 @@ function viewOffline() {
       <div class="evq"><div><span>Lista total</span><b>${fN(x.tot)}</b></div><div><span>Presentes</span><b>${fN(x.pres)}</b></div><div><span>Leads</span><b>${fN(x.conv)}</b></div><div><span>Clientes</span><b>${fN(x.cli)}</b></div></div>
       <div class="evt"><div>Presença <b>${x.marc ? fPc(pctOf(x.pres, x.tot)) : '–'}</b><div class="bar"><i style="width:${Math.min(100, pctOf(x.pres, x.tot) || 0)}%"></i></div></div>
       <div>Lead → cliente <b>${x.conv ? fPc(pctOf(x.convWon, x.conv)) : '–'}</b><div class="bar"><i style="width:${Math.min(100, pctOf(x.convWon, x.conv) || 0)}%"></i></div></div></div></div>`).join('') + '</div></div>';
-  if (!sel) return h;
+  if (!sel) return h + lista;
   const F = ['todos', 'p', 'l', 'c'].includes(S.offF) ? S.offF : 'todos';
-  const lista = sel.ls.filter(l => F === 'todos' || evtMarca(l, F)).sort((a, b) => String(b.e).localeCompare(String(a.e)));
+  const listaEv = sel.ls.filter(l => F === 'todos' || evtMarca(l, F)).sort((a, b) => String(b.e).localeCompare(String(a.e)));
   const sit = l => l.s === 'won' ? '<span class="evtg w">Ganho</span>' : l.s === 'lost' ? '<span class="evtg x">Perdido</span>' : 'Aberto';
   const tipo = l => evtMarca(l, 'c') ? '<span class="evtg c">Cliente</span>' : evtMarca(l, 'l') ? '<span class="evtg l">Lead (convidado)</span>' : '<span class="evtg">não marcado</span>';
   h += `<div class="card mt"><div class="ch"><div><h3>${ESC(sel.nome)}</h3><p>Etiqueta ${ESC(sel.k)} · ${ESC(sel.data)} · todos os negócios do Funil Alpha deste evento que entraram no período</p></div></div>
@@ -5043,9 +5064,9 @@ function viewOffline() {
     <div class="fs2"><span>Clientes</span><b>${fN(sel.cli)}</b></div><div class="fs2"><span>Ganhos do evento</span><b>${fN(sel.won)}</b></div></div>
     <div class="seg" style="margin-bottom:10px">${[['todos', 'Lista total', sel.tot], ['p', 'Presentes', sel.pres], ['l', 'Leads', sel.conv], ['c', 'Clientes', sel.cli]].map(([id, n, q]) => `<button type="button" data-offf="${id}" class="${F === id ? 'on' : ''}">${n} (${fN(q)})</button>`).join('')}</div>
     <div class="tw"><table class="t"><thead><tr><th>Negócio</th><th>Tipo</th><th>Presença</th><th>Etapa</th><th>Consultor</th><th>Entrada</th><th>Situação</th></tr></thead><tbody>` +
-    (lista.length ? lista.map(l => `<tr data-lead="${l.id}" style="cursor:pointer"><td class="wrap">${ESC(l.n || '')}</td><td>${tipo(l)}</td><td>${evtMarca(l, 'p') ? '<span class="evtg p">Presente</span>' : '–'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
+    (listaEv.length ? listaEv.map(l => `<tr data-lead="${l.id}" style="cursor:pointer"><td class="wrap">${ESC(l.n || '')}</td><td>${tipo(l)}</td><td>${evtMarca(l, 'p') ? '<span class="evtg p">Presente</span>' : '–'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
       : '<tr><td colspan="7" class="mut">Nenhum negócio com essa marcação neste evento.</td></tr>') + '</tbody></table></div></div>';
-  return h;
+  return h + lista;
 }
 function viewConsultores() {
   const C = cur(), cs = C.res.consultores.map(c => { const e = evCons(c.consultor);
@@ -5948,8 +5969,9 @@ function bindEvents() {
     if (row) { openDrawer(row.dataset.lead); return; }
     const mpg = t.closest('[data-mpg]'), mpmb = t.closest('[data-mpmb]');
     if (mpg || mpmb) { if (mpg) { S.mpG = mpg.dataset.mpg; S.mpMB = null; } else { const k = Number(mpmb.dataset.mpmb); S.mpMB = S.mpMB === k ? null : k; } const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
-    const offp = t.closest('[data-offp]'), offev = t.closest('[data-offev]'), offf = t.closest('[data-offf]');
-    if (offp || offev || offf) { const y = window.scrollY;
+    const offp = t.closest('[data-offp]'), offev = t.closest('[data-offev]'), offf = t.closest('[data-offf]'), offl = t.closest('[data-offl]');
+    if (offp || offev || offf || offl) { const y = window.scrollY;
+      if (offl) S.offL = offl.dataset.offl;
       if (offp) { S.offP = offp.dataset.offp; S.offEv = ''; S.offF = 'todos'; }
       if (offev) { S.offEv = S.offEv === offev.dataset.offev ? '' : offev.dataset.offev; S.offF = 'todos'; }
       if (offf) S.offF = offf.dataset.offf;
