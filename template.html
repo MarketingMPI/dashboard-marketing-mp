@@ -260,7 +260,7 @@ table.t tr.tot td{background:#f7faf8;font-weight:700;border-top:1px solid var(--
 .empty b{display:block;color:var(--txt);font-size:14.5px;margin-bottom:3px;font-weight:600}
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
-.offpf{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.offpf button{border:1px solid var(--linha);background:#fff;border-radius:99px;padding:8px 15px;cursor:pointer;font:inherit;font-size:13px;color:#1c1c1c}
+.offpf{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}.offtg{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 16px}.offtg>span{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#69727d;margin-right:4px}.offtg button{border:1px solid var(--linha);background:#fff;border-radius:99px;padding:4px 11px;cursor:pointer;font:inherit;font-size:12px;color:#1c1c1c}.offtg button small{color:#69727d;margin-left:5px}.offtg button.on{background:#e6f1ec;border-color:#00503c;color:#00503c;font-weight:600}.offtg em{font-size:11.5px;font-style:normal;margin-left:4px}.offpf button{border:1px solid var(--linha);background:#fff;border-radius:99px;padding:8px 15px;cursor:pointer;font:inherit;font-size:13px;color:#1c1c1c}
 .offpf button b{margin-right:5px}.offpf button small{color:#69727d;margin-left:6px}.offpf button.on{background:#00503c;border-color:#00503c;color:#fff}.offpf button.on small{color:#cfe6d8}
 .evg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}@media(max-width:1100px){.evg{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .evc{border:1px solid var(--linha);border-radius:14px;padding:14px;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}
@@ -1184,6 +1184,8 @@ function makePred(f, skip) {
     if (LB && !(l.lb || []).some(x => LB.has(x))) return false;
     if (MT && !(l.s === 'lost' && MT.has(l.lr || SEM_MOTIVO))) return false;
     if (q && !norm(l.n).includes(q)) return false;
+    if (f.offline && ehDigitalLb(l)) return false;   // B2C - Offline (17/11/2026): todo o Funil Alpha SEM a etiqueta Digital
+    if (f.offTag && (f.offTag === OFF_SEM_TAG ? (l.lb || []).length : !(l.lb || []).includes(f.offTag))) return false;
     return true;
   };
 }
@@ -1989,7 +1991,7 @@ const DIMS = [
   {k: 'etapas', nome: 'Etapa', h: 'et'}, {k: 'etiquetas', nome: 'Etiqueta', h: 'lb'}, {k: 'motivos', nome: 'Motivo da perda', h: 'mt', hidden: true}];
 let LEADS = [], BYID = new Map(), AGORA_STR = '', AGORA = 0, TODAY = '', MIN_DAY = '';
 const S = {
-  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: true, camp: '', igModo: 'org', offP: 'todos', offEv: '', offF: 'todos', offL: 'todos',
+  tab: 'macro', preset: '7d', de: '', ate: '', busca: '', perdaData: true, camp: '', igModo: 'org', offP: 'todos', offT: '', offEv: '', offF: 'todos', offL: 'todos',
   consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [],
   ll: {sort: 'e', dir: -1, page: 0, quick: 'todos'}, lost: {sort: 'l', dir: -1, page: 0},
   cons: {sort: 'leads', dir: -1}, aging: null, tlAll: false, mapaM: 'carteira', consM: 'periodo', mapaOpen: {}
@@ -5014,9 +5016,21 @@ const CONS_COLS = [
    somam sem repetir ninguém. Dados básicos = mesmas contas da Visão Macro (filtro de data e filtros laterais valem).
    Eventos: um bloco por etiqueta de evento (EV-…, EVFO-…, EV3FO; título EV3FO/IND EVFO). Marcação no Pipedrive por
    etiqueta no negócio: PRESENTE, CONVIDADO e CLIENTE (também aceitas com prefixo EVT-, ex.: EVT-PRESENTE). */
-const OFF_PF = [['todos', 'Todos', null], ['ind', 'IND', 'Indicação'], ['mfo', 'MFO', 'MFO'], ['evt', 'EVT', 'Eventos']];
-const OFF_NOME = {ind: 'Indicação', mfo: 'Multi Family Office', evt: 'Eventos'};
-const OFF_ORIG = OFF_PF.filter(x => x[2]).map(x => x[2]);
+/* B2C - Offline (17/11/2026, pedido do usuário): TODOS os negócios do Funil Alpha que NÃO têm a etiqueta Digital.
+   Pré-filtro = origem do negócio (cada negócio em um só grupo, então os grupos somam o Todos); 'Outros' = qualquer
+   origem fora dos grupos nomeados (sem etiqueta de origem, TRD-INT…). Segunda linha = filtro por etiqueta do Pipedrive. */
+const OFF_PF = [['todos', 'Todos', null], ['ind', 'IND', 'Indicação'], ['mfo', 'MFO', 'MFO'], ['evt', 'EVT', 'Eventos'],
+  ['exc', 'EXC', 'Ex-cliente'], ['pro', 'PROSP', 'Prospecção'], ['cur', 'CWB', 'Curitiba'], ['out', 'OUT', '*']];
+const OFF_NOME = {ind: 'Indicação', mfo: 'Multi Family Office', evt: 'Eventos', exc: 'Ex-cliente', pro: 'Prospecção', cur: 'Curitiba', out: 'Outros'};
+const OFF_ORIG = OFF_PF.filter(x => x[2] && x[2] !== '*').map(x => x[2]);
+const OFF_SEM_TAG = '__sem_etiqueta__';
+const ehDigitalLb = l => (l.lb || []).some(x => /^digital$/i.test(String(x).trim()));
+function offOrigens(pf) {   // origens do pré-filtro; 'out' = todas as origens fora dos grupos nomeados
+  if (pf === 'todos') return null;
+  const o = OFF_PF.find(x => x[0] === pf)[2];
+  if (o !== '*') return [o];
+  return [...new Set(LEADS.filter(l => !ehDigitalLb(l)).map(l => l.o))].filter(x => !OFF_ORIG.includes(x));
+}
 const EVT_MARCA = {p: /^(EVT[-\s]?)?PRESENTE$/i, l: /^(EVT[-\s]?)?CONVIDADO$/i, c: /^(EVT[-\s]?)?CLIENTE( ATUAL)?$/i};
 const evtMarca = (l, k) => (l.lb || []).some(x => EVT_MARCA[k].test(String(x).trim()));
 const MES3 = {JAN: 'jan', FEV: 'fev', MAR: 'mar', ABR: 'abr', MAI: 'mai', JUN: 'jun', JUL: 'jul', AGO: 'ago', SET: 'set', OUT: 'out', NOV: 'nov', DEZ: 'dez'};
@@ -5038,10 +5052,24 @@ function evData(k) {
   const m = k.match(/(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)(\d{2})/); if (m) return `${MES3[m[1]]}/20${m[2]}`;
   return 'sem data na etiqueta';
 }
-function offFiltros(pf, over) {   // pré-filtro × filtro lateral de origem (os dois valem)
-  const sel = pf === 'todos' ? OFF_ORIG : [OFF_PF.find(x => x[0] === pf)[2]];
-  const orig = S.origens.length ? sel.filter(o => S.origens.includes(o)) : sel;
-  return filtros(Object.assign({origens: orig.length ? orig : ['__nenhuma__'], campanha: null}, over || {}));
+function offFiltros(pf, over) {   // base sem Digital × pré-filtro de origem × etiqueta da página × filtro lateral de origem (todos valem)
+  const sel = offOrigens(pf);
+  const orig = !sel ? S.origens.slice() : S.origens.length ? sel.filter(o => S.origens.includes(o)) : sel;
+  return filtros(Object.assign({origens: sel && !orig.length ? ['__nenhuma__'] : orig, campanha: null, offline: true, offTag: S.offT || ''}, over || {}));
+}
+function offTagsHtml(pf) {   // linha de etiquetas: contagem com o pré-filtro e os filtros laterais, sem o filtro de etiqueta
+  const pr = makePred(offFiltros(pf, {offTag: ''})), cnt = new Map(); let sem = 0, tot = 0, evn = 0;
+  for (const l of LEADS) { if (!pr(l)) continue; tot++; const lb = l.lb || []; if (!lb.length) sem++;
+    if (lb.some(x => EV_LB_RX.test(String(x).trim()))) evn++;
+    for (const x of new Set(lb)) if (!EV_LB_RX.test(String(x).trim())) cnt.set(x, (cnt.get(x) || 0) + 1); }
+  const atual = S.offT || '';
+  const its = [['', 'Todas', tot, 'Todas as etiquetas (sem filtro de etiqueta)']]
+    .concat([...cnt].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), 'pt-BR')).map(([k, n]) => [k, k, n, `Negócios com a etiqueta ${k} no Pipedrive (qualquer origem)`]))
+    .concat([[OFF_SEM_TAG, 'Sem etiqueta', sem, 'Negócios sem nenhuma etiqueta no Pipedrive']]);
+  if (atual && !its.some(x => x[0] === atual)) its.push([atual, atual === OFF_SEM_TAG ? 'Sem etiqueta' : atual, 0, 'Nenhum negócio com esta etiqueta no período']);
+  return `<div class="offtg" role="radiogroup" aria-label="Etiqueta"><span>Etiqueta</span>` + its.map(([k, nome, n, tip]) =>
+    `<button type="button" data-offt="${ESC(k)}" class="${atual === k ? 'on' : ''}" role="radio" aria-checked="${atual === k}" data-tip="${ESC(tip)}">${ESC(nome)}<small>${fN(n)}</small></button>`).join('')
+    + (evn ? `<em class="mut" data-tip="As etiquetas de evento (EV-…, EVFO-…) ficam no pré-filtro EVT, com um bloco por evento">etiquetas de evento: use EVT</em>` : '') + '</div>';
 }
 function offEventos() {
   const pr = makePred(offFiltros('evt')), ev = new Map();
@@ -5091,9 +5119,9 @@ function viewOffline() {
   const conta = id => { const pr = makePred(offFiltros(id)); return LEADS.reduce((a, l) => a + (pr(l) ? 1 : 0), 0); };
   const C = run(offFiltros(pf)), [pd, pa] = prevRange(), P = run(offFiltros(pf, {de: pd, ate: pa}));
   const k = C.res.kpis, e = C.res.eventos, pk = P.res.kpis, pe = P.res.eventos;
-  let h = viewHead('Visão Macro · B2C - Offline', `Leads que não vêm da mídia: indicações (IND), Multi Family Office (MFO) e eventos (EVT) · ${periodCaption()} · agendados, reuniões, ganhos e perdidos = o que aconteceu no período`);
+  let h = viewHead('Visão Macro · B2C - Offline', `Todos os negócios do Funil Alpha <b>sem a etiqueta Digital</b> · pré-filtro por origem e filtro por etiqueta · ${periodCaption()} · agendados, reuniões, ganhos e perdidos = o que aconteceu no período`);
   h += '<div class="offpf" role="radiogroup" aria-label="Pré-filtro">' + OFF_PF.map(([id, sig, o]) =>
-    `<button type="button" data-offp="${id}" class="${pf === id ? 'on' : ''}" role="radio" aria-checked="${pf === id}"${o ? ` data-tip="${ESC(`${OFF_NOME[id]}: negócios com origem ${o} (etiqueta ou prefixo do título no Pipedrive)`)}"` : ''}><b>${sig}</b>${o ? OFF_NOME[id] : ''}<small>${fN(conta(id))}</small></button>`).join('') + '</div>';
+    `<button type="button" data-offp="${id}" class="${pf === id ? 'on' : ''}" role="radio" aria-checked="${pf === id}"${o ? ` data-tip="${ESC(o === '*' ? 'Outros: negócios sem a etiqueta Digital cuja origem não é nenhum dos grupos ao lado (sem etiqueta de origem, TRD-INT…)' : `${OFF_NOME[id]}: negócios com origem ${o} (etiqueta ou prefixo do título no Pipedrive)`)}"` : ' data-tip="Todos os negócios do Funil Alpha sem a etiqueta Digital"'}><b>${sig}</b>${o ? OFF_NOME[id] : ''}<small>${fN(conta(id))}</small></button>`).join('') + '</div>' + offTagsHtml(pf);
   const pct = (a, b) => b ? fP(a / b * 100) : '–';
   h += '<div class="kpis k6">' + [
     kpiCard({label: 'Leads no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k.abertos)} ainda em aberto hoje`, d: delta(k.leads, pk.leads, 0), tip: 'Negócios do pré-filtro que entraram no Funil Alpha no período'}),
@@ -5103,7 +5131,7 @@ function viewOffline() {
     kpiCard({label: 'Ganhos', cls: 'gain', v: fN(e.ganhos), sub: 'viraram cliente no período', d: delta(e.ganhos, pe.ganhos), tip: 'Negócios ganhos no período'}),
     kpiCard({label: 'Perdidos', v: fN(e.perdidos), sub: 'perdidos no período', d: delta(e.perdidos, pe.perdidos, -1), tip: 'Negócios perdidos no período'})
   ].join('') + '</div>';
-  h += `<div class="card mt"><div class="ch"><div><h3>Funil do período${pf === 'todos' ? '' : ' · ' + OFF_NOME[pf]}</h3><p>Leads do período → contatados; agendados, reuniões e ganhos = o que aconteceu no período (mesmas contas da Visão Macro)</p></div></div>
+  h += `<div class="card mt"><div class="ch"><div><h3>Funil do período${pf === 'todos' ? '' : ' · ' + OFF_NOME[pf]}${S.offT ? ' · etiqueta ' + ESC(S.offT === OFF_SEM_TAG ? 'nenhuma' : S.offT) : ''}</h3><p>Leads do período → contatados; agendados, reuniões e ganhos = o que aconteceu no período (mesmas contas da Visão Macro)</p></div></div>
     <div class="evf"><div class="fs2"><span>Leads</span><b>${fN(k.leads)}</b></div><div class="ar" data-tip="${ESC(`Contatados ÷ leads do período: ${fN(k.contatados)} ÷ ${fN(k.leads)}`)}">contato<b>${fPc(pctOf(k.contatados, k.leads))}</b></div>
     <div class="fs2"><span>Contatados</span><b>${fN(k.contatados)}</b></div><div class="ar" data-tip="${ESC(`Agendados ÷ contatados: ${fN(e.agendamentos)} ÷ ${fN(k.contatados)} (mesma conta da Visão Macro). Agendados ÷ leads: ${fPc(pctOf(e.agendamentos, k.leads))}`)}">agendou<b>${fPc(pctOf(e.agendamentos, k.contatados))}</b></div>
     <div class="fs2"><span>Agendados</span><b>${fN(e.agendamentos)}</b></div><div class="ar" data-tip="${ESC(`Reuniões realizadas ÷ agendadas no período: ${fN(e.reunioes)} ÷ ${fN(e.agendamentos)}`)}">realizou<b>${fPc(pctOf(e.reunioes, e.agendamentos))}</b></div>
@@ -6042,8 +6070,9 @@ function bindEvents() {
     if (row) { openDrawer(row.dataset.lead); return; }
     const mpg = t.closest('[data-mpg]'), mpmb = t.closest('[data-mpmb]');
     if (mpg || mpmb) { if (mpg) { S.mpG = mpg.dataset.mpg; S.mpMB = null; } else { const k = Number(mpmb.dataset.mpmb); S.mpMB = S.mpMB === k ? null : k; } const y = window.scrollY; renderView(); window.scrollTo(0, y); return; }
-    const offp = t.closest('[data-offp]'), offev = t.closest('[data-offev]'), offf = t.closest('[data-offf]'), offl = t.closest('[data-offl]');
-    if (offp || offev || offf || offl) { const y = window.scrollY;
+    const offp = t.closest('[data-offp]'), offev = t.closest('[data-offev]'), offf = t.closest('[data-offf]'), offl = t.closest('[data-offl]'), offt = t.closest('[data-offt]');
+    if (offp || offev || offf || offl || offt) { const y = window.scrollY;
+      if (offt) { S.offT = offt.dataset.offt; S.offEv = ''; S.offF = 'todos'; }
       if (offl) S.offL = offl.dataset.offl;
       if (offp) { S.offP = offp.dataset.offp; S.offEv = ''; S.offF = 'todos'; }
       if (offev) { S.offEv = S.offEv === offev.dataset.offev ? '' : offev.dataset.offev; S.offF = 'todos'; }
