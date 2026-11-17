@@ -2901,7 +2901,7 @@ function mpMetaChart(meta, S0, sel, W) {
         if (x.delta > 0) g += `<rect x="${cx - w / 2}" y="${y(x.v)}" width="${w}" height="${Math.max(2, y(ant) - y(x.v))}" fill="#00503c" opacity="${op}"/>`;
       } else if (emLinha) mqlL.push([cx, y(x.v), x]);
       else g += `<rect x="${cx - w / 2}" y="${y(x.v)}" width="${w}" height="${Math.max(x.v ? 2 : 0, y(0) - y(x.v))}" fill="${MP_COR[mpCls(x.pct)]}" opacity="${op}" rx="2"/>`;
-      if (rotulo && !(emLinha && !x.v)) g += `<text class="ax" x="${cx}" y="${y(x.v) - 6}" text-anchor="middle" style="fill:#1c1c1c;font-weight:600">${tick(x.v)}${S0.tipo === 'estoque' && x.delta ? `<tspan style="fill:${x.delta > 0 ? '#00a611' : '#c0392b'}"> ${x.delta > 0 ? '+' : '−'}${tick(Math.abs(x.delta))}</tspan>` : ''}</text>`;
+      if (rotulo && !emLinha) g += `<text class="ax" x="${cx}" y="${y(x.v) - 6}" text-anchor="middle" style="fill:#1c1c1c;font-weight:600">${tick(x.v)}${S0.tipo === 'estoque' && x.delta ? `<tspan style="fill:${x.delta > 0 ? '#00a611' : '#c0392b'}"> ${x.delta > 0 ? '+' : '−'}${tick(Math.abs(x.delta))}</tspan>` : ''}</text>`;
     }
     if (S0.tipo === 'taxa' && x.acc != null) linha.push([cx, y(x.acc)]);
     if (S0.movel && x.mov != null) movL.push([cx, y(x.mov), x.parcial]);
@@ -2922,6 +2922,8 @@ function mpMetaChart(meta, S0, sel, W) {
       + `<polyline points="${mqlL.map(q => q[0] + ',' + q[1]).join(' ')}" fill="none" stroke="#00503c" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
     g += mqlL.map(([a, b, x]) => x.v ? `<circle cx="${a}" cy="${b}" r="${4}" fill="${x.parcial ? '#fff' : MP_COR[mpCls(x.pct)]}" stroke="${MP_COR[mpCls(x.pct)]}" stroke-width="2"/>`
       : `<circle cx="${a}" cy="${b}" r="2" fill="#cfd9d4"/>`).join('');
+    // valor em cima de cada ponto com MQL (inclusive no semanal, 17/11/2026); contorno branco para ler sobre a linha
+    g += mqlL.map(([a, b, x]) => x.v ? `<text class="ax" x="${a}" y="${b - 8}" text-anchor="middle" style="fill:#1c1c1c;font-weight:600;font-size:10.5px;stroke:#fff;stroke-width:3px;paint-order:stroke">${tick(x.v)}</text>` : '').join('');
   }
   if (linha.length > 1) g += `<polyline points="${linha.map(p => p.join(',')).join(' ')}" fill="none" stroke="#1c1c1c" stroke-width="1.6" opacity=".7"/>`;
   g += linha.map(([a, b]) => `<circle cx="${a}" cy="${b}" r="2.6" fill="#1c1c1c" opacity=".75"/>`).join('');
@@ -2940,7 +2942,7 @@ function mpMetaChart(meta, S0, sel, W) {
   }
   const ym = y(S0.alvo);
   g += `<line x1="${pl}" x2="${W - pr}" y1="${ym}" y2="${ym}" stroke="#a8701c" stroke-width="1.6" stroke-dasharray="6 5"/>
-    <text class="ax" x="${W - pr - 4}" y="${ym - 6 < pt ? ym + 12 : ym - 5}" text-anchor="end" style="fill:#a8701c;font-weight:600;stroke:#fff;stroke-width:3px;paint-order:stroke">Meta ${meta.bom === 'baixo' ? 'até ' : ''}${fmtA(S0.alvo)}${S0.tipo === 'fluxo' ? ' por ' + nomeG : ''}</text>`;
+    <text class="ax" x="${emLinha ? pl + 6 : W - pr - 4}" y="${ym - 6 < pt ? ym + 12 : ym - 5}" text-anchor="${emLinha ? 'start' : 'end'}" style="fill:#a8701c;font-weight:600;stroke:#fff;stroke-width:3px;paint-order:stroke">Meta ${meta.bom === 'baixo' ? 'até ' : ''}${fmtA(S0.alvo)}${S0.tipo === 'fluxo' ? ' por ' + nomeG : ''}</text>`;
   return `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Evolução de ${ESC(meta.t)}">${g}</svg></div>`;
 }
 function mpMetaCard(meta, S0, x) {
