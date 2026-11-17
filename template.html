@@ -5018,11 +5018,11 @@ function offLeadsHtml(ls) {
   const sit = l => l.s === 'won' ? `${statusPill('won')}${l.w ? `<div class="mut">em ${fDay(l.w.slice(0, 10))}</div>` : ''}`
     : l.s === 'lost' ? `${statusPill('lost')}<div class="mut">${ESC(l.lr || 'Sem motivo informado')}${l.l ? ` · ${fDay(l.l.slice(0, 10))}` : ''}</div>`
     : `${statusPill('open')}<div class="mut">${ESC(stageName(l.sg))}</div>`;
-  return `<div class="card np mt"><div class="ch" style="padding:16px 20px 0"><div><h3>Leads, um a um</h3><p>${fN(L.length)} ${L.length === 1 ? 'lead' : 'leads'} que entraram no período, do mais recente para o mais antigo · clique no nome para abrir o negócio no Pipedrive</p></div>
+  return `<div class="card np mt"><div class="ch" style="padding:16px 20px 0"><div><h3>Leads, um a um</h3><p>${fN(L.length)} ${L.length === 1 ? 'lead' : 'leads'} que entraram no período, do mais recente para o mais antigo · clique no lead para ver todas as informações · ↗ abre no Pipedrive</p></div>
       <div class="seg">${OFF_LF.map(([k, n, f]) => `<button type="button" data-offl="${k}" class="${F[0] === k ? 'on' : ''}">${n}<small>${fN(ls.filter(f).length)}</small></button>`).join('')}</div></div>` +
     (L.length ? `<div class="tw" style="max-height:560px"><table class="t stk"><thead><tr><th>Entrada</th><th>Lead</th><th>Origem</th><th>Situação no Pipedrive</th><th>Responsável</th></tr></thead><tbody>` +
-      L.map(l => `<tr><td>${fDMT(l.e)}<span class="wd">${WD[weekday(l.e.slice(0, 10))]}</span></td>
-        <td style="max-width:240px"><div class="lname"><a href="${pdUrl(l.id)}" target="_blank" rel="noopener" title="Abrir no Pipedrive">${ESC(l.n || '')}</a><span class="ext">↗</span></div></td>
+      L.map(l => `<tr data-lead="${l.id}" style="cursor:pointer" title="Clique para ver todas as informações do lead"><td>${fDMT(l.e)}<span class="wd">${WD[weekday(l.e.slice(0, 10))]}</span></td>
+        <td style="max-width:260px"><div class="lname"><b>${ESC(l.n || '#' + l.id)}</b> <a href="${pdUrl(l.id)}" target="_blank" rel="noopener" title="Abrir no Pipedrive" class="ext">↗</a></div></td>
         <td class="wrap" style="max-width:220px"><b>${ESC(sig(l))}</b> · ${ESC(l.o)}${evs(l) ? `<div class="mut">${ESC(evs(l))}</div>` : ''}</td>
         <td class="wrap" style="max-width:240px">${sit(l)}</td><td class="wrap" style="max-width:160px">${ESC(l.c || '–')}</td></tr>`).join('') + '</tbody></table></div>'
       : emptyBox('Nenhum lead neste filtro', 'Escolha outro filtro acima ou ajuste o período.')) + '</div>';
@@ -5078,7 +5078,7 @@ function viewOffline() {
     <div class="fs2"><span>Clientes</span><b>${fN(sel.cli)}</b></div><div class="gap"></div><div class="fs2"><span>Em andamento</span><b>${fN(sel.abertos)}</b></div><div class="fs2"><span>Perdidos</span><b>${fN(sel.lost)}</b></div></div>
     <div class="seg" style="margin-bottom:10px">${[['todos', 'Lista total', sel.tot], ['p', 'Presentes', sel.pres], ['l', 'Leads', sel.conv], ['c', 'Clientes', sel.cli]].map(([id, n, q]) => `<button type="button" data-offf="${id}" class="${F === id ? 'on' : ''}">${n} (${fN(q)})</button>`).join('')}</div>
     <div class="tw"><table class="t"><thead><tr><th>Negócio</th><th>Tipo</th><th>Presença</th><th>Etapa</th><th>Consultor</th><th>Entrada</th><th>Situação</th></tr></thead><tbody>` +
-    (listaEv.length ? listaEv.map(l => `<tr data-lead="${l.id}" style="cursor:pointer"><td class="wrap">${ESC(l.n || '')}</td><td>${tipo(l)}</td><td>${sel.ehPres(l) ? '<span class="evtg p">Presente</span>' : '<span class="evtg">Ausente</span>'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
+    (listaEv.length ? listaEv.map(l => `<tr data-lead="${l.id}" style="cursor:pointer" title="Clique para ver todas as informações do lead"><td class="wrap"><b>${ESC(l.n || '#' + l.id)}</b> <a href="${pdUrl(l.id)}" target="_blank" rel="noopener" title="Abrir no Pipedrive" class="ext">↗</a></td><td>${tipo(l)}</td><td>${sel.ehPres(l) ? '<span class="evtg p">Presente</span>' : '<span class="evtg">Ausente</span>'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
       : '<tr><td colspan="7" class="mut">Nenhum negócio com essa marcação neste evento.</td></tr>') + '</tbody></table></div></div>';
   return h + lista;
 }
