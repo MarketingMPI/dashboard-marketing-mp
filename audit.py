@@ -807,6 +807,15 @@ def compute(leads, filtros, agora_str, stages, equipe=(), midia=None):
     for c in equipe:  # equipe atual sempre aparece, zerada
         if c not in grupos and (not fc or c in fc):
             consultores.append({"consultor": c, **bloco([], {})})
+    # espelho do template (17/11/2026): consultor com movimento no período e sem lead novo também aparece, zerado
+    if filtros.get("de") or filtros.get("ate"):
+        tem = {x["consultor"] for x in consultores}
+        fs = {**filtros, "de": "0000-00-00", "ate": "9999-99-99"}
+        cand = sorted({l["c"] for l in filtra(leads, fs) if l["c"] not in tem})
+        for c in cand:
+            e = eventos(leads, {**filtros, "consultores": [c]})
+            if e.get("agendamentos") or e.get("reunioes") or e.get("ganhos") or e.get("perdidos"):
+                consultores.append({"consultor": c, **bloco([], {})})
     consultores.sort(key=lambda x: (-x["leads"], x["consultor"]))
 
     lost = [l for l in P if l["s"] == "lost"]

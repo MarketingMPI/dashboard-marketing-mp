@@ -1278,6 +1278,17 @@ function computeFull(leads, f, agoraStr) {
     pct_contatados: null, media_dias_1o_contato: null, mediana_dias_1o_contato: null, contatos_por_lead: null, agendados: 0, reunioes: 0,
     ganhos: 0, perdidos: 0, abertos: 0, abertos_sem_contato: 0, parados_7d: 0, leads_em_atraso: 0, atividades_atrasadas: 0, leads_sem_proxima: 0,
     leads_vence_hoje: 0, leads_em_dia: 0, abertos_por_etapa: porEtapa([])});
+  // 17/11/2026: quem teve movimento no período (agendamento, reunião, ganho ou perda de lead que entrou antes) sem lead novo
+  // também aparece, zerado nos campos de entrada; senão a soma dos consultores não fecha com a Visão Macro. Espelho: audit.compute.
+  if (f.de || f.ate) {
+    const pS = makePred(f, 'periodo'), tem = new Set(consultores.map(x => x.consultor)), cand = new Set();
+    for (const l of leads || []) if (!tem.has(l.c) && pS(l)) cand.add(l.c);
+    for (const c of cand) { const e = computeEventos(leads, Object.assign({}, f, {consultores: [c]}));
+      if (e.agendamentos || e.reunioes || e.ganhos || e.perdidos) consultores.push({consultor: c, leads: 0, contatados: 0,
+        pct_contatados: null, media_dias_1o_contato: null, mediana_dias_1o_contato: null, contatos_por_lead: null, agendados: 0, reunioes: 0,
+        ganhos: 0, perdidos: 0, abertos: 0, abertos_sem_contato: 0, parados_7d: 0, leads_em_atraso: 0, atividades_atrasadas: 0, leads_sem_proxima: 0,
+        leads_vence_hoje: 0, leads_em_dia: 0, abertos_por_etapa: porEtapa([])}); }
+  }
   consultores.sort((a, b) => b.leads - a.leads || (a.consultor < b.consultor ? -1 : a.consultor > b.consultor ? 1 : 0));
   const lostRows = rows.filter(r => r.d.lost), motivos = {};
   for (const {l} of lostRows) { const m = l.lr || SEM_MOTIVO; motivos[m] = (motivos[m] || 0) + 1; }
