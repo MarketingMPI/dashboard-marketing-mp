@@ -5123,9 +5123,14 @@ function viewOffline() {
   h += '<div class="offpf" role="radiogroup" aria-label="Pré-filtro">' + OFF_PF.map(([id, sig, o]) =>
     `<button type="button" data-offp="${id}" class="${pf === id ? 'on' : ''}" role="radio" aria-checked="${pf === id}"${o ? ` data-tip="${ESC(o === '*' ? 'Outros: negócios sem a etiqueta Digital cuja origem não é nenhum dos grupos ao lado (sem etiqueta de origem, TRD-INT…)' : `${OFF_NOME[id]}: negócios com origem ${o} (etiqueta ou prefixo do título no Pipedrive)`)}"` : ' data-tip="Todos os negócios do Funil Alpha sem a etiqueta Digital"'}><b>${sig}</b>${o ? OFF_NOME[id] : ''}<small>${fN(conta(id))}</small></button>`).join('') + '</div>' + offTagsHtml(pf);
   const pct = (a, b) => b ? fP(a / b * 100) : '–';
-  h += '<div class="kpis k6">' + [
+  // 17/11/2026: + Em aberto e Cultivo (leads do período, situação de hoje; Em aberto + Cultivo = abertos) · 4 cards em cima, 4 embaixo
+  const CULT = 438, situHoje = R => { let ab = 0, cu = 0; for (const r of R.rows) if (r.l.s === 'open') { if (Number(r.l.sg) === CULT) cu++; else ab++; } return {ab, cu}; };
+  const sa = situHoje(C), sp = situHoje(P);
+  h += '<div class="kpis k8">' + [
     kpiCard({label: 'Leads no período', cls: 'hero', v: fN(k.leads), sub: `${fN(k.abertos)} ainda em aberto hoje`, d: delta(k.leads, pk.leads, 0), tip: 'Negócios do pré-filtro que entraram no Funil Alpha no período'}),
     kpiCard({label: 'Com contato', v: `${fN(k.contatados)}<small>${fP(k.pct_contatados)}</small>`, sub: 'dos leads do período', d: delta(k.pct_contatados, pk.pct_contatados, 1, fP), tip: 'Leads com ao menos um contato concluído ou já agendados'}),
+    kpiCard({label: 'Em aberto', v: `${fN(sa.ab)}<small>${pct(sa.ab, k.leads)}</small>`, sub: 'leads do período em andamento hoje', d: delta(sa.ab, sp.ab, 0), tip: 'Leads que entraram no período e hoje estão abertos em uma etapa do funil (MQL, Agendar, Reunião, Negociação ou Fechamento) · não inclui o Cultivo'}),
+    kpiCard({label: 'Cultivo', v: `${fN(sa.cu)}<small>${pct(sa.cu, k.leads)}</small>`, sub: 'leads do período na etapa Cultivo hoje', d: delta(sa.cu, sp.cu, 0), tip: 'Leads que entraram no período e hoje estão abertos na etapa Cultivo do Pipedrive · Em aberto + Cultivo = leads ainda em aberto'}),
     kpiCard({label: 'Agendados', v: fN(e.agendamentos), sub: 'reuniões marcadas no período', d: delta(e.agendamentos, pe.agendamentos), tip: 'Reuniões marcadas no período (lead de qualquer data)'}),
     kpiCard({label: 'Reuniões', v: fN(e.reunioes), sub: 'realizadas no período', d: delta(e.reunioes, pe.reunioes), tip: 'Reuniões concluídas no período'}),
     kpiCard({label: 'Ganhos', cls: 'gain', v: fN(e.ganhos), sub: 'viraram cliente no período', d: delta(e.ganhos, pe.ganhos), tip: 'Negócios ganhos no período'}),
