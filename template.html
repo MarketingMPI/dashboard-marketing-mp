@@ -1928,7 +1928,8 @@ const fDM = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}` : '–';
 const fDT = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)} ${s.slice(11, 16)}` : '–';
 const fDMT = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}${TODAY && s.slice(0, 4) !== TODAY.slice(0, 4) ? '/' + s.slice(2, 4) : ''} ${s.slice(11, 16)}` : '–';
 const STATUS_NOME = {open: 'Aberto', won: 'Ganho', lost: 'Perdido'};
-const STAGE_COL = {345: ['#e6f1ec', '#00503c'], 346: ['#d2e8de', '#00503c'], 348: ['#b4d9c6', '#003326'], 349: ['#7fbf9f', '#003326'], 350: ['#00503c', '#ffffff'], 438: ['#f1ede4', '#6b5a35']};
+// cor por etapa (17/11/2026: cores distintas): MQL azul · Agendar âmbar · Reunião roxo · Negociação laranja · Fechamento verde · Cultivo cinza
+const STAGE_COL = {345: ['#e3eefc', '#1d4f91'], 346: ['#fff3d6', '#8a5a00'], 348: ['#efe6fb', '#5b2d9e'], 349: ['#ffe6d5', '#a2470d'], 350: ['#00503c', '#ffffff'], 438: ['#eceeed', '#4d5753']};
 const stageName = id => (STAGES.find(s => Number(s.id) === Number(id)) || {}).nome || ('Etapa ' + id);
 const stageIdx = id => { const i = STAGES.findIndex(s => Number(s.id) === Number(id)); return i < 0 ? 99 : i; };
 const stagePill = id => { const c = STAGE_COL[id] || ['#eef1f0', '#44514c']; return `<span class="pill" style="background:${c[0]};color:${c[1]}">${ESC(stageName(id))}</span>`; };
