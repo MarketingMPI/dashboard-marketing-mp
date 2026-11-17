@@ -4997,11 +4997,14 @@ function offEventos() {
        do evento que não é CLIENTE (atual) conta como lead. Ganho = virou cliente. Presença só existe com PRESENTE marcado. */
     // 17/11/2026: ganho = virou cliente, então Clientes = marcados CLIENTE + ganhos
     const ehCli = l => evtMarca(l, 'c') || l.s === 'won';
-    const p = ls.filter(l => evtMarca(l, 'p')), c = ls.filter(ehCli);
+    // 17/11/2026 (regra do usuário): quem está no Pipedrive esteve presente no evento. Se algum dia usarem a etiqueta
+    // PRESENTE no evento, passa a valer só quem tem a etiqueta.
+    const temP = ls.some(l => evtMarca(l, 'p')), ehPres = l => temP ? evtMarca(l, 'p') : true;
+    const p = ls.filter(ehPres), c = ls.filter(ehCli);
     const temConv = ls.some(l => evtMarca(l, 'l')), ehLead = l => temConv ? evtMarca(l, 'l') : !evtMarca(l, 'c'), cv = ls.filter(ehLead);
-    return {k, nome: evNome(k), data: evData(k), ls, tot: ls.length, pres: p.length, conv: cv.length, cli: c.length, ehLead, ehCli, temConv,
+    return {k, nome: evNome(k), data: evData(k), ls, tot: ls.length, pres: p.length, conv: cv.length, cli: c.length, ehLead, ehCli, ehPres, temConv,
       convWon: cv.filter(l => l.s === 'won').length, won: ls.filter(l => l.s === 'won').length, lost: ls.filter(l => l.s === 'lost').length,
-      abertos: ls.filter(l => l.s === 'open').length, temPres: p.length > 0, fora: fora.get(k) || {n: 0, won: 0}};
+      abertos: ls.filter(l => l.s === 'open').length, temPres: true, fora: fora.get(k) || {n: 0, won: 0}};
   }).sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 /* Leads, um a um (16/11/2026, igual ao Indique e Ganhe): leads do pré-filtro que ENTRARAM no período (mesmo número do card
@@ -5054,7 +5057,7 @@ function viewOffline() {
   const EV = offEventos();
   if (!EV.length) return h + `<div class="card mt">${emptyBox('Nenhum lead de evento no período', 'Ajuste o período no topo.')}</div>` + lista;
   const semMarca = !EV.some(x => x.pres || x.cli || x.temConv);
-  if (semMarca) h += `<div class="note mt">Enquanto o Pipedrive não tiver as marcações, todo negócio do evento conta como <b>Lead</b>, e todo <b>ganho</b> é <b>Cliente</b>. Para separar, use no negócio a etiqueta <b>PRESENTE</b> (presença), <b>CONVIDADO</b> (lead) ou <b>CLIENTE</b> (cliente atual).</div>`;
+  if (semMarca) h += `<div class="note mt">Regra: todo negócio do evento no Pipedrive <b>esteve presente</b> e conta como <b>Lead</b>; todo <b>ganho</b> é <b>Cliente</b>. Para separar casos específicos, use no negócio a etiqueta <b>PRESENTE</b>, <b>CONVIDADO</b> ou <b>CLIENTE</b>.</div>`;
   const sel = EV.find(x => x.k === S.offEv) || null;
   h += `<div class="card mt"><div class="ch"><div><h3>Eventos</h3><p>Um bloco por evento (etiqueta do Pipedrive) · leads que entraram no período · clique no evento para ver todos os relacionados</p></div></div><div class="evg">` +
     EV.map(x => `<div class="evc${sel && sel.k === x.k ? ' on' : ''}" data-offev="${ESC(x.k)}" role="button" tabindex="0">
@@ -5065,7 +5068,7 @@ function viewOffline() {
       <div>Lead → cliente <b>${x.conv ? fPc(pctOf(x.convWon, x.conv)) : '–'}</b><div class="bar"><i style="width:${Math.min(100, pctOf(x.convWon, x.conv) || 0)}%"></i></div></div></div></div>`).join('') + '</div></div>';
   if (!sel) return h + lista;
   const F = ['todos', 'p', 'l', 'c'].includes(S.offF) ? S.offF : 'todos';
-  const listaEv = sel.ls.filter(l => F === 'todos' || (F === 'l' ? sel.ehLead(l) : F === 'c' ? sel.ehCli(l) : evtMarca(l, F))).sort((a, b) => String(b.e).localeCompare(String(a.e)));
+  const listaEv = sel.ls.filter(l => F === 'todos' || (F === 'l' ? sel.ehLead(l) : F === 'c' ? sel.ehCli(l) : F === 'p' ? sel.ehPres(l) : evtMarca(l, F))).sort((a, b) => String(b.e).localeCompare(String(a.e)));
   const sit = l => l.s === 'won' ? '<span class="evtg w">Ganho</span>' : l.s === 'lost' ? '<span class="evtg x">Perdido</span>' : 'Aberto';
   const tipo = l => sel.ehCli(l) ? `<span class="evtg c">Cliente</span>${l.s === 'won' && sel.ehLead(l) ? '<div class="mut">era lead, virou cliente</div>' : ''}` : sel.ehLead(l) ? '<span class="evtg l">Lead (convidado)</span>' : '<span class="evtg">não marcado</span>';
   h += `<div class="card mt"><div class="ch"><div><h3>${ESC(sel.nome)}</h3><p>Etiqueta ${ESC(sel.k)} · ${ESC(sel.data)} · todos os negócios do Funil Alpha deste evento que entraram no período${sel.fora.n ? ` · <b>+ ${fN(sel.fora.n)} fora do período${sel.fora.won ? ` (${fN(sel.fora.won)} ${sel.fora.won === 1 ? 'cliente' : 'clientes'})` : ''}</b>: escolha "Tudo" no topo para ver o evento inteiro` : ''}</p></div></div>
@@ -5075,7 +5078,7 @@ function viewOffline() {
     <div class="fs2"><span>Clientes</span><b>${fN(sel.cli)}</b></div><div class="gap"></div><div class="fs2"><span>Em andamento</span><b>${fN(sel.abertos)}</b></div><div class="fs2"><span>Perdidos</span><b>${fN(sel.lost)}</b></div></div>
     <div class="seg" style="margin-bottom:10px">${[['todos', 'Lista total', sel.tot], ['p', 'Presentes', sel.pres], ['l', 'Leads', sel.conv], ['c', 'Clientes', sel.cli]].map(([id, n, q]) => `<button type="button" data-offf="${id}" class="${F === id ? 'on' : ''}">${n} (${fN(q)})</button>`).join('')}</div>
     <div class="tw"><table class="t"><thead><tr><th>Negócio</th><th>Tipo</th><th>Presença</th><th>Etapa</th><th>Consultor</th><th>Entrada</th><th>Situação</th></tr></thead><tbody>` +
-    (listaEv.length ? listaEv.map(l => `<tr data-lead="${l.id}" style="cursor:pointer"><td class="wrap">${ESC(l.n || '')}</td><td>${tipo(l)}</td><td>${evtMarca(l, 'p') ? '<span class="evtg p">Presente</span>' : '–'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
+    (listaEv.length ? listaEv.map(l => `<tr data-lead="${l.id}" style="cursor:pointer"><td class="wrap">${ESC(l.n || '')}</td><td>${tipo(l)}</td><td>${sel.ehPres(l) ? '<span class="evtg p">Presente</span>' : '<span class="evtg">Ausente</span>'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
       : '<tr><td colspan="7" class="mut">Nenhum negócio com essa marcação neste evento.</td></tr>') + '</tbody></table></div></div>';
   return h + lista;
 }
