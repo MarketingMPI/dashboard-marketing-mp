@@ -266,7 +266,7 @@ table.t tr.tot td{background:#f7faf8;font-weight:700;border-top:1px solid var(--
 .evc{border:1px solid var(--linha);border-radius:14px;padding:14px;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}
 .evc:hover{border-color:#61ce70}.evc.on{border-color:#00503c;box-shadow:0 0 0 2px rgba(0,80,60,.15)}
 .evc .evh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.evc h4{font-size:14.5px;margin:0}.evc .evd{color:#69727d;font-size:11.5px;text-align:right}
-.evq{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:10px 0}.evq div{background:#f3f7f5;border-radius:8px;padding:6px 8px}
+.evq{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:10px 0}.evq div{background:#f3f7f5;border-radius:8px;padding:6px 8px}
 .evq span{display:block;font-size:10.5px;color:#69727d}.evq b{font-size:16px}
 .evt{display:flex;gap:10px}.evt div{flex:1;font-size:11.5px;color:#69727d}.evt .bar{height:6px;background:#e8eeeb;border-radius:9px;overflow:hidden;margin-top:3px}.evt .bar i{display:block;height:100%;background:#00a611}
 .evf{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;margin-bottom:14px}.evf .fs2{flex:1;min-width:120px;background:#f3f7f5;border-radius:10px;padding:10px 12px}
@@ -4986,12 +4986,20 @@ function offFiltros(pf, over) {   // pré-filtro × filtro lateral de origem (os
 }
 function offEventos() {
   const pr = makePred(offFiltros('evt')), ev = new Map();
+  // fora do período (17/11/2026): negócios do evento que entraram em outra data, com os mesmos filtros (só sem a data)
+  const prT = makePred(offFiltros('evt', {de: '', ate: ''})), fora = new Map();
+  for (const l of LEADS) { if (!prT(l) || pr(l)) continue;
+    for (const k of evChaves(l)) { const f = fora.get(k) || {n: 0, won: 0}; f.n++; if (l.s === 'won') f.won++; fora.set(k, f); } }
   for (const l of LEADS) { if (!pr(l)) continue;
     for (const k of evChaves(l)) { if (!ev.has(k)) ev.set(k, []); ev.get(k).push(l); } }
   return [...ev].map(([k, ls]) => {
-    const p = ls.filter(l => evtMarca(l, 'p')), c = ls.filter(l => evtMarca(l, 'c')), cv = ls.filter(l => evtMarca(l, 'l'));
-    return {k, nome: evNome(k), data: evData(k), ls, tot: ls.length, pres: p.length, conv: cv.length, cli: c.length,
-      convWon: cv.filter(l => l.s === 'won').length, won: ls.filter(l => l.s === 'won').length, marc: p.length + c.length + cv.length > 0};   // marc = evento já tem alguma marcação (senão a presença fica '–')
+    /* 17/11/2026: Leads (convidados) = etiqueta CONVIDADO; enquanto o evento não tiver nenhum CONVIDADO marcado, todo negócio
+       do evento que não é CLIENTE (atual) conta como lead. Ganho = virou cliente. Presença só existe com PRESENTE marcado. */
+    const p = ls.filter(l => evtMarca(l, 'p')), c = ls.filter(l => evtMarca(l, 'c'));
+    const temConv = ls.some(l => evtMarca(l, 'l')), ehLead = l => temConv ? evtMarca(l, 'l') : !evtMarca(l, 'c'), cv = ls.filter(ehLead);
+    return {k, nome: evNome(k), data: evData(k), ls, tot: ls.length, pres: p.length, conv: cv.length, cli: c.length, ehLead, temConv,
+      convWon: cv.filter(l => l.s === 'won').length, won: ls.filter(l => l.s === 'won').length, lost: ls.filter(l => l.s === 'lost').length,
+      abertos: ls.filter(l => l.s === 'open').length, temPres: p.length > 0, fora: fora.get(k) || {n: 0, won: 0}};
   }).sort((a, b) => b.tot - a.tot || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 /* Leads, um a um (16/11/2026, igual ao Indique e Ganhe): leads do pré-filtro que ENTRARAM no período (mesmo número do card
@@ -5043,27 +5051,28 @@ function viewOffline() {
   // ---- eventos: um bloco por evento ----
   const EV = offEventos();
   if (!EV.length) return h + `<div class="card mt">${emptyBox('Nenhum lead de evento no período', 'Ajuste o período no topo.')}</div>` + lista;
-  const semMarca = !EV.some(x => x.pres || x.conv || x.cli);
-  if (semMarca) h += `<div class="note mt">Para preencher <b>Presentes</b>, <b>Leads (convidados)</b> e <b>Clientes</b>, marque o negócio no Pipedrive com a etiqueta <b>PRESENTE</b>, <b>CONVIDADO</b> ou <b>CLIENTE</b>. Hoje nenhum negócio de evento tem essas etiquetas, por isso aparecem zerados.</div>`;
+  const semMarca = !EV.some(x => x.pres || x.cli || x.temConv);
+  if (semMarca) h += `<div class="note mt">Enquanto o Pipedrive não tiver as marcações, todo negócio do evento conta como <b>Lead</b> e o <b>ganho</b> conta como virou cliente. Para separar, use no negócio a etiqueta <b>PRESENTE</b> (presença), <b>CONVIDADO</b> (lead) ou <b>CLIENTE</b> (cliente atual).</div>`;
   const sel = EV.find(x => x.k === S.offEv) || null;
   h += `<div class="card mt"><div class="ch"><div><h3>Eventos</h3><p>Um bloco por evento (etiqueta do Pipedrive) · leads que entraram no período · clique no evento para ver todos os relacionados</p></div></div><div class="evg">` +
     EV.map(x => `<div class="evc${sel && sel.k === x.k ? ' on' : ''}" data-offev="${ESC(x.k)}" role="button" tabindex="0">
       <div class="evh"><h4>${ESC(x.nome)}</h4><span class="evd">${ESC(x.data)}</span></div>
-      <div class="evq"><div><span>Lista total</span><b>${fN(x.tot)}</b></div><div><span>Presentes</span><b>${fN(x.pres)}</b></div><div><span>Leads</span><b>${fN(x.conv)}</b></div><div><span>Clientes</span><b>${fN(x.cli)}</b></div></div>
-      <div class="evt"><div>Presença <b>${x.marc ? fPc(pctOf(x.pres, x.tot)) : '–'}</b><div class="bar"><i style="width:${Math.min(100, pctOf(x.pres, x.tot) || 0)}%"></i></div></div>
+      <div class="evq"><div><span>Lista total</span><b>${fN(x.tot)}</b></div><div><span>Presentes</span><b>${x.temPres ? fN(x.pres) : '–'}</b></div><div><span>Leads</span><b>${fN(x.conv)}</b></div><div><span>Ganhos</span><b>${fN(x.convWon)}</b></div><div><span>Clientes</span><b>${fN(x.cli)}</b></div></div>
+      ${x.fora.n ? `<div class="mut" style="font-size:11.5px;margin:-4px 0 8px">+ ${fN(x.fora.n)} ${x.fora.n === 1 ? 'negócio' : 'negócios'} deste evento fora do período${x.fora.won ? ` (${fN(x.fora.won)} ${x.fora.won === 1 ? 'ganho' : 'ganhos'})` : ''}</div>` : ''}
+      <div class="evt"><div>Presença <b>${x.temPres ? fPc(pctOf(x.pres, x.tot)) : '–'}</b><div class="bar"><i style="width:${Math.min(100, pctOf(x.pres, x.tot) || 0)}%"></i></div></div>
       <div>Lead → cliente <b>${x.conv ? fPc(pctOf(x.convWon, x.conv)) : '–'}</b><div class="bar"><i style="width:${Math.min(100, pctOf(x.convWon, x.conv) || 0)}%"></i></div></div></div></div>`).join('') + '</div></div>';
   if (!sel) return h + lista;
-  const F = ['todos', 'p', 'l', 'c'].includes(S.offF) ? S.offF : 'todos';
-  const listaEv = sel.ls.filter(l => F === 'todos' || evtMarca(l, F)).sort((a, b) => String(b.e).localeCompare(String(a.e)));
+  const F = ['todos', 'p', 'l', 'w', 'c'].includes(S.offF) ? S.offF : 'todos';
+  const listaEv = sel.ls.filter(l => F === 'todos' || (F === 'l' ? sel.ehLead(l) : F === 'w' ? sel.ehLead(l) && l.s === 'won' : evtMarca(l, F))).sort((a, b) => String(b.e).localeCompare(String(a.e)));
   const sit = l => l.s === 'won' ? '<span class="evtg w">Ganho</span>' : l.s === 'lost' ? '<span class="evtg x">Perdido</span>' : 'Aberto';
-  const tipo = l => evtMarca(l, 'c') ? '<span class="evtg c">Cliente</span>' : evtMarca(l, 'l') ? '<span class="evtg l">Lead (convidado)</span>' : '<span class="evtg">não marcado</span>';
-  h += `<div class="card mt"><div class="ch"><div><h3>${ESC(sel.nome)}</h3><p>Etiqueta ${ESC(sel.k)} · ${ESC(sel.data)} · todos os negócios do Funil Alpha deste evento que entraram no período</p></div></div>
-    <div class="evf"><div class="fs2"><span>Lista total</span><b>${fN(sel.tot)}</b></div><div class="ar">presença<b>${sel.marc ? fPc(pctOf(sel.pres, sel.tot)) : '–'}</b></div>
-    <div class="fs2"><span>Presentes</span><b>${fN(sel.pres)}</b></div><div class="gap"></div>
+  const tipo = l => evtMarca(l, 'c') ? '<span class="evtg c">Cliente atual</span>' : sel.ehLead(l) ? '<span class="evtg l">Lead (convidado)</span>' : '<span class="evtg">não marcado</span>';
+  h += `<div class="card mt"><div class="ch"><div><h3>${ESC(sel.nome)}</h3><p>Etiqueta ${ESC(sel.k)} · ${ESC(sel.data)} · todos os negócios do Funil Alpha deste evento que entraram no período${sel.fora.n ? ` · <b>+ ${fN(sel.fora.n)} fora do período${sel.fora.won ? ` (${fN(sel.fora.won)} ${sel.fora.won === 1 ? 'ganho' : 'ganhos'})` : ''}</b>: escolha "Tudo" no topo para ver o evento inteiro` : ''}</p></div></div>
+    <div class="evf"><div class="fs2"><span>Lista total</span><b>${fN(sel.tot)}</b></div><div class="ar">presença<b>${sel.temPres ? fPc(pctOf(sel.pres, sel.tot)) : '–'}</b></div>
+    <div class="fs2"><span>Presentes</span><b>${sel.temPres ? fN(sel.pres) : '–'}</b></div><div class="gap"></div>
     <div class="fs2"><span>Leads (convidados)</span><b>${fN(sel.conv)}</b></div><div class="ar">conversão<b>${sel.conv ? fPc(pctOf(sel.convWon, sel.conv)) : '–'}</b></div>
     <div class="fs2"><span>Viraram cliente</span><b>${fN(sel.convWon)}</b></div><div class="gap"></div>
-    <div class="fs2"><span>Clientes</span><b>${fN(sel.cli)}</b></div><div class="fs2"><span>Ganhos do evento</span><b>${fN(sel.won)}</b></div></div>
-    <div class="seg" style="margin-bottom:10px">${[['todos', 'Lista total', sel.tot], ['p', 'Presentes', sel.pres], ['l', 'Leads', sel.conv], ['c', 'Clientes', sel.cli]].map(([id, n, q]) => `<button type="button" data-offf="${id}" class="${F === id ? 'on' : ''}">${n} (${fN(q)})</button>`).join('')}</div>
+    <div class="fs2"><span>Clientes atuais</span><b>${fN(sel.cli)}</b></div><div class="gap"></div><div class="fs2"><span>Em andamento</span><b>${fN(sel.abertos)}</b></div><div class="fs2"><span>Perdidos</span><b>${fN(sel.lost)}</b></div></div>
+    <div class="seg" style="margin-bottom:10px">${[['todos', 'Lista total', sel.tot], ['p', 'Presentes', sel.pres], ['l', 'Leads', sel.conv], ['w', 'Viraram cliente', sel.convWon], ['c', 'Clientes atuais', sel.cli]].map(([id, n, q]) => `<button type="button" data-offf="${id}" class="${F === id ? 'on' : ''}">${n} (${fN(q)})</button>`).join('')}</div>
     <div class="tw"><table class="t"><thead><tr><th>Negócio</th><th>Tipo</th><th>Presença</th><th>Etapa</th><th>Consultor</th><th>Entrada</th><th>Situação</th></tr></thead><tbody>` +
     (listaEv.length ? listaEv.map(l => `<tr data-lead="${l.id}" style="cursor:pointer"><td class="wrap">${ESC(l.n || '')}</td><td>${tipo(l)}</td><td>${evtMarca(l, 'p') ? '<span class="evtg p">Presente</span>' : '–'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
       : '<tr><td colspan="7" class="mut">Nenhum negócio com essa marcação neste evento.</td></tr>') + '</tbody></table></div></div>';
