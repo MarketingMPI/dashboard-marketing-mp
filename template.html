@@ -4459,6 +4459,7 @@ function igEvoChart(E, perfil, k, nome, sel, W, contasInfo) {
   const lista = perfil === 'todos' ? contasInfo : contasInfo.filter(c => c.id === perfil);
   const fmt = k === 'alcance_medio_dia' ? (v => fN(Math.round(v))) : fN;
   const tot = P.map(b => igEvoVal(b, perfil, k));
+  if (k === 'seguidores_fim') return igEvoLinha(E, perfil, nome, sel, W, lista, tot, fmt);   // seguidores em LINHA (17/11/2026)
   const mx = niceMax(Math.max(1, ...tot.filter(v => v != null))), y = v => pt + ph - ph * Math.max(0, v) / mx, bw = pw / Math.max(1, P.length), w = Math.max(4, Math.min(bw * .6, 54));
   const step = Math.max(1, Math.ceil(P.length / Math.max(1, Math.floor(pw / 52)))), rotulo = bw >= 40;
   let g = '';
@@ -4480,6 +4481,38 @@ function igEvoChart(E, perfil, k, nome, sel, W, contasInfo) {
     const tip = [`${b.nome}${b.parcial ? ' (em andamento)' : ''}${b.ini_dados ? ` · dados desde ${fDay(E.ini)}` : ''}`,
       `${nome}: ${tot[i] == null ? (IGE_FU.has(k) ? '– (a Meta só informa a partir de 30/10/2025)' : '–') : fmt(tot[i])}`, ...linhas, 'Clique para ver no card'].join('\n');
     g += `<rect class="hit" x="${pl + i * bw}" y="${pt - 14}" width="${bw}" height="${ph + 14}" data-tip="${ESC(tip)}" data-mpmb="${i}" style="cursor:pointer"/>`;
+  });
+  return `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Evolução de ${ESC(nome)}">${g}</svg></div>`;
+}
+/* Seguidores em linha (17/11/2026): eixo começa perto do menor valor para a evolução aparecer (total acumulado). */
+function igEvoLinha(E, perfil, nome, sel, W, lista, tot, fmt) {
+  const P = E.bs, Hh = 172, pl = 56, pr = 16, pt = 22, pb = 24, pw = W - pl - pr, ph = Hh - pt - pb;
+  const vs = tot.filter(v => v != null);
+  if (!vs.length) return emptyBox('Sem dados de seguidores', 'Ainda não há histórico para este período.');
+  const mn = Math.min(...vs), mxv = Math.max(...vs), rng = Math.max(mxv - mn, Math.max(10, mxv * .02));
+  const lo = Math.max(0, Math.floor((mn - rng * .25) / 10) * 10), hi = Math.ceil((mxv + rng * .25) / 10) * 10;
+  const y = v => pt + ph - ph * (v - lo) / Math.max(1, hi - lo), bw = pw / Math.max(1, P.length);
+  const step = Math.max(1, Math.ceil(P.length / Math.max(1, Math.floor(pw / 52)))), rotulo = bw >= 40;
+  const cor = (lista.length === 1 && IG_COR[lista[0].user]) || '#00503c';
+  let g = '';
+  for (let i = 0; i <= 2; i++) { const val = lo + (hi - lo) * i / 2, yy = y(val); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${fN(Math.round(val))}</text>`; }
+  const pts = P.map((b, i) => tot[i] == null ? null : [pl + i * bw + bw / 2, y(tot[i])]);
+  const seg = []; let cur = [];
+  pts.forEach(q => { if (q) cur.push(q); else if (cur.length) { seg.push(cur); cur = []; } }); if (cur.length) seg.push(cur);
+  if (P[sel]) g += `<rect x="${pl + sel * bw + 1}" y="${pt - 16}" width="${bw - 2}" height="${ph + 16}" fill="#f1f6f3" rx="6"/>`;
+  for (const s of seg) {
+    if (s.length > 1) g += `<path d="M${s[0][0]},${pt + ph} ${s.map(q => `L${q[0]},${q[1]}`).join(' ')} L${s[s.length - 1][0]},${pt + ph} Z" fill="${cor}" opacity=".08"/>`;
+    g += `<polyline points="${s.map(q => q.join(',')).join(' ')}" fill="none" stroke="${cor}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  P.forEach((b, i) => {
+    const cx = pl + i * bw + bw / 2, on = i === sel;
+    if (pts[i]) { g += `<circle cx="${cx}" cy="${pts[i][1]}" r="${on ? 4.5 : P.length > 40 ? 0 : 2.8}" fill="#fff" stroke="${cor}" stroke-width="2"${b.parcial ? ' stroke-dasharray="2 2"' : ''}/>`;
+      if (rotulo || on) g += `<text class="ax" x="${cx}" y="${pts[i][1] - 8}" text-anchor="middle" style="fill:#1c1c1c;font-weight:600">${fmt(tot[i])}</text>`; }
+    if (i % step === 0 || on) g += `<text class="ax" x="${cx}" y="${Hh - pb + 14}" text-anchor="middle"${on ? ' style="font-weight:700;fill:#1c1c1c"' : ''}>${b.rot}</text>`;
+    const prevV = i > 0 ? tot[i - 1] : null, d = tot[i] != null && prevV != null ? tot[i] - prevV : null;
+    const tip = [`${b.nome}${b.parcial ? ' (em andamento)' : ''}${b.ini_dados ? ` · dados desde ${fDay(E.ini)}` : ''}`,
+      `${nome}: ${tot[i] == null ? '–' : fmt(tot[i])}${d == null ? '' : ` (${d >= 0 ? '+' : '−'}${fN(Math.abs(d))} vs anterior)`}`, 'Clique para ver no card'].join('\n');
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt - 16}" width="${bw}" height="${ph + 16}" data-tip="${ESC(tip)}" data-mpmb="${i}" style="cursor:pointer"/>`;
   });
   return `<div class="svgc"><svg width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Evolução de ${ESC(nome)}">${g}</svg></div>`;
 }
