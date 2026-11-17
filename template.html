@@ -4718,6 +4718,9 @@ function quickRows(id) {
   const inP = s => { if (!s) return false; const d = String(s).slice(0, 10); return d >= S.de && d <= S.ate; };
   return run(filtros({de: '', ate: ''})).rows.filter(r => LL_EVENTO[q[0]](r.l, inP));
 }
+// coluna 'Dias s/ contato' fica fora da tabela do Lead a Lead (17/11/2026: a Cadência já mostra atraso/em dia); continua
+// em LL_COLS porque ordena o bloco 'Abertos mais parados'
+const LL_VIS = LL_COLS.filter(c => c.k !== 'dSem');
 function listaRows() { return sortRows(quickRows(S.ll.quick), LL_COLS, S.ll); }
 function viewLista() {
   const list = listaRows(), per = 50, perd = S.ll.quick === 'perdidos', ev = !!LL_EVENTO[S.ll.quick];
@@ -4729,7 +4732,7 @@ function viewLista() {
   const seg = '<div class="seg">' + QUICK.map(([id, nome]) => `<button data-quick="${id}" class="${S.ll.quick === id ? 'on' : ''}"${LL_EVENTO[id] ? ` data-tip="${ESC('Pela data em que aconteceu no período (lead de qualquer data de entrada) · mesma conta da Visão Macro e dos Insights')}"` : ''}>${nome}<small>${fN(nQ(id))}</small></button>`).join('') + '</div>';
   if (perd) return h + `<div class="card np"><div class="tbar">${seg}</div></div>` + perdidosHtml() + tempoHtml();
   h += `<div class="card np"><div class="tbar">${seg}<button class="btn gh" data-act="csv-lista">${DL_ICON}Exportar CSV (${fN(list.length)})</button></div>`;
-  h += list.length ? `<div class="tw tall"><table class="t stk">${thead(LL_COLS, S.ll, 'll')}${tableRows(LL_COLS, pageRows)}</table></div>${pager('ll', S.ll.page, list.length, per)}` : emptyBox();
+  h += list.length ? `<div class="tw tall"><table class="t stk">${thead(LL_VIS, S.ll, 'll')}${tableRows(LL_VIS, pageRows)}</table></div>${pager('ll', S.ll.page, list.length, per)}` : emptyBox();
   return h + '</div>' + tempoHtml();
 }
 
