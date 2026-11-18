@@ -240,7 +240,7 @@ ul.igi li:before{content:'';position:absolute;left:4px;top:14px;width:8px;height
 .igd{font-size:11px;color:var(--cinza);font-weight:500;margin-top:2px}
 .hubwarn{display:flex;gap:12px;align-items:center;background:repeating-linear-gradient(135deg,#fff8e6 0 12px,#fdf1d4 12px 24px);border:1px dashed #d9b45a;color:#6b5a2e;border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:16px}
 .hubwarn b{flex:none;background:#a8701c;color:#fff;font-size:11.5px;letter-spacing:.08em;border-radius:6px;padding:4px 9px}
-.note .lnk{border:0;background:none;padding:0;font:inherit;font-weight:700;color:#00503c;text-decoration:underline;cursor:pointer}.note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
+.evd2{display:grid;grid-template-columns:minmax(300px,400px) minmax(0,1fr);gap:22px;align-items:start}@media(max-width:1100px){.evd2{grid-template-columns:1fr}}.evz-r{display:flex;justify-content:center}.evz-b{height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center}.evz-b span{font-size:11.5px;font-weight:600;opacity:.92}.evz-b b{font-size:19px;line-height:1.1}.evz-c{display:flex;justify-content:center;padding:5px 0}.evz .fz-cv{font-size:12px;padding:3px 5px 3px 11px}.evz .fz-cv .dvst{font-size:11px;padding:3px 9px}.evz-q{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--cinza);margin:0 0 10px}.evz-q b{color:var(--txt);font-size:15px;margin-left:3px}.evz-q small{color:var(--cinza)}.evz-q2{margin:10px 0 0}.evz-t{margin-top:12px;padding:9px 12px}.evz-t b{font-size:17px}.evz .fz-leg{font-size:11px;margin:8px 0 0}.evtw{max-height:560px;overflow:auto}.evtt{font-size:12.5px}.evtt td,.evtt th{padding-top:6px;padding-bottom:6px}.note .lnk{border:0;background:none;padding:0;font:inherit;font-weight:700;color:#00503c;text-decoration:underline;cursor:pointer}.note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
 .psh{padding:10px 0;border-bottom:1px solid #edf1ef}.psh:last-child{border-bottom:0}.psl{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}
 .psl span{display:flex;align-items:center;gap:8px}.psl i{width:10px;height:10px;border-radius:3px;display:inline-block}.pst{height:8px;background:#eef3f1;border-radius:99px;overflow:hidden}
 .pst i{display:block;height:100%;border-radius:99px}.psh small{color:var(--cinza);font-size:11.5px}
@@ -5155,15 +5155,39 @@ function viewOffline() {
   const listaEv = sel.ls.filter(l => F === 'todos' || (F === 'l' ? sel.ehLead(l) : F === 'c' ? sel.ehCli(l) : F === 'p' ? sel.ehPres(l) : evtMarca(l, F))).sort((a, b) => String(b.e).localeCompare(String(a.e)));
   const sit = l => l.s === 'won' ? '<span class="evtg w">Ganho</span>' : l.s === 'lost' ? '<span class="evtg x">Perdido</span>' : 'Aberto';
   const tipo = l => sel.ehCli(l) ? `<span class="evtg c">Cliente</span>${l.s === 'won' && sel.ehLead(l) ? '<div class="mut">era lead, virou cliente</div>' : ''}` : sel.ehLead(l) ? '<span class="evtg l">Lead (convidado)</span>' : '<span class="evtg">não marcado</span>';
+  /* 18/11/2026: detalhe do evento compacto — à esquerda o funil de conversão DESTE evento com as metas de conversão
+     (30% agendam · 50% das agendadas acontecem · 33,3% das reuniões fecham · 5% do lead ao cliente); à direita os leads.
+     Funil = jornada dos leads (convidados) do evento, em qualquer data: agendou = tem agendamento, reunião = reunião
+     concluída, cliente = ganho (mesmo número do 'Lead → cliente' do bloco). */
+  const marcaP = sel.ls.some(l => evtMarca(l, 'p'));
+  const base = sel.ls.filter(sel.ehLead), temReu = l => (l.k || []).some(x => MEETING_TYPES.has(x[1]));
+  const nAg = base.filter(l => agendaTempos(l).length > 0).length, nRe = base.filter(temReu).length, nGa = sel.convWon;
+  const pcE = (a, b2) => b2 ? a / b2 * 100 : null, stE = (v, m) => v == null ? null : v >= m - 1e-9 ? 'bom' : v >= m * 0.85 ? 'medida' : 'ruim';
+  const ROTE = {bom: 'Bom', medida: 'Na medida', ruim: 'Ruim'}, pillE = s => s ? `<span class="dvst ${s}">${ROTE[s]}</span>` : '';
+  const fTE = v => v == null ? '–' : v > 100 ? '100% ⚠' : fP(v);
+  const STE = [{nome: 'Leads (convidados)', v: base.length, w: 100}, {nome: 'Agendaram reunião', v: nAg, w: 82, meta: REF_PRU.ag, txt: 'agendaram'},
+    {nome: 'Fizeram a reunião', v: nRe, w: 66, meta: REF_PRU.re / REF_PRU.ag * 100, txt: 'aconteceram'},
+    {nome: 'Viraram clientes', v: nGa, w: 50, meta: REF_PRU.ga / REF_PRU.re * 100, txt: 'fecharam'}];
+  let fun = '';
+  STE.forEach((s, i) => {
+    if (i) { const an = STE[i - 1], tx = pcE(s.v, an.v), sx = an.v ? stE(tx, s.meta) : null;
+      fun += `<div class="evz-c"><div class="fz-cv ${sx || ''}" data-tip="${ESC(`${s.nome} ÷ ${an.nome.toLowerCase()}: ${fN(s.v)} ÷ ${fN(an.v)} · meta ${fP(s.meta)}`)}"><b>▼ ${fTE(tx)}</b> ${s.txt} <span class="fz-m">meta ${fP(s.meta)}</span>${pillE(sx)}</div></div>`; }
+    const nx = STE[i + 1], wb = nx ? nx.w : s.w * 0.74, ins = (s.w - wb) / 2 / s.w * 100;
+    fun += `<div class="evz-r"><div class="evz-b" style="width:${s.w}%;clip-path:polygon(0 0,100% 0,${(100 - ins).toFixed(2)}% 100%,${ins.toFixed(2)}% 100%);background:${['#00503c', '#0b6a4f', '#2f8a69', '#5aa886'][i]}"><span>${ESC(s.nome)}</span><b>${fN(s.v)}</b></div></div>`;
+  });
+  const totE = pcE(nGa, base.length), stT = base.length ? stE(totE, REF_PRU.ga) : null;
   h += `<div class="card mt"><div class="ch"><div><h3>${ESC(sel.nome)}</h3><p>Etiqueta ${ESC(sel.k)} · ${ESC(sel.data)} · todos os negócios do Funil Alpha deste evento que entraram no período${sel.fora.n ? ` · <b>+ ${fN(sel.fora.n)} fora do período${sel.fora.won ? ` (${fN(sel.fora.won)} ${sel.fora.won === 1 ? 'cliente' : 'clientes'})` : ''}</b>: escolha "Tudo" no topo para ver o evento inteiro` : ''}</p></div></div>
-    <div class="evf"><div class="fs2"><span>Lista total</span><b>${fN(sel.tot)}</b></div><div class="ar">presença<b>${sel.temPres ? fPc(pctOf(sel.pres, sel.tot)) : '–'}</b></div>
-    <div class="fs2"><span>Presentes</span><b>${sel.temPres ? fN(sel.pres) : '–'}</b></div><div class="gap"></div>
-    <div class="fs2"><span>Leads (convidados)</span><b>${fN(sel.conv)}</b></div><div class="ar">conversão<b>${sel.conv ? fPc(pctOf(sel.convWon, sel.conv)) : '–'}</b></div>
-    <div class="fs2"><span>Clientes</span><b>${fN(sel.cli)}</b></div><div class="gap"></div><div class="fs2"><span>Em andamento</span><b>${fN(sel.abertos)}</b></div><div class="fs2"><span>Perdidos</span><b>${fN(sel.lost)}</b></div></div>
-    <div class="seg" style="margin-bottom:10px">${[['todos', 'Lista total', sel.tot], ['p', 'Presentes', sel.pres], ['l', 'Leads', sel.conv], ['c', 'Clientes', sel.cli]].map(([id, n, q]) => `<button type="button" data-offf="${id}" class="${F === id ? 'on' : ''}">${n} (${fN(q)})</button>`).join('')}</div>
-    <div class="tw"><table class="t"><thead><tr><th>Negócio</th><th>Tipo</th><th>Presença</th><th>Etapa</th><th>Consultor</th><th>Entrada</th><th>Situação</th></tr></thead><tbody>` +
-    (listaEv.length ? listaEv.map(l => `<tr data-lead="${l.id}" style="cursor:pointer" title="Clique para ver todas as informações do lead"><td class="wrap"><b>${ESC(l.n || '#' + l.id)}</b> <a href="${pdUrl(l.id)}" target="_blank" rel="noopener" title="Abrir no Pipedrive" class="ext">↗</a></td><td>${tipo(l)}</td><td>${sel.ehPres(l) ? '<span class="evtg p">Presente</span>' : '<span class="evtg">Ausente</span>'}</td><td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
-      : '<tr><td colspan="7" class="mut">Nenhum negócio com essa marcação neste evento.</td></tr>') + '</tbody></table></div></div>';
+    <div class="evd2"><div class="evz">
+      <div class="evz-q"><span>Lista total <b>${fN(sel.tot)}</b></span><span>Presentes <b>${sel.temPres ? fN(sel.pres) : '–'}</b>${sel.temPres && sel.tot ? ` <small>${fPc(pctOf(sel.pres, sel.tot))}</small>` : ''}</span><span>Clientes <b>${fN(sel.cli)}</b></span></div>
+      ${fun}
+      <div class="fz-t evz-t"><span>Do lead ao cliente</span><b>${fTE(totE)}</b><small>meta ${fP(REF_PRU.ga)} · ${fN(nGa)} de ${fN(base.length)}</small>${pillE(stT)}</div>
+      <div class="evz-q evz-q2"><span>Em andamento <b>${fN(sel.abertos)}</b></span><span>Perdidos <b>${fN(sel.lost)}</b></span></div>
+      <p class="fz-leg">Jornada dos leads deste evento (qualquer data). Verde = bateu a meta, amarelo = 85–99%, vermelho = abaixo de 85%.</p>
+    </div><div class="evl">
+    <div class="seg" style="margin-bottom:8px">${[['todos', 'Lista total', sel.tot], ['p', 'Presentes', sel.pres], ['l', 'Leads', sel.conv], ['c', 'Clientes', sel.cli]].map(([id, n, q]) => `<button type="button" data-offf="${id}" class="${F === id ? 'on' : ''}">${n} (${fN(q)})</button>`).join('')}</div>
+    <div class="tw evtw"><table class="t evtt"><thead><tr><th>Negócio</th><th>Tipo</th>${marcaP ? '<th>Presença</th>' : ''}<th>Etapa</th><th>Consultor</th><th>Entrada</th><th>Situação</th></tr></thead><tbody>` +
+    (listaEv.length ? listaEv.map(l => `<tr data-lead="${l.id}" style="cursor:pointer" title="Clique para ver todas as informações do lead"><td class="wrap"><b>${ESC(l.n || '#' + l.id)}</b> <a href="${pdUrl(l.id)}" target="_blank" rel="noopener" title="Abrir no Pipedrive" class="ext">↗</a></td><td>${tipo(l)}</td>${marcaP ? `<td>${sel.ehPres(l) ? '<span class="evtg p">Presente</span>' : '<span class="evtg">Ausente</span>'}</td>` : ''}<td>${ESC(stageName(l.sg))}</td><td>${ESC(l.c || '')}</td><td>${fDay(String(l.e).slice(0, 10))}</td><td>${sit(l)}</td></tr>`).join('')
+      : '<tr><td colspan="${marcaP ? 6 : 5}" class="mut">Nenhum negócio com essa marcação neste evento.</td></tr>') + '</tbody></table></div></div></div></div>';
   return h + lista;
 }
 function viewConsultores() {
