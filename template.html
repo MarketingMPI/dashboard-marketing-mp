@@ -240,7 +240,7 @@ ul.igi li:before{content:'';position:absolute;left:4px;top:14px;width:8px;height
 .igd{font-size:11px;color:var(--cinza);font-weight:500;margin-top:2px}
 .hubwarn{display:flex;gap:12px;align-items:center;background:repeating-linear-gradient(135deg,#fff8e6 0 12px,#fdf1d4 12px 24px);border:1px dashed #d9b45a;color:#6b5a2e;border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:16px}
 .hubwarn b{flex:none;background:#a8701c;color:#fff;font-size:11.5px;letter-spacing:.08em;border-radius:6px;padding:4px 9px}
-.evd2{display:grid;grid-template-columns:minmax(380px,520px) minmax(0,1fr);gap:26px;align-items:start}@media(max-width:1100px){.evd2{grid-template-columns:1fr}}.evz-r{display:flex;justify-content:center}.evz-b{height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center}.evz-b span{font-size:13px;font-weight:600;opacity:.92}.evz-b b{font-size:28px;line-height:1.15}.evz-c{display:flex;justify-content:center;padding:9px 0}.evz .fz-cv{font-size:13px;padding:4px 6px 4px 13px}.evz .fz-cv .dvst{font-size:11px;padding:3px 9px}.evz-q{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--cinza);margin:0 0 10px}.evz-q b{color:var(--txt);font-size:15px;margin-left:3px}.evz-q small{color:var(--cinza)}.evz-q2{margin:10px 0 0}.evz-t{margin-top:12px;padding:9px 12px}.evz-t b{font-size:17px}.evz .fz-leg{font-size:11px;margin:8px 0 0}.evtw{max-height:720px;overflow:auto}.evtt{font-size:12.5px}.evtt td,.evtt th{padding-top:6px;padding-bottom:6px}.note .lnk{border:0;background:none;padding:0;font:inherit;font-weight:700;color:#00503c;text-decoration:underline;cursor:pointer}.note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
+.evd2{display:grid;grid-template-columns:minmax(380px,520px) minmax(0,1fr);gap:26px;align-items:start}@media(max-width:1100px){.evd2{grid-template-columns:1fr}}.evz-r{display:flex;justify-content:center}.evz-b{height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center}.evz-b span{font-size:13px;font-weight:600;opacity:.92}.evz-b b{font-size:28px;line-height:1.15}.evz-c{display:flex;justify-content:center;padding:9px 0}.evz .fz-cv{font-size:13px;padding:4px 6px 4px 13px}.evz .fz-cv .dvst{font-size:11px;padding:3px 9px}.evz-q{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--cinza);margin:0 0 10px}.evz-q b{color:var(--txt);font-size:15px;margin-left:3px}.evz-q small{color:var(--cinza)}.evz-q2{margin:10px 0 0}.evz-t{margin-top:12px;padding:9px 12px}.evz-t b{font-size:17px}.evz .fz-leg{font-size:11px;margin:8px 0 0}.evtw{max-height:720px;overflow:auto}.ofz-s{display:flex;flex-direction:column;gap:10px;padding-top:4px}.ofz-m{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--linha);border-radius:12px}.ofz-m>span:first-child{min-width:150px;font-weight:600;font-size:13px}.ofz-m b{font-size:20px;color:var(--txt)}.ofz-m small{color:var(--cinza);font-size:12px}.evtt{font-size:12.5px}.evtt td,.evtt th{padding-top:6px;padding-bottom:6px}.note .lnk{border:0;background:none;padding:0;font:inherit;font-weight:700;color:#00503c;text-decoration:underline;cursor:pointer}.note{background:#fbf6ea;border:1px solid #f0e2bf;color:#6b5a2e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}.note.mt{margin:16px 0 0}
 .psh{padding:10px 0;border-bottom:1px solid #edf1ef}.psh:last-child{border-bottom:0}.psl{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}
 .psl span{display:flex;align-items:center;gap:8px}.psl i{width:10px;height:10px;border-radius:3px;display:inline-block}.pst{height:8px;background:#eef3f1;border-radius:99px;overflow:hidden}
 .pst i{display:block;height:100%;border-radius:99px}.psh small{color:var(--cinza);font-size:11.5px}
@@ -5102,6 +5102,34 @@ function offLeadsHtml(ls) {
         <td class="wrap" style="max-width:240px">${sit(l)}</td><td class="wrap" style="max-width:160px">${ESC(l.c || '–')}</td></tr>`).join('') + '</tbody></table></div>'
       : emptyBox('Nenhum lead neste filtro', 'Escolha outro filtro acima ou ajuste o período.')) + '</div>';
 }
+/* Funil de conversão × metas da página Offline/Eventos (18/11/2026), abaixo de 'Leads, um a um'. Segue a página: período,
+   pré-filtro e filtros laterais. Regra única: leads = entraram no período; agendados, reuniões e ganhos = o que aconteceu
+   no período (mesmos números dos cards). Metas: entre etapas 30% · 50% · 33,3%; sobre os leads 30% · 15% · 5%. */
+function offFunilHtml(k, e, nome) {
+  const L = k.leads, pc = (a, b) => b ? a / b * 100 : null;
+  const st = (v, m) => v == null ? null : v >= m - 1e-9 ? 'bom' : v >= m * 0.85 ? 'medida' : 'ruim';
+  const ROT = {bom: 'Bom', medida: 'Na medida', ruim: 'Ruim'}, pill = s => s ? `<span class="dvst ${s}">${ROT[s]}</span>` : '';
+  const fT = v => v == null ? '–' : v > 100 ? '100% ⚠' : fP(v);
+  const ST = [{nome: 'Leads no período', v: L, w: 100},
+    {nome: 'Agendados', v: e.agendamentos, w: 82, meta: REF_PRU.ag, txt: 'agendaram', mL: REF_PRU.ag},
+    {nome: 'Reuniões realizadas', v: e.reunioes, w: 66, meta: REF_PRU.re / REF_PRU.ag * 100, txt: 'aconteceram', mL: REF_PRU.re},
+    {nome: 'Ganhos (clientes)', v: e.ganhos, w: 50, meta: REF_PRU.ga / REF_PRU.re * 100, txt: 'fecharam', mL: REF_PRU.ga}];
+  let fun = '', side = '';
+  ST.forEach((s, i) => {
+    if (i) { const an = ST[i - 1], tx = pc(s.v, an.v), sx = an.v ? st(tx, s.meta) : null;
+      fun += `<div class="evz-c"><div class="fz-cv ${sx || ''}" data-tip="${ESC(`${s.nome} ÷ ${an.nome.toLowerCase()}: ${fN(s.v)} ÷ ${fN(an.v)} · meta ${fP(s.meta)}`)}"><b>▼ ${fT(tx)}</b> ${s.txt} <span class="fz-m">meta ${fP(s.meta)}</span>${pill(sx)}</div></div>`;
+      const tl = pc(s.v, L), sl = L ? st(tl, s.mL) : null;
+      side += `<div class="ofz-m"><span>${ESC(s.nome)}</span><b>${fT(tl)}</b><small>dos leads · meta ${fP(s.mL)}</small>${pill(sl)}</div>`; }
+    const nx = ST[i + 1], wb = nx ? nx.w : s.w * 0.74, ins = (s.w - wb) / 2 / s.w * 100;
+    fun += `<div class="evz-r"><div class="evz-b" style="width:${s.w}%;clip-path:polygon(0 0,100% 0,${(100 - ins).toFixed(2)}% 100%,${ins.toFixed(2)}% 100%);background:${['#00503c', '#0b6a4f', '#2f8a69', '#5aa886'][i]}"><span>${ESC(s.nome)}</span><b>${fN(s.v)}</b></div></div>`;
+  });
+  const tot = pc(e.ganhos, L), sT = L ? st(tot, REF_PRU.ga) : null;
+  return `<div class="card mt"><div class="ch"><div><h3>Funil de conversão × metas${nome ? ' · ' + ESC(nome) : ''}</h3><p>${periodCaption()} · leads que entraram no período; agendados, reuniões e ganhos que aconteceram no período (mesmos números dos cards) · segue o pré-filtro e os filtros laterais</p></div></div>
+    <div class="evd2"><div class="evz">${fun}</div><div class="ofz-s"><div class="fz-h">Sobre os leads do período</div>${side}
+      <div class="fz-t evz-t"><span>Do lead ao cliente</span><b>${fT(tot)}</b><small>meta ${fP(REF_PRU.ga)} · ${fN(e.ganhos)} de ${fN(L)} leads</small>${pill(sT)}</div>
+      <div class="evz-q evz-q2"><span>Com contato <b>${fN(k.contatados)}</b> <small>${fP(k.pct_contatados)}</small></span><span>Perdidos <b>${fN(e.perdidos)}</b></span></div>
+      <p class="fz-leg">Taxa entre etapas: verde = bateu a meta, amarelo = 85–99%, vermelho = abaixo de 85%.</p></div></div></div>`;
+}
 function viewOffline() {
   // 18/11/2026: a página 'Eventos' (menu B2C - Offline) usa esta mesma tela travada no pré-filtro EVT e é o ÚNICO lugar
   // com os blocos por evento; a Visão Macro mostra só os números.
@@ -5134,7 +5162,7 @@ function viewOffline() {
     <div class="fs2"><span>Agendados</span><b>${fN(e.agendamentos)}</b></div><div class="ar" data-tip="${ESC(`Reuniões realizadas ÷ agendadas no período: ${fN(e.reunioes)} ÷ ${fN(e.agendamentos)}`)}">realizou<b>${fPc(pctOf(e.reunioes, e.agendamentos))}</b></div>
     <div class="fs2"><span>Reuniões</span><b>${fN(e.reunioes)}</b></div><div class="ar" data-tip="${ESC(`Ganhos ÷ reuniões realizadas no período: ${fN(e.ganhos)} ÷ ${fN(e.reunioes)}`)}">fechou<b>${fPc(pctOf(e.ganhos, e.reunioes))}</b></div>
     <div class="fs2"><span>Ganhos</span><b>${fN(e.ganhos)}</b></div><div class="gap"></div><div class="fs2 fstot" data-tip="${ESC(`Conversão do funil inteiro = ganhos no período ÷ leads que entraram no período: ${fN(e.ganhos)} ÷ ${fN(k.leads)}`)}"><span>Leads → clientes</span><b>${fPc(pctOf(e.ganhos, k.leads))}</b><small>${fN(e.ganhos)} de ${fN(k.leads)} leads</small></div></div></div>`;
-  const lista = offLeadsHtml(C.rows.map(r => r.l));
+  const lista = offLeadsHtml(C.rows.map(r => r.l)) + offFunilHtml(k, e, EVP ? 'Eventos' : pf === 'todos' ? '' : OFF_NOME[pf]);   // 18/11/2026: funil × metas abaixo da lista
   if (!EVP) return h + (pf === 'evt' ? `<div class="note mt">Os blocos por evento (lista total, presentes, leads e clientes de cada evento) ficam na página <button type="button" class="lnk" data-tab="eventos">Eventos</button>.</div>` : '') + lista;
 
   // ---- eventos: um bloco por evento ----
