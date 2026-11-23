@@ -2380,13 +2380,15 @@ function viewMacro() {
     kpiCard({label: 'Perdidos', cls: 'red', v: fN(k.perdidos), sub: 'perdidos no período', d: delta(k.perdidos, pk.perdidos, -1), tip: 'Negócios perdidos dentro do período, de qualquer data de entrada'})
   ].join('') + '</div>';
   const vw = document.getElementById('view').clientWidth || 900;
-  const dailyW = window.innerWidth > 1100 ? vw * 2 / 3 - 60 : vw - 44;
+  const dailyW = vw - 44;   // 23/11/2026: o custo por lead por dia ocupa a linha inteira
   const ch = chartCPLDiario(S.de, S.ate, dailyW);
-  h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Custo por lead por dia</h3><p>${ch.semMidia ? 'Esta campanha não tem mídia paga na Meta' : ch.lateral ? `${fN(ch.leads)} leads no período com o filtro atual` : `${fR(ch.inv)} investidos · ${fN(ch.leads)} leads · média ${ch.med != null ? fR(ch.med) : '–'} por lead`} · número embaixo da barra = leads do dia · clique para filtrar o dia</p></div>
+  h += `<div class="card mt"><div class="ch"><div><h3>Custo por lead por dia</h3><p>${ch.semMidia ? 'Esta campanha não tem mídia paga na Meta' : ch.lateral ? `${fN(ch.leads)} leads no período com o filtro atual` : `${fR(ch.inv)} investidos · ${fN(ch.leads)} leads · média ${ch.med != null ? fR(ch.med) : '–'} por lead`} · número embaixo da barra = leads do dia · clique para filtrar o dia</p></div>
       <div class="lg"><span><i style="background:#2f6db5"></i>Custo por lead do dia</span><span><i style="background:#e8a09a"></i>mais de 15% acima da média</span><span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Média do período</span><span><b style="color:#c0392b">×</b> investiu e não entrou lead</span></div></div>
-      ${ch.svg}</div>
-    <div class="card"><div class="ch"><div><h3>Funil do período</h3><p>Leads → Contatados → Agendados → Reuniões → Ganhos</p></div>
-      <div class="lg"><span data-tip="Referência sobre os leads qualificados (MQL): agendados 30%, reuniões 15%, ganhos 5%"><i class="rfk"></i>Referência do funil</span></div></div>${miniFunnel(k)}</div></div>`;
+      ${ch.svg}</div>`;
+  // 23/11/2026 (pedido do usuário): 'Funil do período' virou o funil visual + gráficos das metas de conversão (padrão Offline /
+  // Insights › Metas). Funil = mesmos números dos cards (leads do período; agendados, reuniões e ganhos no período).
+  // Gráficos seguem a campanha e os filtros laterais (filtros()), por semana/mês/trimestre.
+  h += offFunilHtml(k0, e, S.camp && CAMPANHAS[S.camp] ? CAMPANHAS[S.camp].nome.split(' · ')[0] : '', null, over => filtros(over));
   // 23/11/2026 (pedido do usuário): saíram da Visão Macro o 'Tempo até o 1º contato' e o 'Mapa da carteira por consultor' (segue na página Consultores)
   const byO = new Map(); for (const {l, d} of C.rows) { const o = byO.get(l.o) || {v: 0, v2: 0}; d.cont ? o.v++ : o.v2++; byO.set(l.o, o); }
   const oItems = [...byO].sort((a, b) => (b[1].v + b[1].v2) - (a[1].v + a[1].v2) || (a[0] < b[0] ? -1 : 1)).map(([o, x]) => ({key: o, label: o, v: x.v, v2: x.v2, extra: fP(pctOf(x.v + x.v2, k.leads)),
@@ -5173,7 +5175,7 @@ function offLeadsHtml(ls) {
 /* Funil de conversão × metas da página Offline/Eventos (18/11/2026), abaixo de 'Leads, um a um'. Segue a página: período,
    pré-filtro e filtros laterais. Regra única: leads = entraram no período; agendados, reuniões e ganhos = o que aconteceu
    no período (mesmos números dos cards). Metas: entre etapas 30% · 50% · 33,3%; sobre os leads 30% · 15% · 5%. */
-function offFunilHtml(k, e, nome, pf) {
+function offFunilHtml(k, e, nome, pf, fb) {   // fb = construtor de filtros (Visão Macro B2C); sem fb = página Offline
   const L = k.leads, pc = (a, b) => b ? a / b * 100 : null;
   const st = (v, m) => v == null ? null : v >= m - 1e-9 ? 'bom' : v >= m * 0.85 ? 'medida' : 'ruim';
   const ROT = {bom: 'Bom', medida: 'Na medida', ruim: 'Ruim'}, pill = s => s ? `<span class="dvst ${s}">${ROT[s]}</span>` : '';
@@ -5194,20 +5196,20 @@ function offFunilHtml(k, e, nome, pf) {
   /* 23/11/2026 (pedido do usuário): à direita só os gráficos de metas, no padrão de Insights › Metas (barras por período
      coloridas pela meta, linha = acumulado, tracejado = meta). Seguem o pré-filtro e os filtros laterais; a escala de
      tempo é escolhida nos botões (semanal = últimas 20 semanas). */
-  return `<div class="card mt"><div class="ch"><div><h3>Funil de conversão × metas${nome ? ' · ' + ESC(nome) : ''}</h3><p>Funil: ${periodCaption()} · leads que entraram no período; agendados, reuniões e ganhos que aconteceram no período (mesmos números dos cards) · gráficos: evolução de cada meta de conversão · seguem o pré-filtro e os filtros laterais</p></div></div>
-    <div class="evd2 ofz2"><div class="evz">${fun}</div>${offMetasHtml(pf)}</div></div>`;
+  return `<div class="card mt"><div class="ch"><div><h3>Funil de conversão × metas${nome ? ' · ' + ESC(nome) : ''}</h3><p>Funil: ${periodCaption()} · leads que entraram no período; agendados, reuniões e ganhos que aconteceram no período (mesmos números dos cards) · gráficos: evolução de cada meta de conversão · ${fb ? 'seguem a campanha e os filtros laterais' : 'seguem o pré-filtro e os filtros laterais'}</p></div></div>
+    <div class="evd2 ofz2"><div class="evz">${fun}</div>${offMetasHtml(pf, fb)}</div></div>`;
 }
 const OFF_METAS = [{k: 'tAg', t: 'Lead → reunião agendada', meta: REF_PRU.ag, nota: 'agendamentos ÷ leads do período'},
   {k: 'tRe', t: 'Agendada → realizada', meta: REF_PRU.re / REF_PRU.ag * 100, nota: 'reuniões realizadas ÷ agendadas'},
   {k: 'tGa', t: 'Realizada → fechamento', meta: REF_PRU.ga / REF_PRU.re * 100, nota: 'ganhos ÷ reuniões realizadas'},
   {k: 'tTot', t: 'Lead → cliente', meta: REF_PRU.ga, nota: 'ganhos ÷ leads do período'}];
 const OFF_G = [['semanal', 'Semanal'], ['mensal', 'Mensal'], ['trimestral', 'Trimestral']];
-function offMetasHtml(pf) {
+function offMetasHtml(pf, fb) {
   const g = OFF_G.some(x => x[0] === S.offG) ? S.offG : 'mensal', ini = INS_METAS_DESDE < MIN_DAY ? MIN_DAY : INS_METAS_DESDE;
   const bs = g === 'semanal' ? mpBuckets(g, ini).slice(-INS_SEM_N) : mpBuckets(g, ini);
   // conta leve (23/11/2026): só leads + eventos do período, sem o computeFull (o render frio caía de ~0,5 s para poucos ms)
   const OFFM = offMetasHtml.cache || (offMetasHtml.cache = new Map());
-  const calc = (de, ate) => { const f = offFiltros(pf, {de, ate}), key = JSON.stringify(f) + '|' + (D.gerado_em || '');
+  const calc = (de, ate) => { const f = fb ? fb({de, ate}) : offFiltros(pf, {de, ate}), key = JSON.stringify(f) + '|' + (D.gerado_em || '');
     if (!OFFM.has(key)) { if (OFFM.size > 800) OFFM.clear(); const pr = makePred(f); let n = 0; for (const l of LEADS) if (pr(l)) n++;
       const e = computeEventos(LEADS, f); OFFM.set(key, {leads: n, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}); }
     return OFFM.get(key); };
