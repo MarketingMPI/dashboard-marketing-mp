@@ -2387,21 +2387,16 @@ function viewMacro() {
       ${ch.svg}</div>
     <div class="card"><div class="ch"><div><h3>Funil do período</h3><p>Leads → Contatados → Agendados → Reuniões → Ganhos</p></div>
       <div class="lg"><span data-tip="Referência sobre os leads qualificados (MQL): agendados 30%, reuniões 15%, ganhos 5%"><i class="rfk"></i>Referência do funil</span></div></div>${miniFunnel(k)}</div></div>`;
-  // distribuição 1º contato
-  const B = [['< 1 dia', 0, '#003326', 'Mesmo dia (menos de 1 dia)'], ['1–2 dias', 0, '#00503c'], ['2–3 dias', 0, '#3d8a6b'], ['3–7 dias', 0, '#7db59c'], ['> 7 dias', 0, '#b4d6c6', 'Mais de 7 dias'], ['Sem contato', 0, '#d5ddd9']];
-  for (const {d} of C.rows) { const v = d.d1; B[v == null ? 5 : v < 1 ? 0 : v < 2 ? 1 : v < 3 ? 2 : v <= 7 ? 3 : 4][1]++; }
-  const dist = C.rows.length ? columns(B.map(([label, v, c, longo]) => ({label, v, c, tip: `${longo || label}\n${fN(v)} leads (${fP(pctOf(v, k.leads))})`}))) : emptyBox();
+  // 23/11/2026 (pedido do usuário): saíram da Visão Macro o 'Tempo até o 1º contato' e o 'Mapa da carteira por consultor' (segue na página Consultores)
   const byO = new Map(); for (const {l, d} of C.rows) { const o = byO.get(l.o) || {v: 0, v2: 0}; d.cont ? o.v++ : o.v2++; byO.set(l.o, o); }
   const oItems = [...byO].sort((a, b) => (b[1].v + b[1].v2) - (a[1].v + a[1].v2) || (a[0] < b[0] ? -1 : 1)).map(([o, x]) => ({key: o, label: o, v: x.v, v2: x.v2, extra: fP(pctOf(x.v + x.v2, k.leads)),
     tip: `${o}\nLeads: ${fN(x.v + x.v2)}\nContatados: ${fN(x.v)} (${fP(pctOf(x.v, x.v + x.v2))})\nClique para filtrar esta origem`}));
   const cItems = C.res.consultores.map(c => ({key: c.consultor, label: c.consultor, v: c.contatados, v2: c.leads - c.contatados, extra: fP(pctOf(c.leads, k.leads)),
     tip: `${c.consultor}\nLeads: ${fN(c.leads)}\nContatados: ${fN(c.contatados)} (${fP(c.pct_contatados)})\n1º contato médio: ${fD(c.media_dias_1o_contato)}\nClique para filtrar este consultor`}));
-  h += `<div class="g g3 mt">
-    <div class="card"><div class="ch"><div><h3>Tempo até o 1º contato</h3><p>Distribuição dos leads do período</p></div></div>${dist}</div>
+  h += `<div class="g g2 mt">
     <div class="card"><div class="ch"><div><h3>Leads por origem</h3><p>Verde = contatados · cinza = sem contato · clique para filtrar</p></div></div>${hbars(oItems, {dim: 'origens'})}</div>
     <div class="card"><div class="ch"><div><h3>Leads por consultor</h3><p>Verde = contatados · cinza = sem contato · clique para filtrar</p></div></div>${hbars(cItems, {dim: 'consultores'})}</div>
   </div>`;
-  h += mapaConsHtml({onde: 'macro'});
   return h;
 }
 /* ---- Mapa da carteira por consultor (Visão Macro e Consultores) ----
