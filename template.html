@@ -2382,13 +2382,14 @@ function viewMacro() {
   const vw = document.getElementById('view').clientWidth || 900;
   const dailyW = vw - 44;   // 23/11/2026: o custo por lead por dia ocupa a linha inteira
   const ch = chartCPLDiario(S.de, S.ate, dailyW);
-  h += `<div class="card mt"><div class="ch"><div><h3>Custo por lead por dia</h3><p>${ch.semMidia ? 'Esta campanha não tem mídia paga na Meta' : ch.lateral ? `${fN(ch.leads)} leads no período com o filtro atual` : `${fR(ch.inv)} investidos · ${fN(ch.leads)} leads · média ${ch.med != null ? fR(ch.med) : '–'} por lead`} · número embaixo da barra = leads do dia · clique para filtrar o dia</p></div>
-      <div class="lg"><span><i style="background:#2f6db5"></i>Custo por lead do dia</span><span><i style="background:#e8a09a"></i>mais de 15% acima da média</span><span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Média do período</span><span><b style="color:#c0392b">×</b> investiu e não entrou lead</span></div></div>
-      ${ch.svg}</div>`;
   // 23/11/2026 (pedido do usuário): 'Funil do período' virou o funil visual + gráficos das metas de conversão (padrão Offline /
   // Insights › Metas). Funil = mesmos números dos cards (leads do período; agendados, reuniões e ganhos no período).
   // Gráficos seguem a campanha e os filtros laterais (filtros()), por semana/mês/trimestre.
   h += offFunilHtml(k0, e, S.camp && CAMPANHAS[S.camp] ? CAMPANHAS[S.camp].nome.split(' · ')[0] : '', null, over => filtros(over));
+  // 23/11/2026: o custo por lead por dia vem DEPOIS do funil × metas
+  h += `<div class="card mt"><div class="ch"><div><h3>Custo por lead por dia</h3><p>${ch.semMidia ? 'Esta campanha não tem mídia paga na Meta' : ch.lateral ? `${fN(ch.leads)} leads no período com o filtro atual` : `${fR(ch.inv)} investidos · ${fN(ch.leads)} leads · média ${ch.med != null ? fR(ch.med) : '–'} por lead`} · número embaixo da barra = leads do dia · clique para filtrar o dia</p></div>
+      <div class="lg"><span><i style="background:#2f6db5"></i>Custo por lead do dia</span><span><i style="background:#e8a09a"></i>mais de 15% acima da média</span><span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Média do período</span><span><b style="color:#c0392b">×</b> investiu e não entrou lead</span></div></div>
+      ${ch.svg}</div>`;
   // 23/11/2026 (pedido do usuário): saíram da Visão Macro o 'Tempo até o 1º contato' e o 'Mapa da carteira por consultor' (segue na página Consultores)
   const byO = new Map(); for (const {l, d} of C.rows) { const o = byO.get(l.o) || {v: 0, v2: 0}; d.cont ? o.v++ : o.v2++; byO.set(l.o, o); }
   const oItems = [...byO].sort((a, b) => (b[1].v + b[1].v2) - (a[1].v + a[1].v2) || (a[0] < b[0] ? -1 : 1)).map(([o, x]) => ({key: o, label: o, v: x.v, v2: x.v2, extra: fP(pctOf(x.v + x.v2, k.leads)),
