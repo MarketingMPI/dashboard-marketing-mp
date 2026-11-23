@@ -5264,7 +5264,9 @@ function viewOffline() {
     <div class="fs2"><span>Agendados</span><b>${fN(e.agendamentos)}</b></div><div class="ar" data-tip="${ESC(`Reuniões realizadas ÷ agendadas no período: ${fN(e.reunioes)} ÷ ${fN(e.agendamentos)}`)}">realizou<b>${fPc(pctOf(e.reunioes, e.agendamentos))}</b></div>
     <div class="fs2"><span>Reuniões</span><b>${fN(e.reunioes)}</b></div><div class="ar" data-tip="${ESC(`Ganhos ÷ reuniões realizadas no período: ${fN(e.ganhos)} ÷ ${fN(e.reunioes)}`)}">fechou<b>${fPc(pctOf(e.ganhos, e.reunioes))}</b></div>
     <div class="fs2"><span>Ganhos</span><b>${fN(e.ganhos)}</b></div><div class="gap"></div><div class="fs2 fstot" data-tip="${ESC(`Conversão do funil inteiro = ganhos no período ÷ leads que entraram no período: ${fN(e.ganhos)} ÷ ${fN(k.leads)}`)}"><span>Leads → clientes</span><b>${fPc(pctOf(e.ganhos, k.leads))}</b><small>${fN(e.ganhos)} de ${fN(k.leads)} leads</small></div></div></div>`;
-  const lista = offLeadsHtml(C.rows.map(r => r.l)) + offFunilHtml(k, e, EVP ? 'Eventos' : pf === 'todos' ? '' : OFF_NOME[pf], pf);   // 18/11/2026: funil × metas abaixo da lista
+  // 23/11/2026: na Visão Macro o funil vem ANTES de 'Leads, um a um'; na página Eventos segue depois da lista
+  const funOff = offFunilHtml(k, e, EVP ? 'Eventos' : pf === 'todos' ? '' : OFF_NOME[pf], pf), leadsOff = offLeadsHtml(C.rows.map(r => r.l));
+  const lista = EVP ? leadsOff + funOff : funOff + leadsOff;   // 18/11/2026: funil × metas abaixo da lista
   if (!EVP) return h + (pf === 'evt' ? `<div class="note mt">Os blocos por evento (lista total, presentes, leads e clientes de cada evento) ficam na página <button type="button" class="lnk" data-tab="eventos">Eventos</button>.</div>` : '') + lista;
 
   // ---- eventos: um bloco por evento ----
