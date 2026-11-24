@@ -3053,7 +3053,7 @@ function insDrvHtml(o) {
   // status: bom (atingiu), na medida (85–99% do esperado), ruim (abaixo de 85%)
   const status = (v, esp) => v == null || esp == null ? null : v >= esp - 1e-9 ? 'bom' : v >= esp * 0.85 ? 'medida' : 'ruim';
   const ROT = {bom: 'Bom', medida: 'Na medida', ruim: 'Ruim'};
-  const motTop = () => { const m = Object.entries(x.motivos || {}).filter(([k]) => k !== SEM_MOTIVO).sort((a, b) => b[1] - a[1])[0]; return m ? `"${ESC(m[0])}" (${fN(m[1])})` : null; };
+  const motTop = () => { const m = Object.entries(x.motSemAg || x.motivos || {}).filter(([k]) => k !== SEM_MOTIVO).sort((a, b) => b[1] - a[1])[0]; return m ? `"${ESC(m[0])}" (${fN(m[1])})` : null; };
   const lista = () => '';   // 23/11/2026: 'Pesou contra/Ajudou/Atenção' viraram as colunas O que melhorar / O que manter / O que fazer
   const vol = (k, volK) => REF_VOL[modo][volK] * frac;
   const sec = (t, v, alvo, f = insN1) => `<span class="dvsec ${v >= alvo - 1e-9 ? 'ok' : 'no'}">${ESC(t)} <b>${f(v)}</b> de ${f(alvo)}</span>`;
@@ -3185,34 +3185,34 @@ function insDrvHtml(o) {
   // 3) Agendamento
   {
     const v = drvVal('tAg', x), st = status(v, REF_PRU.ag), cs = [];
-    if (x.pSemAg && (subiu(x.pSemAg, ant && ant.pSemAg) || x.pSemAg >= x.ag)) { const m = motTop(); cs.push(`${fN(x.pSemAg)} leads perdidos sem marcar reunião${ant ? ` (antes ${insN1(ant.pSemAg)})` : ''}${m ? ` · motivo mais comum entre os perdidos: ${m}` : ''}`); }
+    if (x.pSemAg) { const m = motTop(); cs.push(`${fN(x.pSemAg)} dos ${fN(x.leads)} leads ${modo === 'mensal' ? 'do mês' : 'da semana'} ${x.pSemAg === 1 ? 'já foi perdido' : 'já foram perdidos'} sem marcar reunião${m ? ` · motivo mais comum: ${m}` : ''}`); }
     if (x.tPerda != null && (x.tPerda < 5 || caiu(x.tPerda, ant && ant.tPerda))) cs.push(`desistência cedo: ${nf1.format(x.tPerda)} tentativas em média antes de perder o lead`);
     if (x.semCont) cs.push(`${fN(x.semCont)} ${x.semCont === 1 ? 'lead novo sem contato' : 'leads novos sem contato'}`);
     const p7 = drvVal('pAg7', x); if (p7 != null && p7 < REF_PRU.ag / 2 && x.leads >= 3) cs.push(p7 ? `só ${fP(p7)} dos leads novos com reunião marcada em até 7 dias` : 'nenhum lead novo marcou reunião em até 7 dias');
     let L;
     if (!x.leads) L = `Nenhum lead novo; ${fN(x.ag)} agendamentos de leads de períodos anteriores.`;
-    else if (st === 'bom') L = `<b>Meta atingida:</b> ${fN(x.ag)} agendamentos para ${fN(x.leads)} leads novos.` + lista('Atenção', cs);
-    else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fN(x.ag)} agendamentos para ${fN(x.leads)} leads novos.` + (cs.length ? lista('Fator provável', cs) : ' Contato e cadência estáveis: o gargalo está na conversa (convite para a reunião).');
+    else if (st === 'bom') L = `<b>Meta atingida:</b> ${fN(x.ag)} ${x.ag === 1 ? 'agendamento' : 'agendamentos'} para ${fN(x.leads)} ${x.leads === 1 ? 'lead novo' : 'leads novos'}.` + lista('Atenção', cs);
+    else L = `<b>${st === 'medida' ? 'Perto da meta' : 'Abaixo da meta'}:</b> ${fN(x.ag)} ${x.ag === 1 ? 'agendamento' : 'agendamentos'} para ${fN(x.leads)} ${x.leads === 1 ? 'lead novo' : 'leads novos'}.` + (cs.length ? lista('Fator provável', cs) : ' Contato e cadência estáveis: o gargalo está na conversa (convite para a reunião).');
     if (recente && recente.leads_em_atraso) L += `<div class="dvlt">Hoje, entre os leads ${modo === 'mensal' ? 'do mês' : 'da semana'}</div>${fN(recente.leads_em_atraso)} ${recente.leads_em_atraso === 1 ? 'lead em aberto' : 'leads em aberto'} com atividade vencida${recente.top.length ? ` (${recente.top.map(c => `${ESC(c.consultor)} ${fN(c.leads_em_atraso)}`).join(', ')})` : ''}${recente.leads_sem_proxima ? ` e ${fN(recente.leads_sem_proxima)} sem próxima atividade` : ''}: lead esquecido não agenda.`;
     else if (recente) L += `<div class="dvlt">Hoje, entre os leads ${modo === 'mensal' ? 'do mês' : 'da semana'}</div>Nenhum lead em aberto com atividade vencida.`;
     L += acoes(st, [
       {amostra: 1, se: () => V.leads > 0 && V.leads < 5, txt: () => `Só ${fN(V.leads)} leads no período: cada agendamento muda a taxa em mais de 20 pontos. Acompanhar lead a lead em vez da porcentagem.`},
       {se: () => V.leads >= 5 && V.tAg < 30, txt: () => `${(f => f === 1 ? 'Falta 1 agendamento' : `Faltam ${fN(f)} agendamentos`)(Math.ceil(V.leads * 0.3 - V.ag))} para 30%. Com ${fN(V.leads)} leads, cada reunião a mais soma ${pp(V.leads)}. ${V.pAg7 ? `Só ${fP(V.pAg7)} marcaram reunião em até 7 dias da entrada` : 'Nenhum lead marcou reunião em até 7 dias da entrada'}: no convite, oferecer 2 horários fechados já na 1ª ligação.`},
-      {se: () => V.pSemAg >= 3 && V.tPerda != null && V.tPerda < 5, txt: () => `${fN(V.pSemAg)} leads perdidos sem agendar depois de só ${n1(V.tPerda)} tentativas em média: só marcar como perdido depois das 5 atividades da cadência (A01 a A15), sempre com motivo.`},
-      {se: () => V.pSemAg >= 5 && V.tPerda != null && V.tPerda >= 5, txt: () => `${fN(V.pSemAg)} leads perdidos sem agendar mesmo com ${n1(V.tPerda)} tentativas em média: o problema é alcançar o lead. Variar o horário das ligações (início da manhã e depois das 18h) e intercalar mensagens de WhatsApp, em vez de repetir só ligação.`},
-      {se: () => recente && ((recente.leads_sem_proxima || 0) > 0 || (recente.leads_em_atraso || 0) > 0), txt: () => `Dos leads ${modo === 'mensal' ? 'do mês' : 'da semana'}, ${fN(recente.leads_sem_proxima || 0)} estão sem próxima atividade e ${fN(recente.leads_em_atraso || 0)} com atividade atrasada: cada consultor marca no Pipedrive o próximo passo de cada um deles ainda esta semana.`},
+      {se: () => V.pSemAg >= 3 && V.tPerda != null && V.tPerda < 5, txt: () => `${fN(V.pSemAg)} leads ${modo === 'mensal' ? 'do mês' : 'da semana'} perdidos sem agendar depois de só ${n1(V.tPerda)} tentativas em média: só marcar como perdido depois das 5 atividades da cadência (A01 a A15), sempre com motivo.`},
+      {se: () => V.pSemAg >= 5 && V.tPerda != null && V.tPerda >= 5, txt: () => `${fN(V.pSemAg)} leads ${modo === 'mensal' ? 'do mês' : 'da semana'} perdidos sem agendar mesmo com ${n1(V.tPerda)} tentativas em média: o problema é alcançar o lead. Variar o horário das ligações (início da manhã e depois das 18h) e intercalar mensagens de WhatsApp, em vez de repetir só ligação.`},
+      {se: () => recente && ((recente.leads_sem_proxima || 0) > 0 || (recente.leads_em_atraso || 0) > 0), txt: () => `Dos leads ${modo === 'mensal' ? 'do mês' : 'da semana'}, ${[recente.leads_em_atraso ? `${fN(recente.leads_em_atraso)} ${recente.leads_em_atraso === 1 ? 'está' : 'estão'} com atividade atrasada` : '', recente.leads_sem_proxima ? `${fN(recente.leads_sem_proxima)} sem próxima atividade` : ''].filter(Boolean).join(' e ')}: cada consultor marca no Pipedrive o próximo passo de cada um deles ainda esta semana.`},
       {se: () => V.leads >= 5 && V.tAg >= 30, txt: () => `${fN(V.ag)} agendamentos para ${fN(V.leads)} leads, ${fN(Math.max(0, Math.floor(V.ag - V.leads * 0.3)))} acima dos 30%. Manter o convite com 2 horários já na 1ª ligação.`}]);
     { const bons = [], p7b = drvVal('pAg7', x);
-      if (st === 'bom') bons.push(`${fN(x.ag)} agendamentos para ${fN(x.leads)} leads novos`);
+      if (st === 'bom') bons.push(`${fN(x.ag)} ${x.ag === 1 ? 'agendamento' : 'agendamentos'} para ${fN(x.leads)} ${x.leads === 1 ? 'lead novo' : 'leads novos'}`);
       if (p7b != null && p7b >= REF_PRU.ag && x.leads >= 3) bons.push(`${fP(p7b)} dos leads novos com reunião marcada em até 7 dias`);
-      if (caiu(x.pSemAg, ant && ant.pSemAg)) bons.push(`menos leads perdidos sem agendar (${insN1(ant.pSemAg)} → ${fN(x.pSemAg)})`);
+      // (comparação de perdidos sem agendar com o período anterior saiu: coorte com menos tempo)
       if (x.tPerda != null && x.tPerda >= 5) bons.push(`cadência cumprida: ${nf1.format(x.tPerda)} tentativas em média antes de perder um lead`);
       if (subiu(x.ag, ant && ant.ag)) bons.push(`mais agendamentos (${insN1(ant.ag)} → ${fN(x.ag)})`);
       CUR.cs = cs; CUR.bons = bons; }
     card('MQL → reunião agendada', 'Agendamentos ÷ leads novos do período', v != null && v > 100 ? '100% ⚠' : fP(v), `meta ${fP(REF_PRU.ag)}`, x.leads ? st : null,
       sec('Reuniões agendadas', x.ag, vol('ag', 'ag')),
-      fator('Agendados em até 7 dias', 'pAg7', 'p', 1, 'Leads novos com reunião marcada em até 7 dias da entrada') + fator('Perdidos sem agendar', 'pSemAg', 'n', -1, 'Perdidos no período sem nunca ter marcado reunião')
-      + fator('Tentativas antes de desistir', 'tPerda', 'n1', 1, 'Média de contatos antes de perder o lead (sem agendar)'), L);
+      fator('Agendados em até 7 dias', 'pAg7', 'p', 1, 'Leads novos com reunião marcada em até 7 dias da entrada') + fator('Perdidos sem agendar', 'pSemAg', 'n', -1, 'Leads que entraram no período e já foram perdidos sem nunca marcar reunião (situação de hoje)')
+      + fator('Tentativas antes de desistir', 'tPerda', 'n1', 1, 'Média de contatos antes de perder o lead, entre os leads do período perdidos sem agendar'), L);
   }
   // 4) Comparecimento
   {
@@ -3350,6 +3350,17 @@ function insSel() {   // período escolhido nos Insights (padrão: último fecha
 /* Insights: toda conta usa só a OPERAÇÃO (filtros.operacao): ficam fora as importações de base/reativados (l.b) e os
    lançamentos retroativos (isRetro). Eles continuam nas outras abas. Espelho: audit.filtra(operacao). */
 const insF = o => filtros(Object.assign({operacao: true}, o || {}));
+/* 24/11/2026 (pedido do usuário): nos cards dos Insights, 'perdidos sem agendar', 'tentativas antes de desistir' e o
+   motivo de perda falam só dos leads que ENTRARAM no período (situação de hoje), e não de perdas de leads antigos. */
+function insCoorteSemAg(de, ate) {
+  const rows = run(insF({de, ate})).rows, tent = [], mot = {};
+  for (const {l} of rows) {
+    if (l.s !== 'lost' || !l.l) continue;
+    if ((l.k || []).some(z => MEETING_TYPES.has(z[1]) && z[0] <= l.l) || agendaTempos(l).some(t2 => t2 <= l.l)) continue;
+    tent.push((l.k || []).filter(z => z[0] <= l.l).length); const m = l.lr || SEM_MOTIVO; mot[m] = (mot[m] || 0) + 1;
+  }
+  return {pSemAg: tent.length, tPerda: tent.length ? tent.reduce((a, b) => a + b, 0) / tent.length : null, motSemAg: mot};
+}
 function insCalc(de, ate, camp) {
   const fx = insF(camp === undefined ? {de, ate} : {de, ate, campanha: camp});
   const R = run(fx), k = R.res.kpis, e = R.res.eventos, pf = R.res.performance.total;
@@ -3789,8 +3800,8 @@ function viewInsights() {
   }
   const DST = {};
   {
-    const xm = Object.assign({}, x, {mql: insMCalc(P.de, P.ate).mql});
-    const pm = xPrev ? insAjusta(Object.assign({}, xPrev, {mql: insMCalc(per[i - 1].de, per[i - 1].fim).mql}), frac) : null;
+    const xm = Object.assign({}, x, {mql: insMCalc(P.de, P.ate).mql}, insCoorteSemAg(P.de, P.ate));
+    const pm = xPrev ? insAjusta(Object.assign({}, xPrev, {mql: insMCalc(per[i - 1].de, per[i - 1].fim).mql}, {pSemAg: null, tPerda: null, motSemAg: null}), frac) : null;   // coorte não se compara: o período anterior teve mais tempo
     h += insDrvHtml({x: xm, ant: pm, P, modo, frac, rotAnt, rotMed, CP, gs, comCpl, cs, recente, pxRows, out: DST});
   }
   const nPos = DST.bom || 0, nNeg = DST.ruim || 0, neg = (DST.ruins || []).map(n => [n]);
