@@ -661,7 +661,17 @@ def instagram(IGP, f, agora_day):
             o["posts"] += 1; o["views"] += x[5] or 0; o["alcance"] += x[4] or 0; o["interacoes"] += x[10] or 0
             o["salvos"] += x[9] or 0; o["compart"] += x[8] or 0
         pv = sum(x[5] or 0 for x in ps); pr = sum(x[4] or 0 for x in ps); pi = sum(x[10] or 0 for x in ps)
-        top = sorted(ps, key=lambda x: (-(x[5] or 0), -(x[10] or 0), [-ord(ch) for ch in x[0]]))[:5]
+        # post impulsionado: x[13] = [investimento ¢, alcance pago, impressões, views de vídeo, curtidas, coment., compart., salvos, nº anúncios]
+        pago13 = lambda x: x[13] if len(x) > 13 else None
+        pago_views = lambda x: ((pago13(x)[3] if x[1] in ("REELS", "VIDEO") else pago13(x)[2]) if pago13(x) else 0)
+        org_views = lambda x: max(0, (x[5] or 0) - pago_views(x))
+        top = sorted(ps, key=lambda x: (-org_views(x), -(x[10] or 0), [-ord(ch) for ch in x[0]]))[:5]
+        imp = sorted(({"data": x[0], "formato": x[1], "link": x[2], "legenda": x[3], "img": (x[12] if len(x) > 12 else None) or None,
+                       "inv": pago13(x)[0], "alcance_pago": pago13(x)[1], "anuncios": pago13(x)[8],
+                       "views": x[5], "views_pagas": pago_views(x), "views_org": org_views(x),
+                       "curtidas": x[6], "curtidas_pagas": pago13(x)[4], "comentarios": x[7], "com_pagos": pago13(x)[5],
+                       "compart": x[8], "compart_pagos": pago13(x)[6], "salvos": x[9], "salvos_pagos": pago13(x)[7]}
+                      for x in ps if pago13(x)), key=lambda o: (-o["inv"], [-ord(ch) for ch in o["data"]]))
         contas.append({
             "id": c["id"], "user": c["user"], "nome": c["nome"], "seguidores_hoje": c["seguidores"],
             "dias_com_dados": len(ds), "dias_periodo": n_dias,
@@ -682,7 +692,9 @@ def instagram(IGP, f, agora_day):
             "formatos": sorted(por.values(), key=lambda o: (-o["posts"], o["formato"])),
             "top": [{"data": x[0], "formato": x[1], "link": x[2], "legenda": x[3], "alcance": x[4], "views": x[5], "curtidas": x[6],
                      "comentarios": x[7], "compart": x[8], "salvos": x[9], "interacoes": x[10],
-                     "engajamento": (x[10] or 0) / x[4] * 100 if x[4] else None, "img": (x[12] if len(x) > 12 else None) or None} for x in top],
+                     "engajamento": (x[10] or 0) / x[4] * 100 if x[4] else None, "img": (x[12] if len(x) > 12 else None) or None,
+                     "pago": pago13(x), "views_pagas": pago_views(x) if pago13(x) else None, "views_org": org_views(x)} for x in top],
+            "impulsionados": imp,
             "serie": [[r[0], r[IGD["views"]] or 0, r[IGD["reach"]] or 0, r[IGD["inter"]] or 0] for r in ds],
             "anuncios": ig_bloco(ds, IG_ADS), "total": ig_bloco(ds, IG_TOT)})
     return {"contas": contas, "base_em": T}

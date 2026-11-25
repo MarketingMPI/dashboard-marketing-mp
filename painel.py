@@ -672,6 +672,38 @@ def midia_payload(m):
     return {"camps": camps, "dias": dias, "atualizado_em": m.get("atualizado_em"), "erro": m.get("erro")}
 
 
+def sync_ig_ads(old):
+    """Lado PAGO das publicações do Instagram usadas em anúncio ("usar publicação existente" no Gerenciador).
+    Soma todos os anúncios que apontam para o mesmo post (effective_instagram_media_id); o ig_payload junta com o
+    post orgânico para o painel separar total × pago × orgânico. Dark posts (criativo que só existe como anúncio)
+    têm um ID próprio que não bate com post nenhum do perfil e ficam de fora na junção. SOMENTE LEITURA."""
+    old = old or {}
+    tok = meta_token()
+    if not tok: return {**old, "erro": "sem token da Meta"}
+    try:
+        ads = meta_get(f"{META_ACCOUNT}/ads", tok, limit=250, fields="id,creative{effective_instagram_media_id}")
+        rows = meta_get(f"{META_ACCOUNT}/insights", tok, level="ad", limit=500, date_preset="maximum",
+                        fields="ad_id,spend,impressions,reach,actions,video_play_actions")
+    except Exception as e:
+        return {**old, "erro": f"falha ao consultar a Meta ({getattr(e, 'code', None) or type(e).__name__})"}
+    ad2post = {a["id"]: (a.get("creative") or {}).get("effective_instagram_media_id") for a in ads}
+    posts = {}
+    for r in rows:
+        mid = ad2post.get(r.get("ad_id"))
+        if not mid: continue
+        act = {a["action_type"]: int(float(a["value"])) for a in r.get("actions") or []}
+        p = posts.setdefault(mid, {"inv": 0, "reach": 0, "impr": 0, "vv": 0, "likes": 0, "com": 0, "shares": 0, "saves": 0, "ads": 0})
+        p["inv"] += int(round(float(r.get("spend") or 0) * 100))          # centavos, como no resto do painel
+        p["reach"] += int(r.get("reach") or 0); p["impr"] += int(r.get("impressions") or 0)
+        p["vv"] += sum(int(float(a["value"])) for a in r.get("video_play_actions") or [])
+        p["likes"] += act.get("onsite_conversion.post_net_like", act.get("post_reaction", 0))   # líquido (desconta descurtidas)
+        p["com"] += act.get("onsite_conversion.post_net_comment", act.get("comment", 0))
+        p["shares"] += act.get("post", 0)
+        p["saves"] += act.get("onsite_conversion.post_net_save", act.get("onsite_conversion.post_save", 0))
+        p["ads"] += 1
+    return {"posts": posts, "erro": None, "atualizado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")}
+
+
 # ---------------------------------------------------------------- MP PRO (Kiwify + Meta Perpétuo, SOMENTE LEITURA)
 KIWIFY_API = "https://public-api.kiwify.com/v1"
 MPPRO_PRODUTO = "5243d100-6347-11f1-9029-d1b5a9444144"   # MP PRO (club, R$ 49/mês, Janela Fundadora)
@@ -1076,9 +1108,10 @@ def ig_seguidores_por_dia(c):
     return sorted(out)
 
 
-def ig_payload(ig):
+def ig_payload(ig, ads=None):
     out = {"contas": [], "erro": (ig or {}).get("erro"), "atualizado_em": (ig or {}).get("atualizado_em"), "sem_permissao": IG_SEM_PERMISSAO}
     todas = ((ig or {}).get("contas") or {})
+    pagos = ((ads or {}).get("posts") or {})
     bs = ig_bs_load()
     for cid, user, nome in IG_CONTAS:
         c = ((ig or {}).get("contas") or {}).get(cid)
@@ -1105,9 +1138,11 @@ def ig_payload(ig):
         posts = []
         for mid, po in sorted(c["posts"].items(), key=lambda x: x[1]["ts"]):
             i = po.get("ins") or {}
+            g = pagos.get(mid)   # post que virou anúncio: [investimento ¢, alcance, impressões, views de vídeo, curtidas, coment., compart., salvos, nº de anúncios]
             posts.append([po["ts"], po.get("tipo"), po.get("link"), po.get("leg"), i.get("reach"), i.get("views"),
                           i.get("likes", po.get("likes")), i.get("comments", po.get("com")), i.get("shares"), i.get("saved"),
-                          i.get("total_interactions"), i.get("ig_reels_avg_watch_time"), po.get("img")])
+                          i.get("total_interactions"), i.get("ig_reels_avg_watch_time"), po.get("img"),
+                          [g["inv"], g["reach"], g["impr"], g["vv"], g["likes"], g["com"], g["shares"], g["saves"], g["ads"]] if g else None])
         out["contas"].append({"id": cid, "user": user, "nome": nome, "seguidores": c.get("seguidores"), "seguindo": c.get("seguindo"),
                               "midias": c.get("midias"), "seg": ig_seguidores_por_dia(c),
                               "dias": dias, "posts": posts, "stories_desde": c.get("stories_desde"),
@@ -1537,10 +1572,15 @@ def collect(full=False):
     cache["midia"] = sync_midia(cache.get("midia"))
     cache["mppro"] = mppro_payload(cache["midia"], cache.get("mppro"))
     cache["ig"] = sync_instagram(cache.get("ig"))
+    cache["ig_ads"] = sync_ig_ads(cache.get("ig_ads"))
+    if cache["ig_ads"].get("erro"): print("AVISO Instagram impulsionados:", cache["ig_ads"]["erro"])
+    else:
+        org = {m for c in (cache["ig"].get("contas") or {}).values() for m in (c.get("posts") or {})}
+        print("Instagram impulsionados: ", sum(1 for m in cache["ig_ads"].get("posts") or {} if m in org), "post(s) com anúncio ligado")
     tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"]), "mphub": mphub_payload(), "mppro_alunos": alunos_payload(), "youtube": youtube_payload(), "aplicacao": aplicacao_payload(cache),
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"], cache.get("ig_ads")), "mphub": mphub_payload(), "mppro_alunos": alunos_payload(), "youtube": youtube_payload(), "aplicacao": aplicacao_payload(cache),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
                      "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run"),

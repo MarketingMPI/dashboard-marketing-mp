@@ -1681,6 +1681,9 @@ function computeIG(IG, f, agoraDay) {
     const segAte = d => { let v = null; for (const [k, n] of c.seg) if (k <= d) v = n; return v; };
     const segIni = segAte(addDays(de, -1)), segFim = segAte(T);
     const ps = c.posts.filter(x => inP(x[0].slice(0, 10)));
+    // post impulsionado: x[13] = [investimento ¢, alcance pago, impressões, views de vídeo, curtidas, coment., compart., salvos, nº anúncios]
+    const pagoViews = x => x[13] ? ((x[1] === 'REELS' || x[1] === 'VIDEO') ? x[13][3] : x[13][2]) : 0;
+    const orgViews = x => Math.max(0, (x[5] || 0) - pagoViews(x));
     // story "no ar" no período = publicado no período OU publicado na véspera e ainda visível (24 h) no início do período
     const noArAte = ts => { const d = new Date(ts + 'Z'); d.setUTCHours(d.getUTCHours() + 24); return d.toISOString().slice(0, 19); };
     const stIni = de === '0000-00-00' ? de : addDays(de, -1);
@@ -1699,9 +1702,13 @@ function computeIG(IG, f, agoraDay) {
       o.posts++; o.views += x[5] || 0; o.alcance += x[4] || 0; o.interacoes += x[10] || 0; o.salvos += x[9] || 0; o.compart += x[8] || 0;
     }
     const pv = ps.reduce((a, x) => a + (x[5] || 0), 0), pr = ps.reduce((a, x) => a + (x[4] || 0), 0), pi = ps.reduce((a, x) => a + (x[10] || 0), 0);
-    const top = ps.slice().sort((a, b) => (b[5] || 0) - (a[5] || 0) || (b[10] || 0) - (a[10] || 0) || (a[0] < b[0] ? 1 : -1)).slice(0, 5)
+    const top = ps.slice().sort((a, b) => orgViews(b) - orgViews(a) || (b[10] || 0) - (a[10] || 0) || (a[0] < b[0] ? 1 : -1)).slice(0, 5)
       .map(x => ({data: x[0], formato: x[1], link: x[2], legenda: x[3], alcance: x[4], views: x[5], curtidas: x[6], comentarios: x[7], compart: x[8], salvos: x[9], interacoes: x[10],
-        engajamento: x[4] ? (x[10] || 0) / x[4] * 100 : null, img: x[12] || null}));
+        engajamento: x[4] ? (x[10] || 0) / x[4] * 100 : null, img: x[12] || null, pago: x[13] || null, views_pagas: x[13] ? pagoViews(x) : null, views_org: orgViews(x)}));
+    const imp = ps.filter(x => x[13]).map(x => ({data: x[0], formato: x[1], link: x[2], legenda: x[3], img: x[12] || null,
+      inv: x[13][0], alcance_pago: x[13][1], anuncios: x[13][8], views: x[5], views_pagas: pagoViews(x), views_org: orgViews(x),
+      curtidas: x[6], curtidas_pagas: x[13][4], comentarios: x[7], com_pagos: x[13][5], compart: x[8], compart_pagos: x[13][6],
+      salvos: x[9], salvos_pagos: x[13][7]})).sort((a, b) => b.inv - a.inv || (a.data < b.data ? 1 : -1));
     return {id: c.id, user: c.user, nome: c.nome, seguidores_hoje: c.seguidores,
       dias_com_dados: ds.length, dias_periodo: nDias,
       views: soma('views'), interacoes: soma('inter'), curtidas: soma('likes'), comentarios: soma('comments'), compartilhamentos: soma('shares'),
@@ -1714,7 +1721,7 @@ function computeIG(IG, f, agoraDay) {
       engajamento_posts: pr ? pi / pr * 100 : null,
       stories: stDesde ? sts.length : null, stories_publicados: stPub, stories_desde: stDesde, stories_completo: !!stDesde && de >= stDesde,
       stories_pub_completo: bsCobre || (!!stDesde && de >= stDesde), stories_pub_fonte: bsCobre ? 'bs' : 'painel', bs,
-      views_por_story: stViews.length ? stViews.reduce((a, b) => a + b, 0) / stViews.length : null, formatos: Object.values(por).sort((a, b) => b.posts - a.posts || (a.formato < b.formato ? -1 : 1)), top,
+      views_por_story: stViews.length ? stViews.reduce((a, b) => a + b, 0) / stViews.length : null, formatos: Object.values(por).sort((a, b) => b.posts - a.posts || (a.formato < b.formato ? -1 : 1)), top, impulsionados: imp,
       serie: ds.map(r => [r[0], r[IGD.views] || 0, r[IGD.reach] || 0, r[IGD.inter] || 0]),
       anuncios: igBloco(ds, IG_MODOS.ads), total: igBloco(ds, IG_MODOS.tot)};
   });
@@ -4753,9 +4760,17 @@ function viewInstagram() {
     const fm = c.formatos.length ? '<div class="igf">' + c.formatos.map(x => `<div><div class="igfh"><b>${x.formato}</b><span class="mut">${x.posts} ${x.posts === 1 ? 'post' : 'posts'}</span></div>
       <div class="igfg"><span><b>${fN(Math.round(x.views / x.posts))}</b>visualizações/post</span><span><b>${fN(Math.round(x.alcance / x.posts))}</b>alcance/post</span><span><b>${f1(x.interacoes / x.posts)}</b>interações/post</span><span><b>${fP(pctOf(x.interacoes, x.alcance))}</b>engajamento</span></div></div>`).join('') + '</div>' : emptyBox('Nenhum post no período');
     const tp = c.top.length ? `<table class="t"><thead><tr><th>Post</th><th>Formato</th><th class="num">Visualizações</th><th class="num">Alcance</th><th class="num">Interações</th><th class="num">Compart.</th><th class="num">Salvos</th><th class="num">Engaj.</th></tr></thead><tbody>` +
-      c.top.map(x => `<tr><td class="wrap" style="min-width:260px;max-width:420px"${x.img ? ` data-igprev="${ESC(x.img)}" data-igleg="${ESC(fmtNome(x.formato) + ' · ' + fDM(x.data.slice(0, 10)))}"` : ''}><a href="${ESC(x.link || '#')}" target="_blank" rel="noopener noreferrer"><b>${fDM(x.data.slice(0, 10))}</b></a> <span class="mut">${ESC((x.legenda || '').slice(0, 70))}${(x.legenda || '').length > 70 ? '…' : ''}</span></td><td>${fmtNome(x.formato)}</td><td class="num b">${fN(x.views)}</td><td class="num">${fN(x.alcance)}</td><td class="num">${fN(x.interacoes)}</td><td class="num">${fN(x.compart)}</td><td class="num">${fN(x.salvos)}</td><td class="num">${fP(x.engajamento)}</td></tr>`).join('') + '</tbody></table>' : emptyBox('Nenhum post no período');
+      c.top.map(x => `<tr><td class="wrap" style="min-width:260px;max-width:420px"${x.img ? ` data-igprev="${ESC(x.img)}" data-igleg="${ESC(fmtNome(x.formato) + ' · ' + fDM(x.data.slice(0, 10)))}"` : ''}><a href="${ESC(x.link || '#')}" target="_blank" rel="noopener noreferrer"><b>${fDM(x.data.slice(0, 10))}</b></a>${x.pago ? ' <span class="pill" title="Este post virou anúncio: os números do post somam orgânico + pago. A separação está no quadro Posts impulsionados, abaixo.">impulsionado</span>' : ''} <span class="mut">${ESC((x.legenda || '').slice(0, 70))}${(x.legenda || '').length > 70 ? '…' : ''}</span></td><td>${fmtNome(x.formato)}</td><td class="num b">${fN(x.views)}</td><td class="num">${fN(x.alcance)}</td><td class="num">${fN(x.interacoes)}</td><td class="num">${fN(x.compart)}</td><td class="num">${fN(x.salvos)}</td><td class="num">${fP(x.engajamento)}</td></tr>`).join('') + '</tbody></table>' : emptyBox('Nenhum post no período');
     h += `<div class="g g32 mt"><div class="card np"><div class="ch"><div><h3>Melhores posts do período</h3><p>Top 5 por visualizações orgânicas · passe o mouse no post para ver a prévia · clique na data para abrir no Instagram</p></div></div><div class="tw">${tp}</div></div>
       <div class="card"><div class="ch"><div><h3>Desempenho por formato</h3><p>Posts publicados no período · números orgânicos</p></div></div>${fm}</div></div>`;
+    if (c.impulsionados.length) {
+      const somaInv = c.impulsionados.reduce((a, x) => a + (x.inv || 0), 0);
+      const celPO = (tot, pago) => tot == null && pago == null ? '<td class="num">–</td>' :
+        `<td class="num"><b>${fN(tot)}</b><div class="mut" style="font-size:11px;white-space:nowrap">pago ${fN(pago || 0)} · org ${tot == null ? '–' : fN(Math.max(0, tot - (pago || 0)))}</div></td>`;
+      h += `<div class="card np mt"><div class="ch"><div><h3>Posts impulsionados · pago × orgânico</h3><p>${c.impulsionados.length === 1 ? '1 post do período virou anúncio' : fN(c.impulsionados.length) + ' posts do período viraram anúncio'} (publicação existente no Gerenciador) · investimento total <b>${fRc(somaInv)}</b> · pago = o que a conta de anúncios registrou para o post; orgânico = total do post − pago</p></div></div><div class="tw"><table class="t"><thead><tr><th>Post</th><th class="num">Investimento</th><th class="num">Visualizações</th><th class="num">Curtidas</th><th class="num">Coment.</th><th class="num">Compart.</th><th class="num">Salvos</th><th class="num">Alcance pago</th></tr></thead><tbody>` +
+        c.impulsionados.map(x => `<tr><td class="wrap" style="min-width:240px;max-width:400px"${x.img ? ` data-igprev="${ESC(x.img)}" data-igleg="${ESC(fmtNome(x.formato) + ' · ' + fDM(x.data.slice(0, 10)))}"` : ''}><a href="${ESC(x.link || '#')}" target="_blank" rel="noopener noreferrer"><b>${fDM(x.data.slice(0, 10))}</b></a> <span class="mut">${ESC((x.legenda || '').slice(0, 60))}${(x.legenda || '').length > 60 ? '…' : ''}</span></td><td class="num b">${fRc(x.inv)}${x.anuncios > 1 ? `<div class="mut" style="font-size:11px">${x.anuncios} anúncios</div>` : ''}</td>${celPO(x.views, x.views_pagas)}${celPO(x.curtidas, x.curtidas_pagas)}${celPO(x.comentarios, x.com_pagos)}${celPO(x.compart, x.compart_pagos)}${celPO(x.salvos, x.salvos_pagos)}<td class="num">${fN(x.alcance_pago)}</td></tr>`).join('') +
+        `</tbody></table></div><p class="mut" style="font-size:12px;margin:8px 16px 14px">Visualizações pagas de vídeo = visualizações de 3 segundos do anúncio (estimativa; a Meta não informa o play pago no mesmo conceito do orgânico). O alcance não separa com exatidão: quem viu o post no orgânico e no anúncio conta uma vez só no total, por isso mostramos apenas o alcance pago.</p></div>`;
+    }
     h += igEvoHtml(contasInfo, vw, c.id);
   });
   h += `<details class="mpd mt"><summary>Como ler esta página</summary><ul>
@@ -4764,6 +4779,7 @@ function viewInstagram() {
     <li><b>Orgânico:</b> a Meta informa quanto das visualizações, do alcance e das interações veio de anúncios pagos; esses números são descontados. Seguidores, novos seguidores e cliques no link da bio são do perfil e podem incluir quem chegou por um anúncio.</li>
     <li><b>Alcance</b> mostra a média por dia, porque a mesma pessoa contaria em vários dias se somássemos.</li>
     <li><b>Posts:</b> feed e reels publicados no período, com os números acumulados de cada post até hoje. Stories não entram.</li>
+    <li><b>Posts impulsionados:</b> quando um post do perfil vira anúncio ("usar publicação existente" no Gerenciador), os números daquele post passam a somar orgânico + pago. O painel busca o lado pago direto na conta de anúncios e mostra a separação no quadro "Posts impulsionados"; o orgânico é o total do post menos o pago. O Top 5 de melhores posts ordena pelas visualizações orgânicas, para não comparar post turbinado com post sem mídia.</li>
     <li><b>Seguidores:</b> o total de cada dia é reconstruído a partir do total atual, descontando o saldo diário informado pela Meta (começaram a seguir − deixaram de seguir). Assim o filtro de período mostra o número exato daquela data e a variação.</li></ul></details>`;
   return h;
 }
