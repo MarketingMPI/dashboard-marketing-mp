@@ -2911,7 +2911,7 @@ function mpMetaChart(meta, S0, sel, W) {
     if (S0.tipo === 'fluxo' && (i % step === 0 || on)) g += `<text class="ax" x="${cx}" y="${Hh - pb + 26}" text-anchor="middle" style="font-size:10px">acum. ${fN(x.acc)}</text>`;
     const tip = [`${x.nome}${x.parcial ? ' (em andamento)' : ''}${x.ini_dados ? ' · dados desde ' + fDay(S0.desde ? S0.desde + '-01' : D.mppro && mpMeses()[0] + '-01') : ''}`,
       `${meta.t}: ${fmtA(x.v)}`, S0.tipo === 'estoque' ? `No período: ${x.delta == null ? '–' : (x.delta > 0 ? '+' : x.delta < 0 ? '−' : '') + meta.fmt(Math.abs(x.delta))}` : null,
-      S0.tipo !== 'estoque' ? `Acumulado até o fim do período: ${fmtA(x.acc)}` : null,
+      S0.tipo !== 'estoque' ? `Acumulado ${S0.accDesde && S0.tipo === 'taxa' ? `desde ${fMesAno(S0.accDesde)} ` : ''}até o fim do período: ${fmtA(x.acc)}` : null,
       meta.k === 'churn' && x.extra ? `${fN(x.extra.sairam)} de ${fN(x.extra.base)} não renovaram` : null,
       meta.k === 'convVisita' && x.extra ? `${fN(x.extra.novas)} ${x.extra.novas === 1 ? 'assinatura' : 'assinaturas'} de ${fN(x.extra.visitas)} visitas na página` : null,
       meta.k === 'ren1' && x.extra ? !x.extra.base ? 'nenhuma assinatura com o 2º mês vencido neste período' : `${fN(x.extra.pagaram)} de ${fN(x.extra.base)} pagaram o 2º mês${x.extra.em_aberto ? ` · ${fN(x.extra.em_aberto)} ainda em aberto` : ''}` : null,
@@ -2958,7 +2958,7 @@ function mpMetaCard(meta, S0, x) {
          !S0.movel ? '<span class="mut">Meta proporcional: não se aplica (o MQL é a base do cálculo)</span>'
          : !x.mql ? '<span class="mvl">Meta proporcional: sem MQL no período</span>'
          : `<span class="mvl">Meta proporcional: <b>${f1(x.mov)}</b> (${fN(x.mql)} MQL × ${fP(S0.movel)}) · <b class="${x.pctMov >= 100 ? 'mt-ok' : x.pctMov >= 80 ? '' : 'mvl-no'}">${fP(x.pctMov)}</b> atingido${x.pctMov >= 100 ? ' ✔' : ''}</span>`]
-      : [`No período: <b>${fmtA(x.v)}</b>${meta.k === 'convVisita' && x.extra ? ` (${fN(x.extra.novas)} de ${fN(x.extra.visitas)} visitas)` : ''}${meta.k === 'ren1' && x.extra ? ` (${fN(x.extra.pagaram)} de ${fN(x.extra.base)}${x.extra.em_aberto ? ` · ${fN(x.extra.em_aberto)} em aberto` : ''})` : ''}`, `Acumulado desde ${fMesAno(S0.desde || mpMeses()[0])}: <b>${fmtA(x.acc)}</b>`];
+      : [`No período: <b>${fmtA(x.v)}</b>${meta.k === 'convVisita' && x.extra ? ` (${fN(x.extra.novas)} de ${fN(x.extra.visitas)} visitas)` : ''}${meta.k === 'ren1' && x.extra ? ` (${fN(x.extra.pagaram)} de ${fN(x.extra.base)}${x.extra.em_aberto ? ` · ${fN(x.extra.em_aberto)} em aberto` : ''})` : ''}`, `Acumulado desde ${fMesAno(S0.accDesde || S0.desde || mpMeses()[0])}: <b>${fmtA(x.acc)}</b>`];
   return `<div class="mt-i mpmc ${mpCls(p)}"><div class="mt-h"><span>${meta.t}<br><small>${ESC(x.nome)}${x.parcial ? ' · em andamento' : ''}</small></span><b>${fmtA(x.v)}</b></div>
     <div class="mt-bar"><i style="width:${Math.min(100, p || 0)}%"></i></div>
     <div class="mt-f"><span><b>${p == null ? '–' : fP(p)}</b> da meta</span><span>Meta ${S0.tipo === 'estoque' ? `${nomeG === 'semana' ? 'da' : 'do'} ${nomeG} ` : ''}${meta.bom === 'baixo' ? 'até ' : ''}<b>${fmtA(x.alvo ?? S0.alvo)}</b>${S0.tipo === 'fluxo' ? ' por ' + nomeG : ''}</span></div>
@@ -3280,6 +3280,7 @@ function insMetaVal(k, x) {
   const pc = (a, b) => b ? a / b * 100 : null;
   return {mql: x.mql, ag: x.ag, reu: x.reu, won: x.won, rap: x.rap, tAg: pc(x.ag, x.leads), tRe: pc(x.reu, x.ag), tGa: pc(x.won, x.reu), tTot: pc(x.won, x.leads)}[k] ?? null;
 }
+const INS_ACC_DESDE = '2026-08-01';   // 24/11/2026 (pedido do usuário): linha de acumulado das CONVERSÕES só a partir de ago/26 (início das campanhas B2C atuais)
 const INS_SEM_N = 20;   // Insights › Metas no semanal: só as últimas 20 semanas (17/11/2026); o acumulado continua desde o início
 function insMetaSerie(meta, g, ini) {
   const bs = g === 'semanal' ? mpBuckets(g, ini).slice(-INS_SEM_N) : mpBuckets(g, ini);
@@ -3287,12 +3288,13 @@ function insMetaSerie(meta, g, ini) {
   const pts = bs.map(b => {
     const ate = b.ate > TODAY ? TODAY : b.ate, cap = v => v != null && meta.tipo === 'taxa' && v > 100 ? 100.0001 : v;
     const X = insMCalc(b.de < ini ? ini : b.de, ate);
-    const v = cap(insMetaVal(meta.k, X)), acc = cap(insMetaVal(meta.k, insMCalc(ini, ate)));
+    const accIni = meta.tipo === 'taxa' && INS_ACC_DESDE > ini ? INS_ACC_DESDE : ini;
+    const v = cap(insMetaVal(meta.k, X)), acc = ate < accIni ? null : cap(insMetaVal(meta.k, insMCalc(accIni, ate)));
     // meta proporcional (antes "móvel"): MQL realizado no período × taxa do funil (agendadas 30%, realizadas 15%, fechamentos 5%)
     const mov = meta.movel && X.mql != null ? X.mql * meta.movel / 100 : null;
     return {...b, v, acc, delta: null, extra: null, pct: mpMetaPct({bom: 'alto', meta: alvo}, v), mql: X.mql, mov, pctMov: mov ? Math.min(100, v / mov * 100) : null};
   });
-  return {g, tipo: meta.tipo, alvo, pts, mensalForcado: false, desde: ini.slice(0, 7), movel: meta.movel || null, ins: true};
+  return {g, tipo: meta.tipo, alvo, pts, mensalForcado: false, desde: ini.slice(0, 7), accDesde: (meta.tipo === 'taxa' && INS_ACC_DESDE > ini ? INS_ACC_DESDE : ini).slice(0, 7), movel: meta.movel || null, ins: true};
 }
 function viewInsMetas() {
   const CN = S.camp && CAMPANHAS[S.camp] ? CAMPANHAS[S.camp].nome : '', CP = CN ? CN.split(' · ')[0] : '';
@@ -3308,9 +3310,9 @@ function viewInsMetas() {
     const S0 = insMetaSerie(meta, g, ini), n = S0.pts.length;
     let ult = n - 1; while (ult > 0 && S0.pts[ult].v == null) ult--;
     const sel = Number.isInteger(S.mpMB) && S.mpMB >= 0 && S.mpMB < n ? S.mpMB : ult;
-    const leg = `<span><i style="background:#00a611"></i>bateu</span><span><i style="background:#d9a441"></i>80–99%</span><span><i style="background:#c0392b"></i>&lt;80%</span>${S0.tipo === 'taxa' ? '<span><i style="background:#1c1c1c;height:2px;vertical-align:middle"></i>acumulado</span>' : ''}`;
+    const leg = `<span><i style="background:#00a611"></i>bateu</span><span><i style="background:#d9a441"></i>80–99%</span><span><i style="background:#c0392b"></i>&lt;80%</span>${S0.tipo === 'taxa' ? '<span><i style="background:#1c1c1c;height:2px;vertical-align:middle"></i>acumulado desde ' + fMesAno(INS_ACC_DESDE.slice(0, 7)) + '</span>' : ''}`;
     const ult20 = g === 'semanal' ? ` · últimas ${INS_SEM_N}` : '';
-    const sub = S0.tipo === 'fluxo' ? `por ${(MPG.find(z => z[0] === S0.g) || [])[2]}${ult20} · acum. desde o início` : `por período${ult20 ? ult20 + ' semanas' : ''} · linha = acumulado`;
+    const sub = S0.tipo === 'fluxo' ? `por ${(MPG.find(z => z[0] === S0.g) || [])[2]}${ult20} · acum. desde o início` : `por período${ult20 ? ult20 + ' semanas' : ''} · linha = acumulado desde ${fMesAno(INS_ACC_DESDE.slice(0, 7))}`;
     return `<div class="g g32 mprow"><div class="card"><div class="ch"><div><h3>${meta.t} <small>${sub}</small></h3></div><div class="lg">${leg}<span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>Meta</span>${S0.movel ? `<span data-tip="${ESC(`Meta ajustada ao volume real: MQL do período × ${fP(S0.movel)}`)}"><i style="background:#2f6db5;height:2px;vertical-align:middle"></i>Meta proporcional (MQL × ${fP(S0.movel)})</span>` : ''}</div></div>${mpMetaChart(meta, S0, sel, W)}</div>
       ${mpMetaCard(meta, S0, S0.pts[sel])}</div>`;
   };
@@ -5229,20 +5231,20 @@ function offMetasHtml(pf, fb) {
     if (!OFFM.has(key)) { if (OFFM.size > 800) OFFM.clear(); const pr = makePred(f); let n = 0; for (const l of LEADS) if (pr(l)) n++;
       const e = computeEventos(LEADS, f); OFFM.set(key, {leads: n, ag: e.agendamentos, reu: e.reunioes, won: e.ganhos}); }
     return OFFM.get(key); };
-  const X = bs.map(b => { const ate = b.ate > TODAY ? TODAY : b.ate; return {b, x: calc(b.de < ini ? ini : b.de, ate), a: calc(ini, ate)}; });
+  const X = bs.map(b => { const ate = b.ate > TODAY ? TODAY : b.ate; const accIni = INS_ACC_DESDE > ini ? INS_ACC_DESDE : ini; return {b, x: calc(b.de < ini ? ini : b.de, ate), a: ate < accIni ? null : calc(accIni, ate)}; });
   const vw = document.getElementById('view').clientWidth || 1200, right = window.innerWidth > 1100 ? vw - 520 - 26 - 40 : vw - 40;
   const W = Math.max(260, Math.floor((right - 12) / 2 - 26));
   const cap = v => v != null && v > 100 ? 100.0001 : v;
   const graf = m0 => {
     const meta = {...m0, bom: 'alto', pct: true, fmt: v => v > 100 ? '100% ⚠' : fP(v)};
-    const pts = X.map(({b, x, a}) => { const v = cap(insMetaVal(m0.k, x)); return {...b, v, acc: cap(insMetaVal(m0.k, a)), delta: null, extra: null, pct: mpMetaPct({bom: 'alto', meta: m0.meta}, v)}; });
-    const S0 = {g, tipo: 'taxa', alvo: m0.meta, pts, mensalForcado: false, desde: ini.slice(0, 7), movel: null, ins: true};
+    const pts = X.map(({b, x, a}) => { const v = cap(insMetaVal(m0.k, x)); return {...b, v, acc: a ? cap(insMetaVal(m0.k, a)) : null, delta: null, extra: null, pct: mpMetaPct({bom: 'alto', meta: m0.meta}, v)}; });
+    const S0 = {g, tipo: 'taxa', alvo: m0.meta, pts, mensalForcado: false, desde: ini.slice(0, 7), accDesde: (INS_ACC_DESDE > ini ? INS_ACC_DESDE : ini).slice(0, 7), movel: null, ins: true};
     let ult = pts.length - 1; while (ult > 0 && pts[ult].v == null) ult--;
     const sel = Number.isInteger(S.mpMB) && S.mpMB >= 0 && S.mpMB < pts.length ? S.mpMB : ult, x = pts[sel] || {};
     return `<div class="ofg"><div class="ofg-h"><b>${ESC(m0.t)}</b><span class="mut">meta ${fP(m0.meta)} · ${ESC(x.nome || '')}: <b class="${mpCls(x.pct)}">${x.v == null ? '–' : meta.fmt(x.v)}</b></span></div>${mpMetaChart(meta, S0, sel, W)}</div>`;
   };
   return `<div class="ofgs"><div class="ofgt"><span class="fz-h">Metas de conversão</span><div class="seg">${OFF_G.map(([k2, l]) => `<button type="button" data-offg="${k2}" class="${g === k2 ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <span class="lg"><span><i style="background:#00a611"></i>bateu</span><span><i style="background:#d9a441"></i>80–99%</span><span><i style="background:#c0392b"></i>&lt;80%</span><span><i style="background:#1c1c1c;height:2px;vertical-align:middle"></i>acumulado</span><span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>meta</span></span></div>
+    <span class="lg"><span><i style="background:#00a611"></i>bateu</span><span><i style="background:#d9a441"></i>80–99%</span><span><i style="background:#c0392b"></i>&lt;80%</span><span><i style="background:#1c1c1c;height:2px;vertical-align:middle"></i>acumulado desde ${fMesAno(INS_ACC_DESDE.slice(0, 7))}</span><span><i style="background:repeating-linear-gradient(90deg,#a8701c 0 4px,transparent 4px 7px);height:2px;vertical-align:middle"></i>meta</span></span></div>
     <div class="ofgg">${OFF_METAS.map(graf).join('')}</div>${g === 'semanal' ? `<p class="fz-leg">Últimas ${INS_SEM_N} semanas.</p>` : ''}</div>`;
 }
 function viewOffline() {
