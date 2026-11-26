@@ -196,7 +196,7 @@ summary.dvh{cursor:pointer;list-style:none}summary.dvh::-webkit-details-marker{d
 .dvchev{width:20px;height:20px;flex:none;fill:none;stroke:var(--cinza);stroke-width:2;transition:transform .15s}details.dvk[open] .dvchev{transform:rotate(180deg)}
 details.dvk:not([open]){padding-top:12px;padding-bottom:12px}details.dvk:not([open]):hover{background:#fafcfb}
 .dvb{margin-top:10px}.dvsub{margin:0 0 8px;font-size:12px;color:var(--cinza)}
-.kpis.k5c{grid-template-columns:repeat(5,minmax(0,1fr))}@media(max-width:1100px){.kpis.k5c{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpis.k5c{grid-template-columns:repeat(5,minmax(0,1fr))}@media(min-width:1101px){.kpis.k6.k10{grid-template-columns:repeat(5,minmax(0,1fr))}}@media(max-width:1100px) and (min-width:761px){.kpis.k6.k10{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:1100px){.kpis.k5c{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mpsec{display:flex;align-items:baseline;gap:12px;margin:22px 0 4px;padding-bottom:8px;border-bottom:2px solid var(--verde)}.mpsec b{font-size:15px;letter-spacing:.08em;color:var(--verde)}.mpsec span{font-size:12.5px;color:var(--cinza)}
 .mpsec2{margin-top:40px;padding-top:26px;border-top:1px dashed #cfd9d4}
 .dvmel{margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef7f1;border:1px solid #cfe6d8}.dvmel .dvlt{color:#00503c;margin-top:0}.dvmel ol{margin:4px 0 0;padding-left:20px}.dvmel li{margin:3px 0;line-height:1.45}
@@ -4748,7 +4748,7 @@ function viewInstagram() {
     if (ic) h += '<div class="igsp" aria-hidden="true"></div>';   // espaçador entre perfis
     h += `<div class="igh mt" id="ig-${ESC(c.user)}"><span class="igdot lg" style="background:${cor}"></span><div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
       <a class="igl" href="https://www.instagram.com/${encodeURIComponent(c.user)}/" target="_blank" rel="noopener noreferrer">abrir perfil ↗</a></div>`;
-    h += '<div class="kpis k6">' + [
+    h += '<div class="kpis k6 k10">' + [
       kpiCard({label: 'Seguidores', cls: 'hero', v: fN(c.seguidores_fim ?? c.seguidores_hoje),
         sub: c.crescimento != null ? `<b>${c.crescimento >= 0 ? '+' : '−'}${fN(Math.abs(c.crescimento))}</b> no período · ${fN(c.novos_seguidores)} novos, ${fN(c.deixaram_de_seguir)} saíram` : 'sem histórico para o período',
         d: igDelta(c.seguidores_fim, p.seguidores_fim), tip: 'Seguidores no último dia do período. A variação compara com o último dia do período anterior; o saldo mostra quem começou a seguir menos quem deixou de seguir.'}),
