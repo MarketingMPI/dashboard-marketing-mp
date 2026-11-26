@@ -4573,6 +4573,12 @@ const IGE_MET = [
   ['deixaram_de_seguir', 'Deixaram de seguir', 'no período · subir é ruim'], ['views', 'Visualizações', 'soma do período'],
   ['alcance_medio_dia', 'Alcance médio/dia', 'média diária de contas alcançadas'], ['interacoes', 'Interações', 'curtidas, comentários, compartilhamentos e salvamentos'],
   ['posts', 'Posts', 'posts e reels publicados, incluindo collabs'], ['cliques_site', 'Cliques no link', 'toques no link da bio']];
+/* 26/11/2026 (pedido do usuário): Evolução de cada perfil separada por categoria. */
+const IGE_GRUPOS = [
+  ['PRODUÇÃO', 'o que o perfil publicou', ['posts']],
+  ['BRANDING', 'tamanho e alcance da marca', ['seguidores_fim', 'novos_seguidores', 'deixaram_de_seguir', 'views', 'alcance_medio_dia']],
+  ['LEAD', 'quem saiu do Instagram em direção à MP', ['cliques_site']],
+  ['ENGAJAMENTO', 'quanto o público interage com o conteúdo', ['interacoes']]];
 const fMesAno = ym => `${MES[+ym.slice(5, 7) - 1]}/${ym.slice(2, 4)}`;   // usado também no MP PRO
 const IGE_FU = new Set(['novos_seguidores', 'deixaram_de_seguir']);   // a Meta só informa a partir de 30/10/2025
 function igEvoSerie(g) {
@@ -4686,10 +4692,13 @@ function igEvoHtml(contasInfo, vw, perfilId) {   // um bloco por perfil (11/11/2
   let h = `<div class="mph mt"><span>EVOLUÇÃO${conta ? ' · @' + ESC(conta.user) : ''}</span>orgânico · não depende do filtro de datas do topo · dados desde ${fDay(E.ini)} · clique numa barra para ver o período no card</div>`;
   h += `<div class="aplpx"><span>Período</span><div class="seg">${MPG.map(([kk, l]) => `<button type="button" data-mpg="${kk}" class="${g === kk ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
   const nomeG = (MPG.find(z => z[0] === g) || [])[2];
-  for (const [k, nome] of IGE_MET) {
+  IGE_GRUPOS.forEach(([gt, gs, ks], gi) => {
+    h += `<div class="mpsec${gi ? ' mpsec2' : ''}"><b>${gt}</b><span>${gs}</span></div>`;
+    for (const k of ks) { const nome = (IGE_MET.find(m => m[0] === k) || [])[1];
     h += `<div class="g g32 mprow"><div class="card"><div class="ch"><div><h3>${nome} <small>por ${nomeG}</small></h3></div></div>${igEvoChart(E, perfil, k, nome, sel, W, contasInfo)}</div>
       ${igEvoCard(E, perfil, k, nome, sel, contasInfo)}</div>`;
-  }
+    }
+  });
   return h;
 }
 function viewInstagram() {
