@@ -205,7 +205,7 @@ details.dvk:not([open]){padding-top:12px;padding-bottom:12px}details.dvk:not([op
 .igmenu button:hover{border-color:#9fbfb1}
 .igmenu button.on{border-color:var(--verde);box-shadow:0 0 0 2px rgba(0,80,60,.15);background:#f3f8f6}
 .igav{position:relative;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:16px;flex:none}
-.igav i{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 0 0 1px var(--linha)}
+.igav img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}.igavh{width:46px;height:46px;box-shadow:0 0 0 2px #fff,0 0 0 3px var(--linha)}.igmenu .igav:has(img){box-shadow:0 0 0 2px #fff,0 0 0 3px var(--linha)}.igav i{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 0 0 1px var(--linha)}
 .igav i svg{width:12px;height:12px;fill:none;stroke:#c13584;stroke-width:2.2}
 .igav.cmp{background:#eef3f1;color:var(--prof)}.igav.cmp svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
 .igmt{display:flex;flex-direction:column;line-height:1.2}.igmt b{font-size:13.5px}.igmt small{font-size:11.5px;color:var(--cinza)}
@@ -4519,6 +4519,7 @@ function viewMPHub() {
 }
 
 /* ---- Redes Sociais · Instagram ---- */
+const igFoto = c => { const f = c && ((D.ig && D.ig.contas || []).find(x => x.id === c.id) || {}).foto; return f && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(f) ? f : null; };   // foto do perfil (26/11/2026)
 const IG_COR = {'meupatrimonio.nacional': '#00503c', 'rede.meupatrimonio': '#3d9a6f', 'gabriel.meupatrimonio': '#c9a94f', 'renanlimacfp': '#1c1c1c'};
 const fmtNome = t => ({REELS: 'Reels', CAROUSEL_ALBUM: 'Carrossel', IMAGE: 'Imagem', VIDEO: 'Vídeo'}[t] || t || '–');
 function igDelta(c, p, fmt = fN, good = 1) { return delta(c, p, good, fmt); }
@@ -4728,7 +4729,7 @@ function viewInstagram() {
   const ICO_CMP = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10M15 10v10"/></svg>';
   h += `<nav class="igmenu" aria-label="Perfis do Instagram">
     <button type="button" data-igp="" class="${selP ? '' : 'on'}"><span class="igav cmp">${ICO_CMP}</span><span class="igmt"><b>Comparativo</b><small>todos os perfis</small></span></button>` +
-    ig.contas.map(c => `<button type="button" data-igp="${ESC(c.id)}" class="${selP === c.id ? 'on' : ''}" data-tip="${ESC(`${c.nome} · ver todos os dados do perfil`)}"><span class="igav" style="background:${IG_COR[c.user] || '#00503c'}">${ini(c.user)}<i>${ICO_IG}</i></span><span class="igmt"><b>@${ESC(c.user)}</b><small>${fN(c.seguidores_hoje)} seguidores</small></span></button>`).join('') + `</nav>`;
+    ig.contas.map(c => `<button type="button" data-igp="${ESC(c.id)}" class="${selP === c.id ? 'on' : ''}" data-tip="${ESC(`${c.nome} · ver todos os dados do perfil`)}"><span class="igav" style="background:${IG_COR[c.user] || '#00503c'}">${igFoto(c) ? `<img src="${igFoto(c)}" alt="">` : ini(c.user)}<i>${ICO_IG}</i></span><span class="igmt"><b>@${ESC(c.user)}</b><small>${fN(c.seguidores_hoje)} seguidores</small></span></button>`).join('') + `</nav>`;
   if (!selP) h += `<div class="card np"><div class="ch"><div><h3>Comparativo dos perfis</h3><p>${MN} · valores no período e variação em relação ao período anterior</p></div></div><div class="tw"><table class="t igc"><thead><tr><th></th>` +
     ig.contas.map(c => `<th class="num"><span class="igdot" style="background:${IG_COR[c.user] || '#00503c'}"></span>@${ESC(c.user)}</th>`).join('') + `</tr></thead><tbody>` +
     row('Seguidores', c => c.seguidores_fim ?? c.seguidores_hoje, fN, 'Seguidores no último dia do período, comparados com o último dia do período anterior. Reconstruído dia a dia pelo saldo informado pela Meta (começaram a seguir − deixaram de seguir).', c => c.seguidores_fim, true) +
@@ -4745,7 +4746,7 @@ function viewInstagram() {
   ig.contas.filter(c => c.id === selP).forEach((c, ic) => {
     const p = pmap.get(c.id) || {}, cor = IG_COR[c.user] || '#00503c';
     if (ic) h += '<div class="igsp" aria-hidden="true"></div>';   // espaçador entre perfis
-    h += `<div class="igh mt" id="ig-${ESC(c.user)}"><span class="igdot lg" style="background:${cor}"></span><div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
+    h += `<div class="igh mt" id="ig-${ESC(c.user)}">${igFoto(c) ? `<span class="igav igavh" style="background:${cor}"><img src="${igFoto(c)}" alt=""></span>` : `<span class="igdot lg" style="background:${cor}"></span>`}<div><h3>@${ESC(c.user)}</h3><p>${ESC(c.nome)} · ${fN(c.seguidores_hoje)} seguidores hoje</p></div>
       <a class="igl" href="https://www.instagram.com/${encodeURIComponent(c.user)}/" target="_blank" rel="noopener noreferrer">abrir perfil ↗</a></div>`;
     h += '<div class="kpis k6 k10">' + [
       kpiCard({label: 'Seguidores', cls: 'hero', v: fN(c.seguidores_fim ?? c.seguidores_hoje),

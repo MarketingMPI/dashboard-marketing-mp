@@ -955,6 +955,30 @@ def ig_get(path, tok, uso, **q):
             time.sleep(4 * (tent + 1))
 
 
+def ig_foto(url, limite=160000, lado=112):
+    """Foto do perfil embutida como data URI (o link do CDN da Meta expira; o perfil é público). Reduz para
+    lado×lado px com Pillow quando disponível (fica ~4 KB); sem Pillow, guarda o arquivo original até `limite`."""
+    if not url: return None
+    try:
+        r = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "mp-dashboard/1.0"}), timeout=30)
+        tipo = (r.headers.get("Content-Type") or "image/jpeg").split(";")[0].strip()
+        b = r.read(limite * 4 + 1)
+        if not tipo.startswith("image/"): return None
+        try:
+            from PIL import Image
+            import io
+            im = Image.open(io.BytesIO(b)).convert("RGB")
+            im.thumbnail((lado, lado))
+            buf = io.BytesIO(); im.save(buf, "JPEG", quality=85, optimize=True)
+            b, tipo = buf.getvalue(), "image/jpeg"
+        except Exception:
+            pass
+        if len(b) > limite or tipo not in ("image/jpeg", "image/png", "image/webp"): return None
+        return f"data:{tipo};base64," + base64.b64encode(b).decode()
+    except Exception:
+        return None
+
+
 def _meia_noite(day):
     return int(datetime.fromisoformat(day).replace(tzinfo=BRT).timestamp())
 
@@ -973,8 +997,12 @@ def sync_instagram(old):
             c = contas.setdefault(cid, {"dias": {}, "seg": {}, "novos": {}, "posts": {}})
             c.setdefault("org", {}); c.setdefault("fu", {})
             c["user"], c["nome"] = user, nome
-            pf = ig_get(cid, tok, uso, fields="followers_count,follows_count,media_count")
+            pf = ig_get(cid, tok, uso, fields="followers_count,follows_count,media_count,profile_picture_url")
             c["seguidores"], c["seguindo"], c["midias"] = pf.get("followers_count"), pf.get("follows_count"), pf.get("media_count")
+            arq = (pf.get("profile_picture_url") or "").split("?")[0].rsplit("/", 1)[-1]
+            if arq and (arq != c.get("foto_arq") or not c.get("foto")):   # só baixa quando a foto do perfil muda
+                foto = ig_foto(pf.get("profile_picture_url"))
+                if foto: c["foto"], c["foto_arq"] = foto, arq   # falhou: fica a anterior (ou as iniciais no painel)
             c["seg"][hoje.isoformat()] = c["seguidores"]
             # stories: a Meta só lista os que estão no ar (24 h). Cada leitura guarda os que encontrar e atualiza
             # os números enquanto estão ativos; o histórico começa no 1º dia em que o painel passou a ler stories.
@@ -1143,7 +1171,7 @@ def ig_payload(ig, ads=None):
                           i.get("likes", po.get("likes")), i.get("comments", po.get("com")), i.get("shares"), i.get("saved"),
                           i.get("total_interactions"), i.get("ig_reels_avg_watch_time"), po.get("img"),
                           [g["inv"], g["reach"], g["impr"], g["vv"], g["likes"], g["com"], g["shares"], g["saves"], g["ads"]] if g else None])
-        out["contas"].append({"id": cid, "user": user, "nome": nome, "seguidores": c.get("seguidores"), "seguindo": c.get("seguindo"),
+        out["contas"].append({"id": cid, "user": user, "nome": nome, "foto": c.get("foto"), "seguidores": c.get("seguidores"), "seguindo": c.get("seguindo"),
                               "midias": c.get("midias"), "seg": ig_seguidores_por_dia(c),
                               "dias": dias, "posts": posts, "stories_desde": c.get("stories_desde"),
                               # posts de OUTRO perfil nosso em que este entrou como colaborador (aceito): [data, dono, link]
