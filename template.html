@@ -4577,8 +4577,7 @@ const IGE_MET = [
 const IGE_GRUPOS = [
   ['PRODUÇÃO', 'o que o perfil publicou', ['posts']],
   ['BRANDING', 'tamanho e alcance da marca', ['seguidores_fim', 'novos_seguidores', 'deixaram_de_seguir', 'views', 'alcance_medio_dia']],
-  ['LEAD', 'quem saiu do Instagram em direção à MP', ['cliques_site']],
-  ['ENGAJAMENTO', 'quanto o público interage com o conteúdo', ['interacoes']]];
+  ['ENGAJAMENTO', 'quanto o público interage com o conteúdo e com o perfil', ['interacoes', 'cliques_site']]];   // 26/11: 'Lead' saiu, cliques no link entram aqui
 const fMesAno = ym => `${MES[+ym.slice(5, 7) - 1]}/${ym.slice(2, 4)}`;   // usado também no MP PRO
 const IGE_FU = new Set(['novos_seguidores', 'deixaram_de_seguir']);   // a Meta só informa a partir de 30/10/2025
 function igEvoSerie(g) {
