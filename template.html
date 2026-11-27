@@ -6229,10 +6229,6 @@ function gaMeta(de, ate) {   // investimento Meta B2C do período: campanhas que
   for (const c of porC.values()) if (c.lpv > 0) z.invSite += c.cent;
   return z;   // centavos (fRc)
 }
-function gaCrmDigital(de, ate) {
-  const r = run(filtros({de, ate, campanha: null, consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [], busca: ''}));
-  return r.rows.filter(({l}) => ehDigitalLb(l)).length;
-}
 function gaGrupo(de, ate, o, dim) {
   const G = D.ga4, s = G.s, m = new Map();
   const acc = (k, sub, r, lp) => { let a = m.get(k); if (!a) { a = {k, sub, ...gaZ(), semDur: !!lp}; m.set(k, a); }
@@ -6274,21 +6270,6 @@ function gaChart(de, ate, o, width) {
     if (b.gl) g += `<circle cx="${cx}" cy="${y2(b.gl)}" r="3.4" fill="#c98a1b" stroke="#fff" stroke-width="1.2"/>`;
     g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)}\nSessões: ${fN(b.ses)}\nInícios de formulário: ${fN(b.fs)}\nLeads no site: ${fN(b.gl)}\nConversão: ${fPc(pctOf(b.gl, b.ses))}`)}"/>`; });
   return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg></div>`;
-}
-function gaFunil(c, crm, mt) {
-  const st = [['Sessões', c.ses, 'visitas ao site'], ['Sessões engajadas', c.eng, '10 s+, 2 páginas ou conversão'], ['Inícios de formulário', c.fs, 'começaram a preencher'], ['Leads no site', c.gl, 'enviaram o formulário']];
-  const verbo = ['', 'engajaram', 'começaram o formulário', 'enviaram'], W = [100, 84, 70, 57], COR = ['#003326', '#00503c', '#0b6a4f', '#2f8a69'];
-  let fun = '';
-  st.forEach(([nm, v, d], i) => {
-    if (i) { const an = st[i - 1]; fun += `<div class="evz-c"><div class="fz-cv" data-tip="${ESC(`${nm} ÷ ${an[0].toLowerCase()}: ${fN(v)} ÷ ${fN(an[1])}`)}"><b>▼ ${fPc(pctOf(v, an[1]))}</b> ${verbo[i]}</div></div>`; }
-    const wb = W[i + 1] ?? W[i] * 0.78, ins = (W[i] - wb) / 2 / W[i] * 100;
-    fun += `<div class="evz-r"><div class="evz-b" style="width:${W[i]}%;clip-path:polygon(0 0,100% 0,${(100 - ins).toFixed(2)}% 100%,${ins.toFixed(2)}% 100%);background:${COR[i]}" data-tip="${ESC(`${nm}: ${fN(v)} · ${d}`)}"><span>${nm}</span><b>${fN(v)}</b></div></div>`;
-  });
-  const tres = [['GA4 · site', c.gl, 'formulários enviados no site (generate_lead)'], ['Meta · plataforma', mt ? mt.leads : null, mt ? `${fN(mt.pixel)} pelo pixel do site · ${fN(Math.max(0, mt.leads - mt.pixel))} por formulário do Instagram/Facebook` : 'escolha Todos os canais'],
-    ['CRM · Pipedrive', crm, 'negócios com etiqueta Digital que entraram no período']];
-  return `<div class="evd2 gaz"><div class="evz">${fun}</div><div class="gaz-s"><div class="fz-h">Os três números de lead no período</div>
-    <div class="gaz-g">${tres.map(([t, v, s]) => `<div class="mpz-c"><span>${t}</span><b>${v == null ? '–' : fN(v)}</b><small>${s}</small></div>`).join('')}</div>
-    <p class="fz-leg">Cada fonte mede uma coisa: o GA4 conta envios de formulário no site (inclui reenvio e teste), a Meta conta os leads que ela atribui aos anúncios (inclui formulário nativo, que nunca passa pelo site) e o CRM conta quem virou negócio. Por isso os três não batem: compare a tendência de cada um.</p></div></div>`;
 }
 function gaTabelaHtml(de, ate, o, dim) {
   const L = gaGrupo(de, ate, o, dim), tl = L.reduce((a, x) => a + x.gl, 0), TOP = 20, top = L.slice(0, TOP), resto = L.slice(TOP);
@@ -6361,10 +6342,9 @@ function viewGA4() {
     kpiCard({label: 'Conversão do site', v: fPc(conv), sub: 'leads ÷ sessões', d: dlL(conv, convP, 1, fP), tip: 'De cada 100 sessões, quantas viraram lead'}),
     kpiCard({label: 'Formulário → lead', v: fPc(pctOf(c.gl, c.fs)), sub: 'dos que começaram, quantos enviaram', d: dlL(pctOf(c.gl, c.fs), p && pctOf(p.gl, p.fs), 1, fP), tip: 'Leads ÷ inícios de formulário. Baixo = formulário longo, erro ou abandono'}),
     kpiCard({label: 'Investimento Meta (site)', cls: pago && semHost ? '' : 'off', v: pago && semHost ? fRc(mt.invSite) : '–', sub: pago && semHost ? `campanhas B2C com visita ao site · total B2C ${fRc0(mt.inv)}` : 'só com Todos os canais e Todas as páginas', d: pago && semHost ? dl(mt.invSite, mtp && mtp.invSite, -1, fRc0) : '', tip: 'Gasto no Meta Ads das campanhas B2C que tiveram visita à página no período (as de formulário nativo ficam de fora)'}),
-    kpiCard({label: 'Custo por lead do site', cls: cpl == null ? 'off' : '', v: cpl == null ? '–' : fRc(cpl), sub: cpl == null ? (pago && semHost ? 'sem lead de anúncio no período' : 'só com Todos os canais e Todas as páginas') : `investimento ÷ ${fN(glAds)} leads vindos de anúncio Meta`, d: cpl == null ? '' : dlL(cpl, cplP, -1, fRc), tip: 'Investimento Meta (site) ÷ leads do site com origem em anúncio Meta (utm_medium=ads)'})
+    kpiCard({label: 'Custo por lead do site', cls: cpl == null ? 'off' : '', v: cpl == null ? '–' : fRc(cpl), sub: cpl == null ? (pago && semHost ? 'sem lead de anúncio no período' : 'só com Todos os canais e Todas as páginas') : `investimento ÷ ${fN(glAds)} ${glAds === 1 ? 'lead vindo' : 'leads vindos'} de anúncio Meta`, d: cpl == null ? '' : dlL(cpl, cplP, -1, fRc), tip: 'Investimento Meta (site) ÷ leads do site com origem em anúncio Meta (utm_medium=ads)'})
   ].join('') + '</div>';
-  // funil + três números
-  h += `<div class="card mt"><div class="ch"><div><h3>Funil do site</h3><p>Da visita ao formulário enviado · ${ESC(cap.split(' · ')[0])}${o.canal ? ' · ' + ESC(o.canal) : ''}${o.host ? ' · ' + ESC(gaHostNome(o.host)) : ''}</p></div></div>${gaFunil(c, o.canal || o.host ? null : gaCrmDigital(de, ate), o.canal || o.host ? null : mt)}</div>`;
+  // funil do site + três números de lead saíram (27/11/2026, pedido do usuário)
   // evolução + destaques
   const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
   h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Sessões e leads</h3><p>barras = sessões (eixo da esquerda) · linha dourada = leads no site (eixo da direita)</p></div></div>${gaChart(de, ate, o, W)}</div>
