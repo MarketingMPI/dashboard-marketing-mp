@@ -751,15 +751,16 @@ def sync_ga4(old):
     sa = ga4_sa()
     if not sa: return {**old, "erro": "sem a chave do GA4"}
     hoje = datetime.now(BRT).date()
-    tem = old.get("v") == 1 and old.get("t")
+    tem = old.get("v") == 2 and old.get("t")   # v2 (27/11/2026): página de entrada com origem/mídia (o filtro de canal vale nela)
     since = GA4_DESDE if not tem else (hoje - timedelta(days=4)).isoformat()
     D7 = ["date", "sessionSource", "sessionMedium", "sessionCampaignName", "sessionManualAdContent", "sessionManualTerm", "hostName", "deviceCategory"]
     try:
         tok = ga4_token(sa)
         T = ga4_report(tok, since, hoje.isoformat(), D7, ["sessions", "engagedSessions", "newUsers", "userEngagementDuration"])
         E = ga4_report(tok, since, hoje.isoformat(), D7 + ["eventName"], ["eventCount"], GA4_EVENTOS)
-        L = ga4_report(tok, since, hoje.isoformat(), ["date", "hostName", "landingPage"], ["sessions", "engagedSessions", "newUsers"])
-        LE = ga4_report(tok, since, hoje.isoformat(), ["date", "hostName", "landingPage", "eventName"], ["eventCount"], GA4_EVENTOS)
+        DL = ["date", "hostName", "landingPage", "sessionSource", "sessionMedium"]
+        L = ga4_report(tok, since, hoje.isoformat(), DL, ["sessions", "engagedSessions", "newUsers", "userEngagementDuration"])
+        LE = ga4_report(tok, since, hoje.isoformat(), DL + ["eventName"], ["eventCount"], GA4_EVENTOS)
         try:
             req = urllib.request.Request(f"https://analyticsadmin.googleapis.com/v1beta/properties/{GA4_PROP}/keyEvents", headers={"Authorization": "Bearer " + tok})
             chave = sorted(k["eventName"] for k in json.loads(urllib.request.urlopen(req, timeout=60).read()).get("keyEvents") or [])
@@ -775,19 +776,19 @@ def sync_ga4(old):
         k = "|".join(r[:8]); x = t.setdefault(k, [0, 0, 0, 0, 0, 0]); x[4 + ev[r[8]]] += int(r[9])
     lp = {}
     for r in L:
-        k = "|".join(r[:3]); lp[k] = [int(r[3]), int(r[4]), int(r[5]), 0, 0]
+        k = "|".join(r[:5]); lp[k] = [int(r[5]), int(r[6]), int(r[7]), int(round(r[8])), 0, 0]
     for r in LE:
-        k = "|".join(r[:3]); x = lp.setdefault(k, [0, 0, 0, 0, 0]); x[3 + ev[r[3]]] += int(r[4])
+        k = "|".join(r[:5]); x = lp.setdefault(k, [0, 0, 0, 0, 0, 0]); x[4 + ev[r[5]]] += int(r[6])
     velho_t = {k: v for k, v in (old.get("t") or {}).items() if tem and k[:10] < since}
     velho_lp = {k: v for k, v in (old.get("lp") or {}).items() if tem and k[:10] < since}
-    return {"v": 1, "t": {**velho_t, **t}, "lp": {**velho_lp, **lp}, "key_events": chave, "erro": None,
+    return {"v": 2, "t": {**velho_t, **t}, "lp": {**velho_lp, **lp}, "key_events": chave, "erro": None,
             "atualizado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")}
 
 
 def ga4_payload(g, midia=None):
     """Tabelas compactas (strings num dicionário `s`, linhas com índices). Hosts de teste (localhost, previews) saem.
     t:  [dia, origem, mídia, campanha, conteúdo(criativo), termo(público), host, dispositivo, sessões, engajadas, novos, seg_engajado, inícios_form, leads]
-    lp: [dia, host, página, sessões, engajadas, novos, inícios_form, leads]  (páginas com < 15 sessões no total viram '(outras páginas)')
+    lp: [dia, host, página, origem, mídia, sessões, engajadas, novos, seg_engajado, inícios_form, leads]  (páginas com < 15 sessões no total viram '(outras páginas)')
     meta: investimento Meta B2C por dia e campanha + visitas à página e leads (para custo por lead do site)."""
     if not g or not g.get("t"):
         return {"t": [], "lp": [], "s": [], "erro": (g or {}).get("erro") or "sem dados", "atualizado_em": (g or {}).get("atualizado_em")}
@@ -801,16 +802,17 @@ def ga4_payload(g, midia=None):
         if GA4_HOST_DEV.search(h): continue
         t.append([d[0]] + [si(x) for x in d[1:6]] + [si(h), si(d[7])] + g["t"][k])
     tot = Counter()
+    lead_pg = Counter()
     for k, v in g["lp"].items():
-        d = k.split("|"); tot[(ga4_host(d[1]), d[2])] += v[0]
+        d = k.split("|"); tot[(ga4_host(d[1]), d[2])] += v[0]; lead_pg[(ga4_host(d[1]), d[2])] += v[5]
     lp, agg = [], {}
     for k in sorted(g["lp"]):
         d = k.split("|"); h = ga4_host(d[1])
         if GA4_HOST_DEV.search(h): continue
-        pg = d[2] if tot[(h, d[2])] >= 15 or g["lp"][k][4] else "(outras páginas)"
-        a = agg.setdefault((d[0], h, pg), [0, 0, 0, 0, 0])
+        pg = d[2] if tot[(h, d[2])] >= 15 or lead_pg[(h, d[2])] else "(outras páginas)"
+        a = agg.setdefault((d[0], h, pg, d[3], d[4]), [0, 0, 0, 0, 0, 0])
         for i, v in enumerate(g["lp"][k]): a[i] += v
-    for (dia, h, pg), v in sorted(agg.items()): lp.append([dia, si(h), si(pg)] + v)
+    for (dia, h, pg, src, med), v in sorted(agg.items()): lp.append([dia, si(h), si(pg), si(src), si(med)] + v)
     meta = {"camps": [], "dias": []}
     if midia and midia.get("dias"):
         ci = {}

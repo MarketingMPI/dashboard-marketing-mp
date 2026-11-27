@@ -6231,10 +6231,11 @@ function gaMeta(de, ate) {   // investimento Meta B2C do período: campanhas que
 }
 function gaGrupo(de, ate, o, dim) {
   const G = D.ga4, s = G.s, m = new Map();
-  const acc = (k, sub, r, lp) => { let a = m.get(k); if (!a) { a = {k, sub, ...gaZ(), semDur: !!lp}; m.set(k, a); }
-    if (lp) { a.ses += r[3]; a.eng += r[4]; a.nov += r[5]; a.fs += r[6]; a.gl += r[7]; } else gaAdd(a, r); };
-  if (dim === 'pagina') {
-    for (const r of G.lp) { if (r[0] < de || r[0] > ate || (o.host && s[r[1]] !== o.host)) continue; acc(s[r[1]] + s[r[2]], s[r[1]], r, true); }
+  const acc = (k, sub, r, lp) => { let a = m.get(k); if (!a) { a = {k, sub, ...gaZ()}; m.set(k, a); }
+    if (lp) { a.ses += r[5]; a.eng += r[6]; a.nov += r[7]; a.dur += r[8]; a.fs += r[9]; a.gl += r[10]; } else gaAdd(a, r); };
+  if (dim === 'pagina') {   // 27/11/2026: a página de entrada também segue o filtro de Canal (origem/mídia na linha)
+    if (!G._cl) G._cl = G.lp.map(r => gaCanal(s[r[3]], s[r[4]]));
+    G.lp.forEach((r, i) => { if (r[0] < de || r[0] > ate || (o.host && s[r[1]] !== o.host) || (o.canal && G._cl[i] !== o.canal)) return; acc(s[r[1]] + s[r[2]], s[r[1]], r, true); });
     for (const a of m.values()) { const pg = a.k.slice(a.sub.length); a.ni = GA_NI.has(pg); a.nome = a.ni ? '(página não registrada)' : pg || '/'; }
   } else {
     for (const i of gaRows(de, ate, o)) { const r = G.t[i];
@@ -6275,7 +6276,7 @@ function gaTabelaHtml(de, ate, o, dim) {
   const L = gaGrupo(de, ate, o, dim), tl = L.reduce((a, x) => a + x.gl, 0), TOP = 20, top = L.slice(0, TOP), resto = L.slice(TOP);
   const mxL = Math.max(1, ...L.map(x => x.gl)), clk = dim === 'canal' ? 'data-gacanal' : dim === 'host' ? 'data-gahost' : '';
   const linha = x => `<tr${clk ? ` ${clk}="${ESC(x.k)}" style="cursor:pointer" title="Filtrar a página por ${ESC(x.nome)}"` : ''}><td class="wrap"><b>${ESC(x.nome)}</b>${x.sub ? `<div class="muted" style="font-size:11px">${ESC(gaHostNome(x.sub))}</div>` : ''}</td>
-    <td class="num">${fN(x.ses)}</td><td class="num">${fPc(pctOf(x.eng, x.ses))}</td><td class="num">${x.semDur ? '–' : fSeg(x.ses ? x.dur / x.ses : null)}</td>
+    <td class="num">${fN(x.ses)}</td><td class="num">${fPc(pctOf(x.eng, x.ses))}</td><td class="num">${fSeg(x.ses ? x.dur / x.ses : null)}</td>
     <td class="num">${fN(x.fs)}</td><td class="num"><b>${fN(x.gl)}</b></td><td class="num">${x.ses ? fPc(pctOf(x.gl, x.ses)) : '–'}</td>
     <td style="min-width:120px"><div class="gabar"><i style="width:${x.gl / mxL * 100}%"></i></div><small class="muted">${tl ? fP(pctOf(x.gl, tl)) : '–'}</small></td></tr>`;
   let rz = '';
@@ -6323,7 +6324,7 @@ function gaCrmCalc(de, ate) {
   const z = () => ({inv: 0, mLead: 0, mPx: 0, site: 0, fs: 0, crm: 0, mql: 0});
   const o = {diag: z(), trd: z(), rcon: z(), tot: z()};
   for (const r of G.lp) { if (r[0] < de || r[0] > ate) continue; const c = gaSiteCamp(s[r[1]], s[r[2]]);
-    o.tot.site += r[7]; o.tot.fs += r[6]; if (c) { o[c].site += r[7]; o[c].fs += r[6]; } }
+    o.tot.site += r[10]; o.tot.fs += r[9]; if (c) { o[c].site += r[10]; o[c].fs += r[9]; } }
   const M = G.meta || {camps: [], dias: []};
   for (const [d, ci, cent, , , lead, px] of M.dias) { if (d < de || d > ate) continue; const gr = (M.camps[ci] || {}).grupo;
     o.tot.inv += cent; o.tot.mLead += lead; o.tot.mPx += px; if (o[gr]) { o[gr].inv += cent; o[gr].mLead += lead; o[gr].mPx += px; } }
@@ -6338,7 +6339,7 @@ function gaCrmChart(de, ate, width) {
   for (let d = de; d <= ate; d = addDays(d, 1)) { const k = key(d); if (!bins.has(k)) bins.set(k, {k, from: d, to: d}); bins.get(k).to = d; }
   for (const b of bins.values()) Object.assign(b, {site: 0, crm: 0, mql: 0});
   const G = D.ga4, s = G.s;
-  for (const r of G.lp) { if (r[0] < de || r[0] > ate || gaSiteCamp(s[r[1]], s[r[2]]) !== 'diag') continue; const b = bins.get(key(r[0])); if (b) b.site += r[7]; }
+  for (const r of G.lp) { if (r[0] < de || r[0] > ate || gaSiteCamp(s[r[1]], s[r[2]]) !== 'diag') continue; const b = bins.get(key(r[0])); if (b) b.site += r[10]; }
   for (const {l} of run(filtros({de, ate, campanha: 'diag', consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [], busca: ''})).rows) {
     const b = bins.get(key(String(l.e || '').slice(0, 10))); if (b) { b.crm++; if (ehMetaMql(l)) b.mql++; } }
   const bs = [...bins.values()];
@@ -6425,7 +6426,7 @@ function viewGA4() {
     <div class="card"><div class="ch"><div><h3>Destaques do período</h3><p>o que mais trouxe lead e o que converte melhor</p></div></div>${gaDestaques(de, ate, o)}</div></div>`;
   // atribuição
   const dim = GA_DIMS.some(d => d[0] === S.gaDim) ? S.gaDim : 'canal';
-  h += `<div class="card mt"><div class="ch"><div><h3>Atribuição: de onde vêm as sessões e os leads</h3><p>${dim === 'pagina' && o.canal ? 'Página de entrada não separa por canal: mostrando todos os canais · ' : ''}${GA_DIM_TIP[dim] ? ESC(GA_DIM_TIP[dim]) + ' · ' : ''}ordenado por leads${dim === 'canal' || dim === 'host' ? ' · clique numa linha para filtrar a página' : ''}</p></div></div>
+  h += `<div class="card mt"><div class="ch"><div><h3>Atribuição: de onde vêm as sessões e os leads</h3><p>${o.canal || o.host ? `filtrado por ${[o.canal, o.host && gaHostNome(o.host)].filter(Boolean).map(ESC).join(' e ')} · ` : ''}${GA_DIM_TIP[dim] ? ESC(GA_DIM_TIP[dim]) + ' · ' : ''}ordenado por leads${dim === 'canal' || dim === 'host' ? ' · clique numa linha para filtrar a página' : ''}</p></div></div>
     <div class="aplpx" style="margin-top:0"><div class="seg">${GA_DIMS.map(([k, t]) => `<button type="button" data-gadim="${k}" class="${dim === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
     ${gaTabelaHtml(de, ate, o, dim)}</div>`;
   h += `<div class="card mt"><div class="ch"><div><h3>Qualidade do rastreamento</h3><p>o que impede de saber de onde veio cada lead · ${o.host ? ESC(gaHostNome(o.host)) : 'todo o site'} no período</p></div></div>${gaQualidade(de, ate, o)}</div>`;
