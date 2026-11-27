@@ -629,7 +629,7 @@ def sync_midia(old):
     if not tok:
         return {**old, "erro": "sem token da Meta"}
     hoje = datetime.now(BRT).date()
-    dias = old.get("dias") or {} if old.get("v") == 2 else {}
+    dias = old.get("dias") or {} if old.get("v") == 3 else {}   # v3 (26/11/2026): + leads e leads do pixel
     since = META_DESDE if not dias else (hoje - timedelta(days=35)).isoformat()
     try:
         rows = meta_get(f"{META_ACCOUNT}/insights", tok, level="campaign", time_increment=1, limit=500,
@@ -647,11 +647,12 @@ def sync_midia(old):
         act = {a["action_type"]: int(float(a["value"])) for a in r.get("actions") or []}
         dias[f"{r['date_start']}|{cid}"] = [int(round(float(r.get("spend") or 0) * 100)), int(r.get("impressions") or 0),
                                             int(r.get("inline_link_clicks") or 0), act.get("landing_page_view", 0),
-                                            act.get("initiate_checkout", 0), act.get("purchase", 0)]
+                                            act.get("initiate_checkout", 0), act.get("purchase", 0), act.get("lead", 0),
+                                            act.get("offsite_conversion.fb_pixel_lead", 0)]
     for cid, c in camps.items():
         if cid in nomes: nomes[cid] = c["name"]
     status = {cid: c.get("effective_status") for cid, c in camps.items()}
-    return {"v": 2, "dias": dias, "nomes": nomes, "status": status, "erro": None,
+    return {"v": 3, "dias": dias, "nomes": nomes, "status": status, "erro": None,
             "atualizado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")}
 
 
@@ -670,6 +671,158 @@ def midia_payload(m):
             camps.append({"id": cid, "nome": m["nomes"].get(cid, cid), "grupo": g, "status": (m.get("status") or {}).get(cid)})
         dias.append([day, idx[cid]] + v[:3])
     return {"camps": camps, "dias": dias, "atualizado_em": m.get("atualizado_em"), "erro": m.get("erro")}
+
+# ---------------------------------------------------------------- GA4 (propriedade "Meu Patrimônio - B2C", SOMENTE LEITURA)
+# Conta de serviço com papel Leitor. A chave vai CIFRADA (PAINEL_SENHA) em fontes/ga4_sa.enc.json:
+#   python painel.py ga4-import <chave.json>      (guarda só client_email, private_key e token_uri)
+# Localmente também lê GA4_SA_FILE (caminho do JSON) se existir. O token de acesso é um JWT assinado pelo node (sem libs).
+GA4_PROP = "510377730"
+GA4_DESDE = "2026-08-01"      # início das campanhas B2C atuais (mesmo corte do acumulado das Metas)
+GA4_ENC = ROOT / "fontes" / "ga4_sa.enc.json"
+GA4_EVENTOS = ["form_start", "generate_lead"]
+GA4_HOST_DEV = re.compile(r"^(localhost|127\.0\.0\.1)$|\.(lovable\.app|replit\.app|replit\.dev)$", re.I)
+_JWT_JS = ("const c=require('crypto');let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const {k,h,p}=JSON.parse(s);"
+           "const b=x=>Buffer.from(JSON.stringify(x)).toString('base64url');const u=b(h)+'.'+b(p);"
+           "process.stdout.write(u+'.'+c.sign('RSA-SHA256',Buffer.from(u),k).toString('base64url'))})")
+
+
+def ga4_sa():
+    f = env("GA4_SA_FILE")
+    if f and pathlib.Path(f).exists():
+        return json.loads(pathlib.Path(f).read_text(encoding="utf-8"))
+    if GA4_ENC.exists():
+        return json.loads(crypt("dec", GA4_ENC.read_bytes()))
+    return None
+
+
+def ga4_import(arq):
+    sa = json.loads(pathlib.Path(arq).read_text(encoding="utf-8"))
+    mini = {k: sa[k] for k in ("client_email", "private_key", "token_uri")}
+    GA4_ENC.parent.mkdir(exist_ok=True)
+    GA4_ENC.write_bytes(crypt("enc", json.dumps(mini).encode()))
+    print("ok: chave do GA4 cifrada em", GA4_ENC.relative_to(ROOT))
+
+
+def ga4_token(sa):
+    agora = int(time.time())
+    pl = {"iss": sa["client_email"], "scope": "https://www.googleapis.com/auth/analytics.readonly",
+          "aud": sa.get("token_uri") or "https://oauth2.googleapis.com/token", "iat": agora, "exp": agora + 3000}
+    r = subprocess.run([node_bin(), "-e", _JWT_JS], input=json.dumps({"k": sa["private_key"], "h": {"alg": "RS256", "typ": "JWT"}, "p": pl}).encode(),
+                       capture_output=True)
+    if r.returncode: raise RuntimeError("falha ao assinar o token do GA4")
+    body = urllib.parse.urlencode({"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": r.stdout.decode()}).encode()
+    d = json.loads(urllib.request.urlopen(urllib.request.Request(pl["aud"], data=body), timeout=60).read())
+    return d["access_token"]
+
+
+def ga4_report(tok, de, ate, dims, mets, eventos=None):
+    """runReport paginado. Devolve [[dims...] + [métricas...]] com a data em AAAA-MM-DD."""
+    url = f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROP}:runReport"
+    out, off = [], 0
+    while True:
+        body = {"dateRanges": [{"startDate": de, "endDate": ate}], "dimensions": [{"name": d} for d in dims],
+                "metrics": [{"name": m} for m in mets], "limit": 100000, "offset": off}
+        if eventos: body["dimensionFilter"] = {"filter": {"fieldName": "eventName", "inListFilter": {"values": eventos}}}
+        req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Authorization": "Bearer " + tok, "Content-Type": "application/json"})
+        for tent in range(3):
+            try:
+                d = json.loads(urllib.request.urlopen(req, timeout=120).read()); break
+            except urllib.error.HTTPError as e:
+                if e.code in (400, 401, 403) or tent == 2: raise
+                time.sleep(5 * (tent + 1))
+        for r in d.get("rows") or []:
+            dv = [x.get("value", "") for x in r["dimensionValues"]]
+            if dims[0] == "date": dv[0] = f"{dv[0][:4]}-{dv[0][4:6]}-{dv[0][6:]}"
+            out.append(dv + [float(x.get("value") or 0) for x in r["metricValues"]])
+        off += 100000
+        if off >= int(d.get("rowCount") or 0): return out
+
+
+def ga4_host(h):
+    h = (h or "").lower()
+    if h.startswith("www."): h = h[4:]
+    if h.endswith(".translate.goog"): h = h.split(".translate.goog")[0].replace("-", ".")
+    return h
+
+
+def sync_ga4(old):
+    """Sessões e eventos por dia × origem/UTM/página. Incremental: refaz os 4 últimos dias (o GA4 ainda consolida)."""
+    old = old or {}
+    sa = ga4_sa()
+    if not sa: return {**old, "erro": "sem a chave do GA4"}
+    hoje = datetime.now(BRT).date()
+    tem = old.get("v") == 1 and old.get("t")
+    since = GA4_DESDE if not tem else (hoje - timedelta(days=4)).isoformat()
+    D7 = ["date", "sessionSource", "sessionMedium", "sessionCampaignName", "sessionManualAdContent", "sessionManualTerm", "hostName", "deviceCategory"]
+    try:
+        tok = ga4_token(sa)
+        T = ga4_report(tok, since, hoje.isoformat(), D7, ["sessions", "engagedSessions", "newUsers", "userEngagementDuration"])
+        E = ga4_report(tok, since, hoje.isoformat(), D7 + ["eventName"], ["eventCount"], GA4_EVENTOS)
+        L = ga4_report(tok, since, hoje.isoformat(), ["date", "hostName", "landingPage"], ["sessions", "engagedSessions", "newUsers"])
+        LE = ga4_report(tok, since, hoje.isoformat(), ["date", "hostName", "landingPage", "eventName"], ["eventCount"], GA4_EVENTOS)
+        try:
+            req = urllib.request.Request(f"https://analyticsadmin.googleapis.com/v1beta/properties/{GA4_PROP}/keyEvents", headers={"Authorization": "Bearer " + tok})
+            chave = sorted(k["eventName"] for k in json.loads(urllib.request.urlopen(req, timeout=60).read()).get("keyEvents") or [])
+        except Exception:
+            chave = old.get("key_events") or []
+    except Exception as e:
+        return {**old, "erro": f"falha ao consultar o GA4 ({getattr(e, 'code', None) or type(e).__name__})"}
+    ev = {n: i for i, n in enumerate(GA4_EVENTOS)}
+    t = {}
+    for r in T:
+        k = "|".join(r[:8]); t[k] = [int(r[8]), int(r[9]), int(r[10]), int(round(r[11])), 0, 0]
+    for r in E:
+        k = "|".join(r[:8]); x = t.setdefault(k, [0, 0, 0, 0, 0, 0]); x[4 + ev[r[8]]] += int(r[9])
+    lp = {}
+    for r in L:
+        k = "|".join(r[:3]); lp[k] = [int(r[3]), int(r[4]), int(r[5]), 0, 0]
+    for r in LE:
+        k = "|".join(r[:3]); x = lp.setdefault(k, [0, 0, 0, 0, 0]); x[3 + ev[r[3]]] += int(r[4])
+    velho_t = {k: v for k, v in (old.get("t") or {}).items() if tem and k[:10] < since}
+    velho_lp = {k: v for k, v in (old.get("lp") or {}).items() if tem and k[:10] < since}
+    return {"v": 1, "t": {**velho_t, **t}, "lp": {**velho_lp, **lp}, "key_events": chave, "erro": None,
+            "atualizado_em": datetime.now(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00")}
+
+
+def ga4_payload(g, midia=None):
+    """Tabelas compactas (strings num dicionário `s`, linhas com índices). Hosts de teste (localhost, previews) saem.
+    t:  [dia, origem, mídia, campanha, conteúdo(criativo), termo(público), host, dispositivo, sessões, engajadas, novos, seg_engajado, inícios_form, leads]
+    lp: [dia, host, página, sessões, engajadas, novos, inícios_form, leads]  (páginas com < 15 sessões no total viram '(outras páginas)')
+    meta: investimento Meta B2C por dia e campanha + visitas à página e leads (para custo por lead do site)."""
+    if not g or not g.get("t"):
+        return {"t": [], "lp": [], "s": [], "erro": (g or {}).get("erro") or "sem dados", "atualizado_em": (g or {}).get("atualizado_em")}
+    S, ix = [], {}
+    def si(x):
+        if x not in ix: ix[x] = len(S); S.append(x)
+        return ix[x]
+    t = []
+    for k in sorted(g["t"]):
+        d = k.split("|"); h = ga4_host(d[6])
+        if GA4_HOST_DEV.search(h): continue
+        t.append([d[0]] + [si(x) for x in d[1:6]] + [si(h), si(d[7])] + g["t"][k])
+    tot = Counter()
+    for k, v in g["lp"].items():
+        d = k.split("|"); tot[(ga4_host(d[1]), d[2])] += v[0]
+    lp, agg = [], {}
+    for k in sorted(g["lp"]):
+        d = k.split("|"); h = ga4_host(d[1])
+        if GA4_HOST_DEV.search(h): continue
+        pg = d[2] if tot[(h, d[2])] >= 15 or g["lp"][k][4] else "(outras páginas)"
+        a = agg.setdefault((d[0], h, pg), [0, 0, 0, 0, 0])
+        for i, v in enumerate(g["lp"][k]): a[i] += v
+    for (dia, h, pg), v in sorted(agg.items()): lp.append([dia, si(h), si(pg)] + v)
+    meta = {"camps": [], "dias": []}
+    if midia and midia.get("dias"):
+        ci = {}
+        for key in sorted(midia["dias"]):
+            day, cid = key.split("|"); v = midia["dias"][key]
+            if day < GA4_DESDE: continue
+            gr = grupo_midia(midia["nomes"].get(cid, ""))
+            if gr is None or not v[0]: continue
+            if cid not in ci: ci[cid] = len(meta["camps"]); meta["camps"].append({"nome": midia["nomes"].get(cid, cid), "grupo": gr})
+            meta["dias"].append([day, ci[cid], v[0], v[2], v[3], v[6] if len(v) > 6 else 0, v[7] if len(v) > 7 else 0])
+    return {"s": S, "t": t, "lp": lp, "meta": meta, "desde": GA4_DESDE, "key_events": g.get("key_events") or [],
+            "eventos": GA4_EVENTOS, "atualizado_em": g.get("atualizado_em"), "erro": g.get("erro")}
 
 
 def sync_ig_ads(old):
@@ -1601,6 +1754,8 @@ def collect(full=False):
     cache["mppro"] = mppro_payload(cache["midia"], cache.get("mppro"))
     cache["ig"] = sync_instagram(cache.get("ig"))
     cache["ig_ads"] = sync_ig_ads(cache.get("ig_ads"))
+    cache["ga4"] = sync_ga4(cache.get("ga4"))
+    print("GA4:", cache["ga4"].get("erro") or f"{len(cache['ga4'].get('t') or {})} linhas de tráfego")
     if cache["ig_ads"].get("erro"): print("AVISO Instagram impulsionados:", cache["ig_ads"]["erro"])
     else:
         org = {m for c in (cache["ig"].get("contas") or {}).values() for m in (c.get("posts") or {})}
@@ -1608,7 +1763,7 @@ def collect(full=False):
     tmp = CACHE.with_suffix(".tmp"); tmp.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8"); tmp.replace(CACHE)
     snap = {"gerado_em": now.astimezone(BRT).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
             "stages": [{"id": s, "nome": n} for s, n in STAGES],
-            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"], cache.get("ig_ads")), "mphub": mphub_payload(), "mppro_alunos": alunos_payload(), "youtube": youtube_payload(), "aplicacao": aplicacao_payload(cache),
+            "tipos": TYPE_NAMES, "equipe": EQUIPE, "leads": leads, "midia": midia_payload(cache["midia"]), "mppro": cache["mppro"], "ig": ig_payload(cache["ig"], cache.get("ig_ads")), "ga4": ga4_payload(cache.get("ga4"), cache.get("midia")), "mphub": mphub_payload(), "mppro_alunos": alunos_payload(), "youtube": youtube_payload(), "aplicacao": aplicacao_payload(cache),
             "meta": {"pipeline": "B2C Funil Alpha (45)", "excluidos_teste": excl.get("teste", 0),
                      "coleta": "completa" if was_full else f"incremental ({n_changed} negócios atualizados)",
                      "erro_pipedrive": erro_pd, "pipedrive_em": cache.get("last_run"),
@@ -1807,6 +1962,7 @@ if __name__ == "__main__":
     elif cmd == "collect": print(stable_summary(collect(full="--full" in sys.argv)))
     elif cmd == "pages": build_pages(); print("ok", OUT)
     elif cmd == "mphub-import": print("ok", mphub_import(sys.argv[2]), "usuários")
+    elif cmd == "ga4-import": ga4_import(sys.argv[2])
     elif cmd == "rede-import": print("ok", rede_import(sys.argv[2]), "pessoas da rede")
     elif cmd == "alunos-import": print("ok", alunos_import(sys.argv[2]))
     elif cmd == "youtube-import": print("ok", youtube_import(sys.argv[2]))
