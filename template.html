@@ -6329,20 +6329,24 @@ function viewGA4() {
   const nd = diffDays(de, ate) + 1, dl = (a, b, good, fmt) => temAnt ? delta(a, b, good, fmt) : delta(a, null);
   const dlL = (a, b, good, fmt) => temAntL ? delta(a, b, good, fmt) : `<span class="dl na">sem comparação</span><span class="vs">${prim ? 'lead medido desde ' + fDM(prim) : ''}</span>`;
   const mt = gaMeta(de, ate), mtp = temAnt ? gaMeta(pd, pa) : null, pago = !o.canal || o.canal === 'Anúncios Meta', semHost = !o.host;
-  const glAds = gaTot(de, ate, {canal: 'Anúncios Meta'}).gl, glAdsP = temAnt ? gaTot(pd, pa, {canal: 'Anúncios Meta'}).gl : null;
-  const cpl = pago && semHost && glAds ? mt.invSite / glAds : null, cplP = temAnt && pago && semHost && glAdsP ? mtp.invSite / glAdsP : null;
-  const conv = pctOf(c.gl, c.ses), convP = p ? pctOf(p.gl, p.ses) : null;
+  // o GA4 só registra lead (generate_lead) desde `prim`: as métricas de lead usam só os dias medidos (27/11/2026)
+  const semLead = !prim || ate < prim, parcial = !semLead && de < prim, deL = parcial ? prim : de, cL = semLead ? null : parcial ? gaTot(deL, ate, o) : c;
+  const mtL = parcial ? gaMeta(deL, ate) : mt, notaL = semLead ? `o GA4 só mede lead desde ${prim ? fDM(prim) : '–'}` : parcial ? `só de ${fDM(prim)} em diante (antes o GA4 não media lead)` : '';
+  const glAds = semLead ? 0 : gaTot(deL, ate, {canal: 'Anúncios Meta'}).gl, glAdsP = temAnt ? gaTot(pd, pa, {canal: 'Anúncios Meta'}).gl : null;
+  const cpl = pago && semHost && glAds ? mtL.invSite / glAds : null, cplP = temAnt && pago && semHost && glAdsP ? mtp.invSite / glAdsP : null;
+  const conv = cL ? pctOf(cL.gl, cL.ses) : null, convP = p ? pctOf(p.gl, p.ses) : null;
+  if (semLead || parcial) h += `<div class="note">O GA4 só começou a registrar o envio do formulário (lead) em <b>${prim ? fDay(prim) : '–'}</b>. ${semLead ? 'Neste período' : 'Antes dessa data'} os leads existiram (aparecem no CRM e na Meta), mas o GA4 não os via: leads, conversão e custo por lead desta página contam só ${semLead ? 'a partir dessa data' : `de ${fDM(prim)} em diante`}.</div>`;
   h += '<div class="kpis k6 k10">' + [
     kpiCard({label: 'Sessões', cls: 'hero', v: fN(c.ses), sub: `${f1(c.ses / nd)} por dia`, d: dl(c.ses, p && p.ses), tip: 'Visitas ao site e às LPs no período (sessões do GA4)'}),
     kpiCard({label: 'Usuários novos', v: fN(c.nov), sub: `${fPc(pctOf(c.nov, c.ses))} das sessões`, d: dl(c.nov, p && p.nov), tip: 'Pessoas que entraram pela primeira vez no período'}),
     kpiCard({label: 'Taxa de engajamento', v: fPc(pctOf(c.eng, c.ses)), sub: `${fN(c.eng)} sessões engajadas`, d: dl(pctOf(c.eng, c.ses), p && pctOf(p.eng, p.ses), 1, fP), tip: 'Sessões engajadas ÷ sessões. Engajada = ficou 10 s ou mais, viu 2+ páginas ou converteu'}),
     kpiCard({label: 'Tempo engajado por sessão', v: fSeg(c.ses ? c.dur / c.ses : null), sub: 'tempo com a página em primeiro plano', d: dl(c.ses ? c.dur / c.ses : null, p && p.ses ? p.dur / p.ses : null, 1, fSeg), tip: 'Tempo de engajamento ÷ sessões'}),
     kpiCard({label: 'Inícios de formulário', v: fN(c.fs), sub: `${c.ses ? f1(c.fs / c.ses * 100) : '–'} a cada 100 sessões`, d: dl(c.fs, p && p.fs), tip: 'Evento form_start: a pessoa começou a preencher um formulário'}),
-    kpiCard({label: 'Leads no site', cls: 'hero gain', v: fN(c.gl), sub: `${f1(c.gl / nd)} por dia · generate_lead`, d: dlL(c.gl, p && p.gl), tip: 'Evento generate_lead: formulário enviado no site (conta reenvios e testes)'}),
-    kpiCard({label: 'Conversão do site', v: fPc(conv), sub: 'leads ÷ sessões', d: dlL(conv, convP, 1, fP), tip: 'De cada 100 sessões, quantas viraram lead'}),
-    kpiCard({label: 'Formulário → lead', v: fPc(pctOf(c.gl, c.fs)), sub: 'dos que começaram, quantos enviaram', d: dlL(pctOf(c.gl, c.fs), p && pctOf(p.gl, p.fs), 1, fP), tip: 'Leads ÷ inícios de formulário. Baixo = formulário longo, erro ou abandono'}),
+    kpiCard({label: 'Leads no site', cls: 'hero gain', v: semLead ? '–' : fN(c.gl), sub: notaL || `${f1(c.gl / nd)} por dia · generate_lead`, d: dlL(c.gl, p && p.gl), tip: 'Evento generate_lead: formulário enviado no site (conta reenvios e testes)'}),
+    kpiCard({label: 'Conversão do site', v: fPc(conv), sub: notaL ? 'leads ÷ sessões · ' + notaL : 'leads ÷ sessões', d: dlL(conv, convP, 1, fP), tip: 'De cada 100 sessões, quantas viraram lead'}),
+    kpiCard({label: 'Formulário → lead', v: fPc(cL ? pctOf(cL.gl, cL.fs) : null), sub: notaL ? 'enviaram ÷ começaram · ' + notaL : 'dos que começaram, quantos enviaram', d: dlL(cL ? pctOf(cL.gl, cL.fs) : null, p && pctOf(p.gl, p.fs), 1, fP), tip: 'Leads ÷ inícios de formulário. Baixo = formulário longo, erro ou abandono'}),
     kpiCard({label: 'Investimento Meta (site)', cls: pago && semHost ? '' : 'off', v: pago && semHost ? fRc(mt.invSite) : '–', sub: pago && semHost ? `campanhas B2C com visita ao site · total B2C ${fRc0(mt.inv)}` : 'só com Todos os canais e Todas as páginas', d: pago && semHost ? dl(mt.invSite, mtp && mtp.invSite, -1, fRc0) : '', tip: 'Gasto no Meta Ads das campanhas B2C que tiveram visita à página no período (as de formulário nativo ficam de fora)'}),
-    kpiCard({label: 'Custo por lead do site', cls: cpl == null ? 'off' : '', v: cpl == null ? '–' : fRc(cpl), sub: cpl == null ? (pago && semHost ? 'sem lead de anúncio no período' : 'só com Todos os canais e Todas as páginas') : `investimento ÷ ${fN(glAds)} ${glAds === 1 ? 'lead vindo' : 'leads vindos'} de anúncio Meta`, d: cpl == null ? '' : dlL(cpl, cplP, -1, fRc), tip: 'Investimento Meta (site) ÷ leads do site com origem em anúncio Meta (utm_medium=ads)'})
+    kpiCard({label: 'Custo por lead do site', cls: cpl == null ? 'off' : '', v: cpl == null ? '–' : fRc(cpl), sub: cpl == null ? (!(pago && semHost) ? 'só com Todos os canais e Todas as páginas' : semLead ? notaL : 'sem lead de anúncio no período') : `${parcial ? `investimento de ${fDM(prim)} em diante` : 'investimento'} ÷ ${fN(glAds)} ${glAds === 1 ? 'lead vindo' : 'leads vindos'} de anúncio Meta`, d: cpl == null ? '' : dlL(cpl, cplP, -1, fRc), tip: 'Investimento Meta (site) ÷ leads do site com origem em anúncio Meta (utm_medium=ads)'})
   ].join('') + '</div>';
   // funil do site + três números de lead saíram (27/11/2026, pedido do usuário)
   // evolução + destaques
