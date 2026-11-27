@@ -6309,6 +6309,75 @@ function gaDestaques(de, ate, o) {
   if (dv.length) linhas.push(`<li><b>Dispositivo</b><span>${dv.map(x => `${ESC(x.nome)} ${fP(pctOf(x.ses, dv.reduce((a, y) => a + y.ses, 0)))} das sessões · conv. ${fPc(pctOf(x.gl, x.ses))}`).join(' · ')}</span></li>`);
   return linhas.length ? `<ul class="gadq">${linhas.join('')}</ul><p class="fz-leg">Melhor conversão considera só itens com ${min}+ sessões.</p>` : emptyBox('Sem leads no período', 'Os destaques aparecem quando há leads no site.');
 }
+/* GA4 × CRM (27/11/2026, pedido do usuário): cruza, por campanha, o formulário do site (GA4) com os negócios e os MQL do
+   Pipedrive e com o investimento/leads da Meta. Não existe ligação lead a lead (o negócio não guarda UTM): o cruzamento é
+   por campanha e por dia. DIAG = LP MP360 (mp360.); RCON = análise de carteira (analisedecarteira. e /analise-de-carteira);
+   TRD = formulário nativo da Meta/WhatsApp (não passa pelo site). Leads e MQL do CRM: mesma regra do painel (data de entrada,
+   título TRD | / DIAG | / RCON; MQL = etiqueta Digital), sem os filtros laterais. */
+const GA_CRM_CAMP = [['diag', 'DIAG · LP MP360', 'diag'], ['trd', 'TRD · Tríade', 'trd'], ['rcon', 'RCON · Análise de carteira', null]];
+const gaSiteCamp = (h, pg) => h === 'mp360.meupatrimonio.com' ? 'diag'
+  : (h === 'analisedecarteira.meupatrimonio.com' || /^\/(analise-de-carteira|sessao-gratuita-analise)/.test(pg || '')) ? 'rcon' : null;
+function gaCrmCalc(de, ate) {
+  const G = D.ga4, s = G.s, k = `crm|${de}|${ate}`;
+  if (GA_MEMO.has(k)) return GA_MEMO.get(k);
+  const z = () => ({inv: 0, mLead: 0, mPx: 0, site: 0, fs: 0, crm: 0, mql: 0});
+  const o = {diag: z(), trd: z(), rcon: z(), tot: z()};
+  for (const r of G.lp) { if (r[0] < de || r[0] > ate) continue; const c = gaSiteCamp(s[r[1]], s[r[2]]);
+    o.tot.site += r[7]; o.tot.fs += r[6]; if (c) { o[c].site += r[7]; o[c].fs += r[6]; } }
+  const M = G.meta || {camps: [], dias: []};
+  for (const [d, ci, cent, , , lead, px] of M.dias) { if (d < de || d > ate) continue; const gr = (M.camps[ci] || {}).grupo;
+    o.tot.inv += cent; o.tot.mLead += lead; o.tot.mPx += px; if (o[gr]) { o[gr].inv += cent; o[gr].mLead += lead; o[gr].mPx += px; } }
+  const base = {de, ate, consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [], busca: ''};
+  for (const [id] of GA_CRM_CAMP) { const rows = run(filtros({...base, campanha: id})).rows;
+    o[id].crm = rows.length; o[id].mql = rows.filter(({l}) => ehMetaMql(l)).length; o.tot.crm += o[id].crm; o.tot.mql += o[id].mql; }
+  GA_MEMO.set(k, o); return o;
+}
+function gaCrmChart(de, ate, width) {
+  const n = diffDays(de, ate) + 1, mode = n <= 62 ? 'dia' : n <= 420 ? 'semana' : 'mes', monday = d => addDays(d, -((weekday(d) + 6) % 7));
+  const key = d => mode === 'dia' ? d : mode === 'semana' ? monday(d) : d.slice(0, 7), bins = new Map();
+  for (let d = de; d <= ate; d = addDays(d, 1)) { const k = key(d); if (!bins.has(k)) bins.set(k, {k, from: d, to: d}); bins.get(k).to = d; }
+  for (const b of bins.values()) Object.assign(b, {site: 0, crm: 0, mql: 0});
+  const G = D.ga4, s = G.s;
+  for (const r of G.lp) { if (r[0] < de || r[0] > ate || gaSiteCamp(s[r[1]], s[r[2]]) !== 'diag') continue; const b = bins.get(key(r[0])); if (b) b.site += r[7]; }
+  for (const {l} of run(filtros({de, ate, campanha: 'diag', consultores: [], origens: [], status: [], etapas: [], etiquetas: [], motivos: [], busca: ''})).rows) {
+    const b = bins.get(key(String(l.e || '').slice(0, 10))); if (b) { b.crm++; if (ehMetaMql(l)) b.mql++; } }
+  const bs = [...bins.values()];
+  const W = Math.max(300, width), H = 260, pl = 34, pr = 10, pt = 20, pb = 30, pw = W - pl - pr, ph = H - pt - pb;
+  const mx = niceMax(Math.max(1, ...bs.map(b => Math.max(b.site, b.mql)))), bw = pw / Math.max(1, bs.length), w = Math.max(1.5, Math.min(bw * .62, 40)), y = v => pt + ph - ph * v / mx;
+  const lbl = v => Number.isInteger(v) ? fN(v) : f1(v);
+  let g = '', pts = '';
+  for (let i = 0; i <= 4; i++) { const yy = y(mx * i / 4); g += `<line x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}" stroke="${i ? '#edf1ef' : '#cfd9d4'}"/><text class="ax" x="${pl - 6}" y="${yy + 3.5}" text-anchor="end">${lbl(mx * i / 4)}</text>`; }
+  const step = Math.max(1, Math.ceil(bs.length / Math.max(1, Math.floor(pw / 48))));
+  bs.forEach((b, i) => { const cx = pl + i * bw + bw / 2, r = Math.min(3, w / 4);
+    if (b.mql) g += `<rect class="bar" x="${cx - w / 2}" y="${y(b.mql)}" width="${w}" height="${y(0) - y(b.mql)}" fill="#00503c" rx="${r}"/>`;
+    pts += `${i ? 'L' : 'M'}${cx.toFixed(1)},${y(b.site).toFixed(1)}`;
+    if (i % step === 0) g += `<text class="ax" x="${cx}" y="${H - pb + 16}" text-anchor="middle">${mode === 'mes' ? MESN(b.k) : fDM(b.from)}</text>`; });
+  g += `<path d="${pts}" fill="none" stroke="#c98a1b" stroke-width="2.4" stroke-linejoin="round"/>`;
+  bs.forEach((b, i) => { const cx = pl + i * bw + bw / 2;
+    if (b.site) g += `<circle cx="${cx}" cy="${y(b.site)}" r="3.4" fill="#c98a1b" stroke="#fff" stroke-width="1.2"/>`;
+    g += `<rect class="hit" x="${pl + i * bw}" y="${pt}" width="${bw}" height="${ph}" data-tip="${ESC(`${b.from === b.to ? fDay(b.from) : fDay(b.from) + ' a ' + fDay(b.to)} · DIAG\nLeads no site (GA4): ${fN(b.site)}\nMQL no CRM: ${fN(b.mql)}${b.site ? `\nMQL ÷ leads do site: ${fPc(pctOf(b.mql, b.site))}` : ''}`)}"/>`; });
+  return `<div class="svgc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg></div>`;
+}
+function gaCrmHtml(de, ate, prim, W) {
+  const semLead = !prim || ate < prim, deL = !semLead && de < prim ? prim : de, c = gaCrmCalc(deL, ate), cTudo = deL === de ? c : gaCrmCalc(de, ate);
+  const linha = (nome, x, xT, ga4ok, tip) => `<tr><td class="wrap"><b>${nome}</b>${tip ? `<div class="muted" style="font-size:11px">${tip}</div>` : ''}</td>
+    <td class="num">${xT.inv ? fRc0(xT.inv) : '–'}</td><td class="num">${xT.inv || xT.mLead ? fN(xT.mLead) : '–'}</td>
+    <td class="num">${ga4ok && !semLead ? fN(x.site) : '–'}</td>
+    <td class="num"><b>${fN(xT.mql)}</b>${xT.crm > xT.mql ? `<div class="muted" style="font-size:11px">+${fN(xT.crm - xT.mql)} sem etiqueta Digital</div>` : ''}</td>
+    <td class="num">${ga4ok && !semLead && x.site ? fPc(pctOf(x.mql, x.site)) : '–'}</td><td class="num">${xT.mLead ? fPc(pctOf(xT.mql, xT.mLead)) : '–'}</td>
+    <td class="num">${xT.inv && xT.mLead ? fRc(xT.inv / xT.mLead) : '–'}</td><td class="num"><b>${xT.inv && xT.mql ? fRc(xT.inv / xT.mql) : '–'}</b></td></tr>`;
+  const tips = {diag: 'formulário da LP MP360 · utm b2c-diag', trd: 'formulário nativo da Meta e WhatsApp: não passa pelo site', rcon: 'pedido de análise de carteira no site'};
+  const t = GA_CRM_CAMP.map(([id, nome]) => linha(nome, c[id], cTudo[id], id !== 'trd', tips[id])).join('')
+    + linha('Total das 3 campanhas', {site: c.diag.site + c.rcon.site, mql: c.diag.mql + c.rcon.mql}, cTudo.tot, true, 'investimento e leads Meta = todo o B2C');
+  const d = c.diag, fora = d.site - d.mql;
+  const msg = semLead ? `O GA4 só mede o envio do formulário desde ${fDay(prim)}: neste período o cruzamento com o site não existe.`
+    : d.site ? `Na LP MP360, <b>${fN(d.site)}</b> leads enviaram o formulário no site e <b>${fN(d.mql)}</b> viraram MQL no CRM (${fPc(pctOf(d.mql, d.site))}).${fora > 0 ? ` Os outros <b>${fN(fora)}</b> não entraram no Pipedrive: não passaram na qualificação do formulário, reenviaram ou eram teste. O GA4 não sabe quem é a pessoa, então não dá para separar esses motivos aqui.` : ''}`
+    : 'Sem formulário enviado na LP MP360 no período.';
+  return `<div class="note" style="margin:0 0 12px">${msg}${deL !== de ? ` As colunas do site contam de ${fDM(prim)} em diante; o resto, o período todo.` : ''}</div>
+    <div class="tw"><table class="t gat"><thead><tr><th>Campanha</th><th class="num">Invest. Meta</th><th class="num">Leads Meta</th><th class="num">Leads no site (GA4)</th><th class="num">MQL no CRM</th><th class="num">MQL ÷ leads do site</th><th class="num">MQL ÷ leads Meta</th><th class="num">Custo por lead Meta</th><th class="num">Custo por MQL</th></tr></thead><tbody>${t}</tbody></table></div>
+    <h4 class="cadh" style="margin-top:16px">DIAG por ${(diffDays(de, ate) + 1) <= 62 ? 'dia' : (diffDays(de, ate) + 1) <= 420 ? 'semana' : 'mês'}: leads no site × MQL no CRM</h4>
+    <p class="fz-leg" style="margin:0 0 4px">barras = MQL DIAG que entraram no CRM · linha dourada = leads que enviaram o formulário na LP (GA4)</p>${gaCrmChart(de, ate, W)}`;
+}
 function viewGA4() {
   const G = D.ga4, cap = periodCaption().replace(/^Leads por data de entrada /, '');
   let h = viewHead('GA4 · Site e UTMs', `Propriedade Meu Patrimônio - B2C (Google Analytics 4) · ${cap}`);
@@ -6349,6 +6418,7 @@ function viewGA4() {
     kpiCard({label: 'Custo por lead do site', cls: cpl == null ? 'off' : '', v: cpl == null ? '–' : fRc(cpl), sub: cpl == null ? (!(pago && semHost) ? 'só com Todos os canais e Todas as páginas' : semLead ? notaL : 'sem lead de anúncio no período') : `${parcial ? `investimento de ${fDM(prim)} em diante` : 'investimento'} ÷ ${fN(glAds)} ${glAds === 1 ? 'lead vindo' : 'leads vindos'} de anúncio Meta`, d: cpl == null ? '' : dlL(cpl, cplP, -1, fRc), tip: 'Investimento Meta (site) ÷ leads do site com origem em anúncio Meta (utm_medium=ads)'})
   ].join('') + '</div>';
   // funil do site + três números de lead saíram (27/11/2026, pedido do usuário)
+  h += `<div class="card mt"><div class="ch"><div><h3>GA4 × CRM: dos leads aos MQL</h3><p>por campanha · só o período (não segue Canal e Site) · lead = enviou o formulário (site ou Meta) · MQL = entrou no Pipedrive (etiqueta Digital), pela data de entrada</p></div></div>${gaCrmHtml(de, ate, prim, (document.getElementById('view').clientWidth || 900) - 44)}</div>`;
   // evolução + destaques
   const vw = document.getElementById('view').clientWidth || 900, W = Math.max(320, window.innerWidth > 1100 ? (vw - 16) * 2 / 3 - 34 : vw - 44);
   h += `<div class="g g32 mt"><div class="card"><div class="ch"><div><h3>Sessões e leads</h3><p>barras = sessões (eixo da esquerda) · linha dourada = leads no site (eixo da direita)</p></div></div>${gaChart(de, ate, o, W)}</div>
